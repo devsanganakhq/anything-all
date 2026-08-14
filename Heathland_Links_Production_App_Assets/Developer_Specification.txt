@@ -1,0 +1,30 @@
+HEATHLAND LINKS — PRODUCTION APP ASSET SPECIFICATION
+
+Approved source reference:
+- Assets are derived from the supplied approved Heathland Links raster artwork.
+- The full approved lockup is preserved for the main logo, app icons, and splash logo.
+- The approved HL monogram is used for the notification icon and favicons.
+
+FILES
+1. Main_Logo_1024.png — 1024×1024, transparent
+2. Android_App_Icon_512.png — 512×512, opaque, square, no rounded-corner mask
+3. iOS_App_Icon_1024.png — 1024×1024, opaque, square, no rounded-corner mask
+4. Splash_Logo_512.png — 512×512, transparent
+5. Notification_Icon_96.png — 96×96, transparent, single solid-white approved HL monogram
+6. Favicon_32.png — 32×32
+7. Favicon_16.png — 16×16
+8. Favicon.ico — 16×16 and 32×32 embedded
+
+COLOURS
+Splash / primary background green: #091811
+Approximate cream highlight sampled from supplied raster artwork: #ECD294
+Approximate gold sampled from supplied raster artwork: #D1A962
+
+IMPLEMENTATION NOTES
+- Do not apply a rounded-square mask to the Android or iOS source icon files. OS/store tooling applies final icon treatment.
+- App-icon artwork has been scaled to remain within the requested central safe area.
+- Use splash background #091811 behind Splash_Logo_512.png.
+- Transparent PNGs contain genuine alpha transparency.
+- Notification_Icon_96.png is intentionally a one-colour white silhouette for Android status-bar use.
+- The supplied approved originals are JPEG/raster references, so the sampled HEX values are representative values from the approved artwork rather than authoritative vector swatches.
+- For future large-format print, embroidery, signage, or exact Pantone/CMYK production, retain/create a vector master from the approved artwork without redesigning it.

@@ -1,0 +1,9 @@
+-- Starter UK courses have been replaced by the Heathland Links master database.
+-- Seed / refresh courses + GB&I rankings from the XLSX masters:
+--
+--   cd web
+--   node scripts/migrate-master-courses.mjs --dry-run
+--   node scripts/migrate-master-courses.mjs --wipe-and-load
+--   node scripts/migrate-master-courses.mjs --resume
+--
+-- Source folder: Heathland_Links_Master_Course_Database_COMPLETE

@@ -1,0 +1,30 @@
+# Root ignores for anything-client
+.DS_Store
+.history/
+**/.history/
+*.zip
+
+# Env / secrets (never commit)
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+web/env
+*.keystore
+*.jks
+*.apk
+*.aab
+*.apks
+*.idsig
+
+# Dependencies & build
+node_modules/
+**/node_modules/
+.expo/
+dist/
+build/
+.react-router/
+.vercel/
+**/.vercel/

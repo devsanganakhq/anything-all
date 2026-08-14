@@ -1,0 +1,87 @@
+/**
+ * GET  /api/user/notifications   — fetch notifications for current user
+ * POST /api/user/notifications   — mark one or all as read
+ *                                   body: { notificationId? }  (null = mark all)
+ */
+import sql from "@/app/api/utils/sql";
+import { getSessionUserId } from "@/app/api/utils/getUserId";
+
+export async function GET(request) {
+  const userId = await getSessionUserId(request);
+
+  try {
+    const notifications = await sql(
+      `SELECT
+          n.id,
+          n.notification_type,
+          n.from_user_id,
+          n.activity_id,
+          n.community_id,
+          n.message,
+          n.read_at,
+          n.created_at,
+
+          -- From user (safe — no email)
+          u.first_name || ' ' || u.last_name  AS from_user_name,
+          u.profile_photo_url                  AS from_user_photo,
+
+          -- Community name (if any)
+          c.name AS community_name,
+
+          -- Related friendship id (for accept/decline from notification)
+          (SELECT f.id FROM friendships f
+            WHERE f.user_id = n.from_user_id AND f.friend_id = $1 AND f.status = 'pending'
+            LIMIT 1) AS friendship_id,
+
+          -- Relative time
+          CASE
+            WHEN n.created_at > NOW() - INTERVAL '1 hour'
+              THEN EXTRACT(EPOCH FROM (NOW()-n.created_at))::int/60 || 'm'
+            WHEN n.created_at > NOW() - INTERVAL '24 hours'
+              THEN EXTRACT(EPOCH FROM (NOW()-n.created_at))::int/3600 || 'h'
+            WHEN n.created_at > NOW() - INTERVAL '7 days'
+              THEN EXTRACT(EPOCH FROM (NOW()-n.created_at))::int/86400 || 'd'
+            ELSE TO_CHAR(n.created_at, 'DD Mon')
+          END AS time_ago
+
+        FROM notifications n
+        LEFT JOIN users u ON n.from_user_id = u.id
+        LEFT JOIN communities c ON n.community_id = c.id
+        WHERE n.user_id = $1
+        ORDER BY n.created_at DESC
+        LIMIT 100`,
+      [userId],
+    );
+
+    const unreadCount = notifications.filter((n) => !n.read_at).length;
+
+    return Response.json({ notifications, unread_count: unreadCount });
+  } catch (error) {
+    console.error("Notifications error:", error);
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+}
+
+export async function POST(request) {
+  const userId = await getSessionUserId(request);
+  const { notificationId } = await request.json();
+
+  try {
+    if (notificationId) {
+      await sql(
+        `UPDATE notifications SET read_at=NOW()
+          WHERE id=$1 AND user_id=$2 AND read_at IS NULL`,
+        [notificationId, userId],
+      );
+    } else {
+      await sql(
+        `UPDATE notifications SET read_at=NOW()
+          WHERE user_id=$1 AND read_at IS NULL`,
+        [userId],
+      );
+    }
+    return Response.json({ success: true });
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500 });
+  }
+}

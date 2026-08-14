@@ -1,0 +1,15 @@
+.DS_Store
+/node_modules/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# React Router
+/.react-router/
+/build/
+.vercel/
+
+# Master course migration reports
+/scripts/output/

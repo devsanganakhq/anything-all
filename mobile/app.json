@@ -1,0 +1,100 @@
+{
+  "expo": {
+    "name": "Anything mobile app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyASqVSa6Q98DvY5csNodKL0LCp6T6uFflM"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#091811"
+      },
+      "notification": {
+        "icon": "./assets/images/notification-icon.png",
+        "color": "#091811"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyASqVSa6Q98DvY5csNodKL0LCp6T6uFflM"
+        }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "xyz.create.CreateExpoEnvironment"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "sitemap": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#091811"
+        }
+      ],
+      "expo-audio",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsBackgroundPlayback": true,
+          "supportsPictureInPicture": true
+        }
+      ],
+      "expo-font",
+      "expo-secure-store",
+      "expo-web-browser",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
+          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+        }
+      ]
+    ],
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false,
+        "sitemap": false
+      },
+      "eas": {
+        "projectId": "0571c258-6004-4ae8-9604-7463c9403e91"
+      }
+    },
+    "owner": "syedaliwork789s-team",
+    "slug": "anything"
+  }
+}
