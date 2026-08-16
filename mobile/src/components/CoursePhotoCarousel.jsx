@@ -147,6 +147,22 @@ export function CoursePhotoCarousel({
     setReportModal(true);
   }, []);
 
+  // Must stay above the empty-state return — otherwise uploading the first
+  // photo changes hook order and crashes the screen.
+  const renderItem = useCallback(
+    ({ item, index }) => (
+      <CarouselSlide
+        photo={item}
+        height={height}
+        onTap={() => {
+          setGalleryIndex(index);
+          setGalleryOpen(true);
+        }}
+      />
+    ),
+    [height],
+  );
+
   // ── Empty → placeholder ───────────────────────────────────────────────────
   if (!photos.length) {
     return (
@@ -170,22 +186,7 @@ export function CoursePhotoCarousel({
     );
   }
 
-  const current = photos[activeIndex];
-
-  // ── Carousel item renderer ─────────────────────────────────────────────────
-  const renderItem = useCallback(
-    ({ item, index }) => (
-      <CarouselSlide
-        photo={item}
-        height={height}
-        onTap={() => {
-          setGalleryIndex(index);
-          setGalleryOpen(true);
-        }}
-      />
-    ),
-    [height],
-  );
+  const current = photos[activeIndex] ?? photos[0];
 
   return (
     <View style={{ height, position: "relative" }}>

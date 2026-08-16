@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Animated } from "react-native";
+import { View, Text, Animated, TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
 import { Award } from "lucide-react-native";
 import { HERO_HEIGHT } from "@/constants/courseConstants";
@@ -44,7 +44,8 @@ export function CourseHero({
           courseName={courseName}
           county={county}
           country={country}
-          height={HERO_HEIGHT + 80}
+          height={HERO_HEIGHT}
+          contentBottomInset={52}
         />
       )}
 
@@ -59,7 +60,7 @@ export function CourseHero({
         />
       )}
 
-      {/* Bottom pills */}
+      {/* Bottom pills + claim CTA */}
       <View
         style={{
           position: "absolute",
@@ -71,27 +72,53 @@ export function CourseHero({
           paddingTop: 60,
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <View style={styles.heroPill}>
-            <Text style={styles.heroPillText}>
-              {courseType?.toUpperCase() || "GOLF COURSE"}
-            </Text>
-          </View>
-          {hasRankings && (
-            <View
-              style={[
-                styles.heroPill,
-                { backgroundColor: "rgba(201,168,76,0.9)" },
-              ]}
-            >
-              <Award color="#FFF" size={9} />
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 8,
+              flexShrink: 1,
+            }}
+          >
+            <View style={styles.heroPill}>
               <Text style={styles.heroPillText}>
-                {rankings.length > 1
-                  ? `${rankings.length} RANKINGS`
-                  : `#${rankings[0].position} ${RANKING_ACCENTS[rankings[0].ranking_name]?.short || "RANKED"}`}
+                {courseType?.toUpperCase() || "GOLF COURSE"}
               </Text>
             </View>
-          )}
+            {hasRankings && (
+              <View
+                style={[
+                  styles.heroPill,
+                  { backgroundColor: "rgba(201,168,76,0.9)" },
+                ]}
+              >
+                <Award color="#FFF" size={9} />
+                <Text style={styles.heroPillText}>
+                  {rankings.length > 1
+                    ? `${rankings.length} RANKINGS`
+                    : `#${rankings[0].position} ${RANKING_ACCENTS[rankings[0].ranking_name]?.short || "RANKED"}`}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity
+            disabled
+            activeOpacity={1}
+            accessibilityState={{ disabled: true }}
+            accessibilityLabel="Claim this club"
+            style={styles.claimClubBtn}
+          >
+            <Text style={styles.claimClubBtnText}>CLAIM THIS CLUB</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>

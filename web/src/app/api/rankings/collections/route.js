@@ -138,6 +138,7 @@ export async function GET(request) {
               'course_type',       c.course_type,
               'holes',             c.holes,
               'par',               c.par,
+              'official_logo_url', c.official_logo_url,
               'verification_status', r.verification_status,
               'research_batch',    r.research_batch
             )
@@ -209,7 +210,7 @@ export async function GET(request) {
     const topRated = await sql(
       `SELECT
           c.id, c.name, c.club_name, c.display_name, c.is_claimed, c.city, c.county, c.country,
-          c.latitude, c.longitude,
+          c.latitude, c.longitude, c.official_logo_url,
           c.community_rating, c.played_count, c.course_type, c.holes, c.par,
           ROW_NUMBER() OVER (ORDER BY c.community_rating DESC NULLS LAST, c.played_count DESC NULLS LAST) AS position
         FROM public.courses c
@@ -221,7 +222,7 @@ export async function GET(request) {
     const mostPlayed = await sql(
       `SELECT
           c.id, c.name, c.club_name, c.display_name, c.is_claimed, c.city, c.county, c.country,
-          c.latitude, c.longitude,
+          c.latitude, c.longitude, c.official_logo_url,
           c.community_rating, c.played_count, c.course_type, c.holes, c.par,
           ROW_NUMBER() OVER (ORDER BY c.played_count DESC NULLS LAST) AS position
         FROM public.courses c
@@ -233,7 +234,7 @@ export async function GET(request) {
     const trending = await sql(
       `SELECT
           c.id, c.name, c.club_name, c.display_name, c.is_claimed, c.city, c.county, c.country,
-          c.latitude, c.longitude,
+          c.latitude, c.longitude, c.official_logo_url,
           c.community_rating, c.played_count, c.course_type, c.holes, c.par,
           COUNT(pc.id)::int AS recent_plays,
           ROW_NUMBER() OVER (ORDER BY COUNT(pc.id) DESC) AS position
@@ -251,7 +252,7 @@ export async function GET(request) {
     const hiddenGems = await sql(
       `SELECT
           c.id, c.name, c.club_name, c.display_name, c.is_claimed, c.city, c.county, c.country,
-          c.latitude, c.longitude,
+          c.latitude, c.longitude, c.official_logo_url,
           c.community_rating, c.played_count, c.course_type, c.holes, c.par,
           ROW_NUMBER() OVER (ORDER BY c.community_rating DESC NULLS LAST) AS position
         FROM public.courses c

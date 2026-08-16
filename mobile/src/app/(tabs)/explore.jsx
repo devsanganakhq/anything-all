@@ -21,16 +21,15 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
-  Platform,
 } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-// Google Maps when a key is set (or on Android); otherwise iOS uses Apple Maps.
-const MAP_PROVIDER =
-  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || Platform.OS === "android"
-    ? PROVIDER_GOOGLE
-    : undefined;
+import {
+  CourseMarker,
+  MAP_PROVIDER,
+  MAP_STYLE,
+  MARKER,
+} from "@/components/ExploreMapShared";
 import {
   Search,
   MapPin,
@@ -57,6 +56,8 @@ import {
 } from "@/constants/theme";
 import { RANKING_COLLECTIONS, ACCENT_HEX } from "@/data/rankingCollections";
 import { CourseImagePlaceholder } from "@/components/CourseImagePlaceholder";
+import { CourseListRow } from "@/components/CourseListRow";
+import { MapCoursePreviewCard, markPlayedHref } from "@/components/MapCoursePreviewCard";
 import {
   courseDisplayName,
   formatCourseLocation,
@@ -105,19 +106,6 @@ const COUNTRY_FLAGS = {
 
 function countryFlagEmoji(country) {
   return COUNTRY_FLAGS[country] || null;
-}
-
-// ─── Marker colours by status ────────────────────────────────────────────────
-const MARKER = {
-  played: { bg: "#2C6E49", border: "#1B4D35" },
-  wishlisted: { bg: "#C9A84C", border: "#A8843A" },
-  unplayed: { bg: "#1B3828", border: "#0E1E15" },
-};
-
-function getMarkerStyle(course) {
-  if (course.user_played) return MARKER.played;
-  if (course.user_wishlisted) return MARKER.wishlisted;
-  return MARKER.unplayed;
 }
 
 // ─── Status badge used on course cards ───────────────────────────────────────
@@ -181,58 +169,6 @@ function StatusBadge({ played, wishlisted }) {
       </View>
     );
   return null;
-}
-
-// ─── Marker dot ──────────────────────────────────────────────────────────────
-// Android only snapshots custom marker views while tracksViewChanges is true.
-// Start tracking, then stop after paint so markers appear without burning CPU.
-function CourseMarker({ course, onPress }) {
-  const style = getMarkerStyle(course);
-  const [tracksViewChanges, setTracksViewChanges] = useState(true);
-  const size = course.user_played ? 14 : course.user_wishlisted ? 13 : 10;
-  const lat = Number(course.latitude);
-  const lng = Number(course.longitude);
-
-  useEffect(() => {
-    setTracksViewChanges(true);
-    const t = setTimeout(() => setTracksViewChanges(false), 400);
-    return () => clearTimeout(t);
-  }, [course.user_played, course.user_wishlisted, course.id]);
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-
-  return (
-    <Marker
-      coordinate={{ latitude: lat, longitude: lng }}
-      onPress={() => onPress(course)}
-      tracksViewChanges={tracksViewChanges}
-      anchor={{ x: 0.5, y: 0.5 }}
-    >
-      <View
-        style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: style.bg,
-          borderWidth: 2,
-          borderColor: style.border,
-          justifyContent: "center",
-          alignItems: "center",
-          overflow: "hidden",
-        }}
-      >
-        {/* Non-empty child — empty Views often fail to snapshot on Android */}
-        <View
-          style={{
-            width: Math.max(4, size - 6),
-            height: Math.max(4, size - 6),
-            borderRadius: Math.max(2, (size - 6) / 2),
-            backgroundColor: style.bg,
-          }}
-        />
-      </View>
-    </Marker>
-  );
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -731,98 +667,14 @@ export default function ExploreScreen() {
             )
           }
           renderItem={({ item }) => (
-            <TouchableOpacity
+            <CourseListRow
+              item={item}
+              showRating
               onPress={() => {
                 closeSearch();
                 router.push(`/course/${item.id}`);
               }}
-              style={{
-                backgroundColor: Colors.white,
-                borderRadius: Radius.md,
-                padding: 14,
-                marginBottom: 8,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                ...Shadow.card,
-              }}
-            >
-              <View
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: Colors.greenLight,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <MapPin color={Colors.green} size={16} strokeWidth={1.8} />
-              </View>
-              <View style={{ flex: 1 }}>
-                {(() => {
-                  const { title, subtitle } = courseDisplayName(item);
-                  const location = formatCourseLocation(item, {
-                    includeCounty: true,
-                  });
-                  return (
-                    <>
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          fontWeight: "700",
-                          color: Colors.textPrimary,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {title}
-                      </Text>
-                      {subtitle ? (
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            color: Colors.textSecondary,
-                            marginTop: 2,
-                          }}
-                          numberOfLines={1}
-                        >
-                          {subtitle}
-                        </Text>
-                      ) : null}
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: Colors.textSecondary,
-                          marginTop: 2,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {location}
-                        {item.course_type ? ` · ${item.course_type}` : ""}
-                      </Text>
-                    </>
-                  );
-                })()}
-              </View>
-              {item.community_rating > 0 && (
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
-                >
-                  <Star color={Colors.gold} size={11} fill={Colors.gold} />
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: "700",
-                      color: Colors.textPrimary,
-                    }}
-                  >
-                    {Number(item.community_rating).toFixed(1)}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+            />
           )}
         />
       </View>
@@ -836,13 +688,6 @@ export default function ExploreScreen() {
       { key: "PLAYED", label: "✓ PLAYED" },
       { key: "WISHLIST", label: "♥ SAVED" },
     ];
-    const selectedIdentity = selectedCourse
-      ? courseDisplayName(selectedCourse)
-      : null;
-    const selectedLocation = selectedCourse
-      ? formatCourseLocation(selectedCourse)
-      : "";
-
     return (
       <View style={{ flex: 1 }}>
         {/* Header overlay */}
@@ -961,366 +806,21 @@ export default function ExploreScreen() {
               bottom: insets.bottom + TAB_BAR_CLEARANCE,
               left: Spacing.screenH,
               right: Spacing.screenH,
-              backgroundColor: Colors.white,
-              borderRadius: Radius.lg,
-              overflow: "hidden",
-              ...Shadow.float,
               transform: [{ translateY: slideAnim }],
             }}
           >
-            {/* Course image — priority-aware thumbnail */}
-            <View style={{ height: 110, backgroundColor: Colors.ivoryDeep }}>
-              {selectedCourse.resolved_thumbnail_url ? (
-                <Image
-                  source={{ uri: selectedCourse.resolved_thumbnail_url }}
-                  style={{ width: "100%", height: "100%" }}
-                  contentFit={
-                    selectedCourse.media_display_type === "club_logo"
-                      ? "contain"
-                      : "cover"
-                  }
-                />
-              ) : (
-                <CourseImagePlaceholder
-                  courseName={selectedIdentity.title}
-                  county={selectedCourse.county}
-                  country={selectedCourse.country}
-                  height={110}
-                  compact
-                />
-              )}
-              {/* Status badge on image */}
-              {selectedCourse.user_played && (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: 10,
-                    left: 10,
-                    backgroundColor: MARKER.played.bg,
-                    borderRadius: Radius.pill,
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <CheckCircle size={11} color="#fff" strokeWidth={2.5} />
-                  <Text
-                    style={{
-                      fontSize: 9,
-                      fontWeight: "800",
-                      color: "#fff",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    PLAYED
-                  </Text>
-                </View>
-              )}
-              {!selectedCourse.user_played &&
-                selectedCourse.user_wishlisted && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: 10,
-                      left: 10,
-                      backgroundColor: MARKER.wishlisted.bg,
-                      borderRadius: Radius.pill,
-                      paddingHorizontal: 10,
-                      paddingVertical: 4,
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    <Heart size={11} color="#fff" fill="#fff" strokeWidth={2} />
-                    <Text
-                      style={{
-                        fontSize: 9,
-                        fontWeight: "800",
-                        color: "#fff",
-                        letterSpacing: 0.5,
-                      }}
-                    >
-                      SAVED
-                    </Text>
-                  </View>
-                )}
-              {/* Close button */}
-              <TouchableOpacity
-                onPress={closePreview}
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  right: 10,
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: "rgba(0,0,0,0.4)",
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <X size={14} color="#fff" strokeWidth={2.5} />
-              </TouchableOpacity>
-
-              {/* Ranking badge on image */}
-              {selectedCourse.rankings?.[0] && (
-                <View
-                  style={{
-                    position: "absolute",
-                    bottom: 10,
-                    right: 10,
-                    backgroundColor: "rgba(0,0,0,0.56)",
-                    borderRadius: Radius.sm,
-                    paddingHorizontal: 8,
-                    paddingVertical: 3,
-                  }}
-                >
-                  <Text
-                    style={{ fontSize: 9, fontWeight: "700", color: "#fff" }}
-                  >
-                    #{selectedCourse.rankings[0].position}{" "}
-                    {selectedCourse.rankings[0].ranking_name}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {/* Course info */}
-            <View style={{ padding: 14 }}>
-              <Text
-                style={{
-                  fontSize: 17,
-                  fontWeight: "700",
-                  color: Colors.textPrimary,
-                  marginBottom: 2,
-                }}
-                numberOfLines={1}
-              >
-                {selectedIdentity.title}
-              </Text>
-              {selectedIdentity.subtitle ? (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: Colors.textSecondary,
-                    marginBottom: 4,
-                  }}
-                  numberOfLines={1}
-                >
-                  {selectedIdentity.subtitle}
-                </Text>
-              ) : null}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 12,
-                }}
-              >
-                <View
-                  style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
-                >
-                  <MapPin
-                    color={Colors.textSecondary}
-                    size={11}
-                    strokeWidth={1.8}
-                  />
-                  <Text style={{ fontSize: 11, color: Colors.textSecondary }}>
-                    {selectedLocation}
-                  </Text>
-                </View>
-                {selectedCourse.community_rating > 0 && (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 3,
-                    }}
-                  >
-                    <Star size={10} color={Colors.gold} fill={Colors.gold} />
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: "700",
-                        color: Colors.textPrimary,
-                      }}
-                    >
-                      {Number(selectedCourse.community_rating).toFixed(1)}
-                    </Text>
-                  </View>
-                )}
-                {selectedCourse.course_type && (
-                  <View
-                    style={{
-                      backgroundColor: Colors.ivoryDeep,
-                      borderRadius: Radius.sm,
-                      paddingHorizontal: 6,
-                      paddingVertical: 2,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 8,
-                        fontWeight: "700",
-                        letterSpacing: 0.5,
-                        color: Colors.textMuted,
-                      }}
-                    >
-                      {selectedCourse.course_type.toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Action buttons */}
-              <View style={{ flexDirection: "row", gap: 8 }}>
-                {/* Add to Wishlist */}
-                <TouchableOpacity
-                  onPress={() => {
-                    if (selectedCourse.user_played) return;
-                    wishlistMutation.mutate(selectedCourse.id);
-                  }}
-                  disabled={
-                    selectedCourse.user_played || wishlistMutation.isPending
-                  }
-                  style={{
-                    flex: 1,
-                    paddingVertical: 11,
-                    borderRadius: 6,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexDirection: "row",
-                    gap: 6,
-                    backgroundColor: selectedCourse.user_played
-                      ? Colors.ivoryDeep
-                      : selectedCourse.user_wishlisted
-                        ? MARKER.wishlisted.bg
-                        : Colors.purpleLight,
-                    borderWidth: 1,
-                    borderColor: selectedCourse.user_played
-                      ? Colors.border
-                      : selectedCourse.user_wishlisted
-                        ? MARKER.wishlisted.border
-                        : Colors.purpleBorder,
-                    opacity: selectedCourse.user_played
-                      ? 0.4
-                      : wishlistMutation.isPending
-                        ? 0.6
-                        : 1,
-                  }}
-                >
-                  {wishlistMutation.isPending ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={
-                        selectedCourse.user_wishlisted ? "#fff" : Colors.purple
-                      }
-                    />
-                  ) : (
-                    <>
-                      <Heart
-                        size={13}
-                        color={
-                          selectedCourse.user_wishlisted
-                            ? "#fff"
-                            : Colors.purple
-                        }
-                        fill={
-                          selectedCourse.user_wishlisted
-                            ? "#fff"
-                            : "transparent"
-                        }
-                        strokeWidth={2}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 9,
-                          fontWeight: "800",
-                          letterSpacing: 1,
-                          color: selectedCourse.user_wishlisted
-                            ? "#fff"
-                            : Colors.purple,
-                        }}
-                      >
-                        {selectedCourse.user_wishlisted ? "SAVED" : "SAVE"}
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-
-                {/* Mark as Played */}
-                <TouchableOpacity
-                  onPress={() => {
-                    if (selectedCourse.user_played) {
-                      Alert.alert(
-                        "Already Played",
-                        "You've already recorded a round at this course. You can update your review from the course page.",
-                      );
-                      return;
-                    }
-                    router.push(
-                      `/activity/mark-played?courseId=${selectedCourse.id}&courseName=${encodeURIComponent(formatCourseShareLabel(selectedCourse))}`,
-                    );
-                  }}
-                  disabled={playedMutation.isPending}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 11,
-                    borderRadius: 6,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexDirection: "row",
-                    gap: 6,
-                    backgroundColor: selectedCourse.user_played
-                      ? MARKER.played.bg
-                      : Colors.green,
-                    opacity: playedMutation.isPending ? 0.6 : 1,
-                  }}
-                >
-                  {selectedCourse.user_played ? (
-                    <CheckCircle size={13} color="#fff" strokeWidth={2.5} />
-                  ) : null}
-                  <Text
-                    style={{
-                      fontSize: 9,
-                      fontWeight: "800",
-                      letterSpacing: 1,
-                      color: Colors.ivory,
-                    }}
-                  >
-                    {selectedCourse.user_played ? "PLAYED" : "MARK PLAYED"}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* View full course page */}
-                <TouchableOpacity
-                  onPress={() => {
-                    closePreview();
-                    router.push(`/course/${selectedCourse.id}`);
-                  }}
-                  style={{
-                    paddingHorizontal: 14,
-                    paddingVertical: 11,
-                    borderRadius: 6,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: Colors.ivoryDeep,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                  }}
-                >
-                  <ChevronRight
-                    color={Colors.textSecondary}
-                    size={16}
-                    strokeWidth={2}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
+            <MapCoursePreviewCard
+              course={selectedCourse}
+              onClose={closePreview}
+              onWishlist={(courseId) => wishlistMutation.mutate(courseId)}
+              wishlistPending={wishlistMutation.isPending}
+              onMarkPlayed={(course) => router.push(markPlayedHref(course))}
+              playedPending={playedMutation.isPending}
+              onViewCourse={(course) => {
+                closePreview();
+                router.push(`/course/${course.id}`);
+              }}
+            />
           </Animated.View>
         )}
       </View>
@@ -2188,31 +1688,3 @@ function DestinationCardSkeleton() {
     />
   );
 }
-
-// ─── Google Maps style ─────────────────────────────────────────────────────────
-const MAP_STYLE = [
-  { featureType: "poi", stylers: [{ visibility: "off" }] },
-  { featureType: "transit", stylers: [{ visibility: "off" }] },
-  {
-    featureType: "landscape",
-    elementType: "geometry",
-    stylers: [{ color: "#F0EBE0" }],
-  },
-  { featureType: "landscape.natural", stylers: [{ color: "#E8F0E4" }] },
-  { featureType: "water", stylers: [{ color: "#C9D8E8" }] },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#FFFFFF" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#7A8570" }],
-  },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#1B3828" }],
-  },
-];

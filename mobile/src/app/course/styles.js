@@ -23,6 +23,21 @@ export const styles = {
     letterSpacing: 1,
     color: "#FFFFFF",
   },
+  claimClubBtn: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    borderRadius: 50,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+    opacity: 0.55,
+  },
+  claimClubBtnText: {
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    color: "#FFFFFF",
+  },
 };
 
 // Fake absolute-fill style object (matches StyleSheet.absoluteFill behaviour)

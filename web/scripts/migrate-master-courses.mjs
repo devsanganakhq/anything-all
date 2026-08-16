@@ -21,6 +21,8 @@ import {
   pickSourceSheet,
   rankingMatchKeys,
   countriesForRankingName,
+  sheetToObjectsFixed,
+  rankingsFromCourseRow,
 } from "./lib/masterCourseNormalize.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -67,17 +69,12 @@ function resolveMastersDir() {
   return found;
 }
 
-function sheetToObjects(workbook, sheetName) {
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) return [];
-  return XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
-}
-
 function loadWorkbookSheets(filePath) {
   const workbook = XLSX.readFile(filePath, { cellDates: false });
   const sheets = {};
   for (const name of workbook.SheetNames) {
-    sheets[name] = sheetToObjects(workbook, name);
+    // Header-offset sheets (Canada) are repaired via sheetToObjectsFixed.
+    sheets[name] = sheetToObjectsFixed(workbook.Sheets[name]);
   }
   return sheets;
 }
@@ -120,29 +117,68 @@ function collectCourses(mastersDir) {
   return { courses: rows, perCountry, skipped, duplicates };
 }
 
-function collectRankings(mastersDir) {
-  const filePath = resolve(mastersDir, RANKINGS_WORKBOOK);
-  if (!existsSync(filePath)) {
-    throw new Error(`Missing rankings workbook: ${filePath}`);
+function collectRankings(mastersDir, courses) {
+  const fromCourses = [];
+  for (const course of courses) {
+    fromCourses.push(...rankingsFromCourseRow(course));
   }
-  const sheets = loadWorkbookSheets(filePath);
-  const rows = sheets.Ranking_Memberships || [];
-  return rows
-    .map((raw) => ({
-      ranking_source: String(raw.ranking_provider || "").trim() || null,
-      ranking_year: raw.ranking_year ? Number.parseInt(raw.ranking_year, 10) : null,
-      ranking_name: String(raw.ranking_list || "").trim(),
-      position: raw.ranking_position
-        ? Number.parseInt(raw.ranking_position, 10)
-        : null,
-      hl_course_id: String(raw.hl_course_id || "").trim() || null,
-      course_display_name: String(raw.course_display_name || "").trim(),
-      verification_status: String(raw.verification_status || "").trim() || null,
-      is_active: ["1", "true", "yes"].includes(
-        String(raw.is_active ?? "1").trim().toLowerCase(),
-      ),
-    }))
-    .filter((row) => row.ranking_name && row.course_display_name);
+
+  // Optional dedicated Ranking_Memberships workbook (older GBI rebuild).
+  const candidates = [
+    resolve(mastersDir, RANKINGS_WORKBOOK),
+    resolve(mastersDir, "..", "Heathland_Links_Master_Course_Database_COMPLETE", RANKINGS_WORKBOOK),
+    resolve(appsRoot, "..", "Heathland_Links_Master_Course_Database_COMPLETE", RANKINGS_WORKBOOK),
+  ];
+  const rankingsPath = candidates.find((p) => existsSync(p));
+  const fromWorkbook = [];
+  if (rankingsPath) {
+    console.log(`Also reading rankings workbook: ${rankingsPath}`);
+    const sheets = loadWorkbookSheets(rankingsPath);
+    const rows = sheets.Ranking_Memberships || [];
+    for (const raw of rows) {
+      fromWorkbook.push({
+        ranking_source: String(raw.ranking_provider || "").trim() || null,
+        ranking_year: raw.ranking_year
+          ? Number.parseInt(raw.ranking_year, 10)
+          : null,
+        ranking_name: String(raw.ranking_list || "").trim(),
+        position: raw.ranking_position
+          ? Number.parseInt(String(raw.ranking_position).replace(/[^\d]/g, ""), 10)
+          : null,
+        hl_course_id: String(raw.hl_course_id || "").trim() || null,
+        course_display_name: String(raw.course_display_name || "").trim(),
+        verification_status:
+          String(raw.verification_status || "").trim() || null,
+        is_active: ["1", "true", "yes"].includes(
+          String(raw.is_active ?? "1").trim().toLowerCase(),
+        ),
+      });
+    }
+  } else {
+    console.warn(
+      "No dedicated Ranking_Memberships workbook found; using ranking columns from country sheets only.",
+    );
+  }
+
+  // Prefer workbook rows when present; always keep course-sheet rankings too,
+  // then dedupe by ranking_name + position + display/hl id.
+  const merged = [...fromWorkbook, ...fromCourses].filter(
+    (row) => row.ranking_name && (row.course_display_name || row.hl_course_id),
+  );
+  const seen = new Set();
+  const out = [];
+  for (const row of merged) {
+    const key = [
+      row.ranking_name,
+      row.position ?? "",
+      row.hl_course_id || "",
+      row.course_display_name || "",
+    ].join("|");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return out;
 }
 
 function buildCourseIndex(courses) {
@@ -163,12 +199,27 @@ function uniqueCourses(hits) {
 
 function matchRankings(rankingRows, courses) {
   const index = buildCourseIndex(courses);
+  const byHlId = new Map(
+    courses
+      .filter((c) => c.hl_course_id)
+      .map((c) => [String(c.hl_course_id).toUpperCase(), c]),
+  );
   const matched = [];
   const unmatched = [];
   const ambiguous = [];
 
   for (const ranking of rankingRows) {
     const allowed = countriesForRankingName(ranking.ranking_name);
+
+    // Fast path: direct hl_course_id (works for enriched sheet rankings).
+    if (ranking.hl_course_id) {
+      const hit = byHlId.get(String(ranking.hl_course_id).toUpperCase());
+      if (hit && (!allowed || allowed.includes(hit.country))) {
+        matched.push({ ranking, course: hit });
+        continue;
+      }
+    }
+
     let unique = [];
 
     for (const key of rankingMatchKeys(ranking.course_display_name)) {
@@ -489,7 +540,7 @@ async function main() {
   console.log(`Reading masters from ${mastersDir}`);
 
   const collected = collectCourses(mastersDir);
-  const rankingRows = collectRankings(mastersDir);
+  const rankingRows = collectRankings(mastersDir, collected.courses);
   const rankingPreview = matchRankings(rankingRows, collected.courses);
 
   const byCountry = {};

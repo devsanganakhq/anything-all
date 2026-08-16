@@ -1,31 +1,24 @@
 /**
  * CourseImagePlaceholder — Heathland Links
  *
- * Premium branded placeholder shown whenever a course has no approved image.
- * Used consistently across: course detail, search, rankings, map cards,
- * passport, wishlist, social feed, club discovery screens.
+ * Default club/course banner when no approved photo is available.
+ * Real club banners always win; this only renders when those are missing.
+ * The default photo sits behind the same name / location text as before.
  *
  * Props:
- *   courseName    string   — displayed course name
- *   county        string?  — county / region
- *   country       string?  — country
- *   width         number   — container width  (default fills parent)
- *   height        number   — container height (default 220)
- *   style         object?  — additional View style overrides
- *   compact       boolean  — minimal layout for small cards / thumbnails
+ *   courseName         string   — displayed course name
+ *   county             string?  — county / region
+ *   country            string?  — country
+ *   height             number   — container height (default 220)
+ *   style              object?  — additional View style overrides
+ *   compact            boolean  — minimal layout for small cards / thumbnails
+ *   contentBottomInset number   — lifts text above overlapping hero chrome
  */
-import React, { useMemo } from "react";
-import { View, Text } from "react-native";
-import { Colors } from "@/constants/theme";
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 
-// ── Subtle dot-pattern SVG rendered as a background tint ─────────────────────
-// We replicate it with a pure-RN layered approach for zero external deps
-
-const BRAND_GREENS = [
-  "#1B3828", // primary brand green
-  "#162D20",
-  "#1E4030",
-];
+export const DEFAULT_COURSE_BANNER = require("../../assets/images/default-course-banner.jpg");
 
 export function CourseImagePlaceholder({
   courseName = "Golf Course",
@@ -34,37 +27,41 @@ export function CourseImagePlaceholder({
   height = 220,
   style,
   compact = false,
+  contentBottomInset = 0,
 }) {
-  // Pick a deterministic tint shade based on course name length so siblings
-  // look gently varied without being random on re-render
-  const bgIndex = useMemo(
-    () => (courseName?.length ?? 0) % BRAND_GREENS.length,
-    [courseName],
-  );
-  const bg = BRAND_GREENS[bgIndex];
-
   const locationStr = [county, country].filter(Boolean).join(", ");
+  const basePad = compact ? 10 : 16;
 
   return (
     <View
       style={[
         {
           height,
-          backgroundColor: bg,
           overflow: "hidden",
           justifyContent: "flex-end",
           alignItems: "flex-start",
+          backgroundColor: "#0e1e15",
         },
         style,
       ]}
     >
-      {/* ── Decorative concentric arc lines (top-right) ─────────────────── */}
-      <ArcDecoration />
+      <Image
+        source={DEFAULT_COURSE_BANNER}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+        transition={200}
+      />
 
-      {/* ── Subtle dot grid overlay ──────────────────────────────────────── */}
-      <DotGrid />
+      {/* Readability scrim over the photo */}
+      <View
+        style={{
+          ...StyleSheet.absoluteFillObject,
+          backgroundColor: "rgba(14,30,21,0.45)",
+        }}
+        pointerEvents="none"
+      />
 
-      {/* ── Bottom gradient block ────────────────────────────────────────── */}
+      {/* Bottom text block — same content as before */}
       <View
         style={{
           position: "absolute",
@@ -73,10 +70,9 @@ export function CourseImagePlaceholder({
           right: 0,
           paddingHorizontal: compact ? 12 : 18,
           paddingTop: compact ? 20 : 36,
-          paddingBottom: compact ? 10 : 16,
+          paddingBottom: basePad + contentBottomInset,
         }}
       >
-        {/* Brand mark */}
         {!compact && (
           <View
             style={{
@@ -100,7 +96,6 @@ export function CourseImagePlaceholder({
           </View>
         )}
 
-        {/* Course name */}
         <Text
           style={{
             fontSize: compact ? 13 : 22,
@@ -115,7 +110,6 @@ export function CourseImagePlaceholder({
           {courseName}
         </Text>
 
-        {/* Location */}
         {locationStr.length > 0 && (
           <Text
             style={{
@@ -134,72 +128,7 @@ export function CourseImagePlaceholder({
   );
 }
 
-// ── Internal decorative elements ──────────────────────────────────────────────
-
-function ArcDecoration() {
-  // Three concentric quarter-circle arcs in the top-right corner
-  return (
-    <View
-      style={{ position: "absolute", top: -20, right: -20 }}
-      pointerEvents="none"
-    >
-      {[120, 80, 44].map((size, i) => (
-        <View
-          key={size}
-          style={{
-            position: "absolute",
-            top: 0,
-            right: 0,
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderWidth: 1,
-            borderColor: `rgba(245,241,235,${0.06 + i * 0.03})`,
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
-function DotGrid() {
-  // 5×4 grid of tiny dots
-  const dots = [];
-  for (let row = 0; row < 4; row++) {
-    for (let col = 0; col < 5; col++) {
-      dots.push(
-        <View
-          key={`${row}-${col}`}
-          style={{
-            width: 3,
-            height: 3,
-            borderRadius: 1.5,
-            backgroundColor: "rgba(245,241,235,0.07)",
-            margin: 5,
-          }}
-        />,
-      );
-    }
-  }
-  return (
-    <View
-      style={{
-        position: "absolute",
-        top: 24,
-        left: 18,
-        flexDirection: "row",
-        flexWrap: "wrap",
-        width: 80,
-      }}
-      pointerEvents="none"
-    >
-      {dots}
-    </View>
-  );
-}
-
 function HeatherMark({ size = 14 }) {
-  // Simple stylised diamond/flag mark as pure View
   return (
     <View
       style={{

@@ -25,12 +25,18 @@ const COUNTRY_ALIASES = {
   scotland: "Scotland",
   wales: "Wales",
   ireland: "Ireland",
+  "republic of ireland": "Ireland",
   "northern ireland": "Northern Ireland",
   "new zealand": "New Zealand",
   nz: "New Zealand",
   portugal: "Portugal",
   spain: "Spain",
   turkey: "Turkey",
+  canada: "Canada",
+  netherlands: "Netherlands",
+  holland: "Netherlands",
+  uae: "UAE",
+  "united arab emirates": "UAE",
 };
 
 const USA_STATES = {
@@ -88,58 +94,34 @@ const USA_STATES = {
 };
 
 export const COUNTRY_WORKBOOKS = [
-  {
-    key: "australia",
-    file: "Heathland_Links_Australia_Master_Course_Database_NAMED_RECONCILIATION.xlsx",
-  },
-  {
-    key: "england",
-    file: "Heathland_Links_England_Master_Course_Database_FINAL_320_COMPLETED.xlsx",
-  },
-  {
-    key: "ireland",
-    file: "Heathland_Links_Ireland_Master_Course_Database_EXPANDED.xlsx",
-  },
-  {
-    key: "new_zealand",
-    file: "Heathland_Links_New_Zealand_Master_Course_Database_COMPLETED.xlsx",
-  },
+  { key: "australia", file: "australia enriched database (1).xlsx" },
+  { key: "canada", file: "canada enriched database (1).xlsx" },
+  { key: "england", file: "england enriched database v1.xlsx" },
+  { key: "ireland", file: "republic of ireland enriched database (1).xlsx" },
+  { key: "netherlands", file: "netherlands enriched database (1).xlsx" },
+  { key: "new_zealand", file: "new zealand enriched database (1).xlsx" },
   {
     key: "northern_ireland",
-    file: "Heathland_Links_Northern_Ireland_Master_Course_Database.xlsx",
+    file: "northern ireland enriched database (1).xlsx",
   },
-  {
-    key: "portugal",
-    file: "Heathland_Links_Portugal_Master_Course_Database_POPULATED.xlsx",
-  },
-  {
-    key: "scotland",
-    file: "Heathland_Links_Scotland_Master_Course_Database_COMPLETE.xlsx",
-  },
-  {
-    key: "spain",
-    file: "Heathland_Links_Spain_Master_Course_Database_POPULATED.xlsx",
-  },
-  {
-    key: "turkey",
-    file: "Heathland_Links_Turkey_Master_Course_Database_POPULATED.xlsx",
-  },
-  {
-    key: "usa_part1",
-    file: "Heathland_Links_USA_Master_Course_Database_THROUGH_NEBRASKA(1).xlsx",
-  },
-  {
-    key: "usa_part2",
-    file: "Heathland_Links_USA_Master_Part_2_NEVADA_THROUGH_WYOMING_FINAL.xlsx",
-  },
-  {
-    key: "wales",
-    file: "Heathland_Links_Wales_Master_Course_Database_COMPLETE.xlsx",
-  },
+  { key: "portugal", file: "portugal enriched database (1).xlsx" },
+  { key: "scotland", file: "scotland enriched database v1.xlsx" },
+  // Filename has a known typo ("databse") and an extra space before "(1)"
+  { key: "spain", file: "spain enriched databse  (1).xlsx" },
+  { key: "turkey", file: "turkey enriched database (1).xlsx" },
+  { key: "uae", file: "UAE enriched database (1).xlsx" },
+  { key: "usa", file: "USA enriched database (1).xlsx" },
+  { key: "wales", file: "enriched wales database (1).xlsx" },
 ];
 
+/** Optional dedicated rankings workbook (older GBI rebuild). */
 export const RANKINGS_WORKBOOK =
   "Heathland_Links_Great_Britain_Ireland_Master_Course_Database_REBUILT.xlsx";
+
+export const RANKINGS_WORKBOOK_CANDIDATES = [
+  RANKINGS_WORKBOOK,
+  // Keep looking in the parent archive folder if the enriched pack omits it.
+];
 
 function firstNonEmpty(row, keys) {
   for (const key of keys) {
@@ -208,6 +190,9 @@ function countryFromId(hlCourseId) {
   if (id.startsWith("ES-")) return "Spain";
   if (id.startsWith("TR-")) return "Turkey";
   if (id.startsWith("USA-")) return "USA";
+  if (id.startsWith("CA-")) return "Canada";
+  if (id.startsWith("NL-")) return "Netherlands";
+  if (id.startsWith("AE-") || id.startsWith("UAE-")) return "UAE";
   return null;
 }
 
@@ -219,15 +204,115 @@ function usaStateFromId(hlCourseId) {
 }
 
 export function sheetHasPopulatedIds(rows) {
-  return rows.some((row) => firstNonEmpty(row, ["hl_course_id", "hl_courseid"]));
+  return rows.some((row) =>
+    firstNonEmpty(row, ["hl_course_id", "hl_courseid"]),
+  );
+}
+
+/**
+ * Some enriched workbooks (notably Canada) put a title row above the real
+ * header. Rebuild objects from the row that contains hl_course_id.
+ */
+export function sheetToObjectsFixed(sheet) {
+  if (!sheet) return [];
+  const matrix = XLSXLikeHeaderMatrix(sheet);
+  const headerIdx = matrix.findIndex((row) =>
+    row.some((cell) => String(cell || "").trim().toLowerCase() === "hl_course_id"),
+  );
+  if (headerIdx === -1) {
+    // Fallback: treat first row as headers (normal sheets).
+    return sheetToJsonDefault(sheet);
+  }
+  const headers = matrix[headerIdx].map((h) => String(h || "").trim());
+  const out = [];
+  for (const row of matrix.slice(headerIdx + 1)) {
+    if (!row.some((cell) => String(cell ?? "").trim())) continue;
+    const obj = {};
+    headers.forEach((header, i) => {
+      if (!header) return;
+      obj[header] = row[i] ?? "";
+    });
+    out.push(obj);
+  }
+  return out;
+}
+
+// Lazy require of xlsx helpers without importing at module top in case of cycles.
+// Callers pass already-parsed sheets; we only need sheet_to_json behaviour.
+function XLSXLikeHeaderMatrix(sheet) {
+  // Dynamic import avoided — callers in migrate use xlsx; here we duplicate
+  // minimal conversion via the sheet's !ref if available through global? No.
+  // Instead migrate will call sheetToObjectsFixed with pre-converted matrix OR
+  // we accept sheet objects and use a tiny local converter.
+  return sheetToMatrix(sheet);
+}
+
+function sheetToMatrix(sheet) {
+  // Use the same algorithm as SheetJS sheet_to_json({header:1})
+  const ref = sheet["!ref"];
+  if (!ref) return [];
+  const decoded = decodeRange(ref);
+  const rows = [];
+  for (let R = decoded.s.r; R <= decoded.e.r; R++) {
+    const row = [];
+    for (let C = decoded.s.c; C <= decoded.e.c; C++) {
+      const addr = encodeCell(R, C);
+      const cell = sheet[addr];
+      row.push(cell ? (cell.w ?? cell.v ?? "") : "");
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+function sheetToJsonDefault(sheet) {
+  const matrix = sheetToMatrix(sheet);
+  if (!matrix.length) return [];
+  const headers = matrix[0].map((h) => String(h || "").trim());
+  return matrix.slice(1).map((row) => {
+    const obj = {};
+    headers.forEach((header, i) => {
+      if (!header) return;
+      obj[header] = row[i] ?? "";
+    });
+    return obj;
+  });
+}
+
+function decodeRange(ref) {
+  const [a, b] = String(ref).split(":");
+  return { s: decodeCell(a), e: decodeCell(b || a) };
+}
+
+function decodeCell(addr) {
+  const m = String(addr).match(/^([A-Z]+)(\d+)$/i);
+  if (!m) return { c: 0, r: 0 };
+  const col = m[1].toUpperCase();
+  let c = 0;
+  for (let i = 0; i < col.length; i++) c = c * 26 + (col.charCodeAt(i) - 64);
+  return { c: c - 1, r: Number(m[2]) - 1 };
+}
+
+function encodeCell(r, c) {
+  let col = "";
+  let n = c + 1;
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    col = String.fromCharCode(65 + rem) + col;
+    n = Math.floor((n - 1) / 26);
+  }
+  return `${col}${r + 1}`;
 }
 
 export function pickSourceSheet(workbookSheets) {
-  const developer = workbookSheets.Developer_Import || [];
-  if (sheetHasPopulatedIds(developer)) return { name: "Developer_Import", rows: developer };
+  // Prefer master sheets that already have populated IDs.
+  for (const name of ["Master_Courses", "Course_Master", "Developer_Import"]) {
+    const rows = workbookSheets[name] || [];
+    if (sheetHasPopulatedIds(rows)) return { name, rows };
+  }
   return {
     name: "Master_Courses",
-    rows: workbookSheets.Master_Courses || [],
+    rows: workbookSheets.Master_Courses || workbookSheets.Course_Master || [],
   };
 }
 
@@ -247,14 +332,6 @@ export function normalizeCourseRow(raw, sourceFile) {
   if (latitude == null) missing.push("latitude");
   if (longitude == null) missing.push("longitude");
 
-  const region =
-    firstNonEmpty(raw, [
-      "region",
-      "autonomous_community",
-      "district_region",
-      "state",
-    ]) || usaStateFromId(hlCourseId);
-
   return {
     hl_course_id: hlCourseId,
     hl_club_id: firstNonEmpty(raw, ["hl_club_id", "hl_clubid"]),
@@ -268,8 +345,20 @@ export function normalizeCourseRow(raw, sourceFile) {
       "municipality",
       "district",
     ]),
-    county: firstNonEmpty(raw, ["county", "province"]),
-    region,
+    county: firstNonEmpty(raw, [
+      "county",
+      "province",
+      "autonomous_community",
+      "district_region",
+    ]),
+    region:
+      firstNonEmpty(raw, [
+        "region",
+        "autonomous_community",
+        "district_region",
+        "state",
+        "province",
+      ]) || usaStateFromId(hlCourseId),
     country:
       normalizeCountry(firstNonEmpty(raw, ["country"])) ||
       countryFromId(hlCourseId),
@@ -283,7 +372,49 @@ export function normalizeCourseRow(raw, sourceFile) {
     mvp_data_status: latitude != null && longitude != null ? "ready" : "needs_coords",
     mvp_missing_fields: missing,
     source_file: sourceFile,
+    // Ranking fields carried for membership extraction
+    ranking_provider: firstNonEmpty(raw, ["ranking_provider", "ranking_source"]),
+    ranking_list: firstNonEmpty(raw, ["ranking_list", "ranking_name"]),
+    ranking_year: parseIntOrNull(firstNonEmpty(raw, ["ranking_year"])),
+    ranking_position_raw: firstNonEmpty(raw, ["ranking_position"]),
+    verification_status: firstNonEmpty(raw, ["verification_status"]),
   };
+}
+
+export function parseRankingPosition(value, listName = "") {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  if (listName) {
+    const escaped = listName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const scoped = text.match(new RegExp(`${escaped}\\s*#\\s*(\\d+)`, "i"));
+    if (scoped) return Number.parseInt(scoped[1], 10);
+  }
+  const hash = text.match(/#\s*(\d+)/);
+  if (hash) return Number.parseInt(hash[1], 10);
+  const bare = text.match(/^(\d+)$/);
+  if (bare) return Number.parseInt(bare[1], 10);
+  return null;
+}
+
+/** Expand course-row ranking columns into one membership per list name. */
+export function rankingsFromCourseRow(row) {
+  const lists = String(row.ranking_list || "")
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!lists.length) return [];
+  const provider = row.ranking_provider || null;
+  const year = Number.isFinite(row.ranking_year) ? row.ranking_year : 2026;
+  return lists.map((ranking_name) => ({
+    ranking_source: provider,
+    ranking_year: year,
+    ranking_name,
+    position: parseRankingPosition(row.ranking_position_raw, ranking_name),
+    hl_course_id: row.hl_course_id || null,
+    course_display_name: row.display_name || row.name || row.club_name || "",
+    verification_status: row.verification_status || null,
+    is_active: true,
+  }));
 }
 
 export function dedupeByHlCourseId(rows) {
