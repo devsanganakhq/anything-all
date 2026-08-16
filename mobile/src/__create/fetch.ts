@@ -1,8 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import { fetch as expoFetch } from 'expo/fetch';
+import { authKey, secureStoreOptions, useAuthStore } from '@/utils/auth/store';
 
 const originalFetch = fetch;
-const authKey = `${process.env.EXPO_PUBLIC_PROJECT_GROUP_ID}-jwt`;
 
 const getURLFromArgs = (...args: Parameters<typeof fetch>) => {
   const [urlArg] = args;
@@ -76,13 +76,19 @@ const fetchToWeb = async function fetchWithHeaders(...args: Params) {
     }
   }
 
-  const auth = await SecureStore.getItemAsync(authKey)
-    .then((auth) => {
-      return auth ? JSON.parse(auth) : null;
-    })
-    .catch(() => {
-      return null;
-    });
+  // In-memory auth is the source of truth after hydrate. Falling back to
+  // Keychain after logout races deleteItemAsync and re-attaches the old JWT.
+  const authState = useAuthStore.getState();
+  let auth = authState.auth;
+  if (!auth && !authState.isReady) {
+    auth = await SecureStore.getItemAsync(authKey, secureStoreOptions)
+      .then((stored) => {
+        return stored ? JSON.parse(stored) : null;
+      })
+      .catch(() => {
+        return null;
+      });
+  }
 
   if (auth) {
     finalHeaders.set('authorization', `Bearer ${auth.jwt}`);

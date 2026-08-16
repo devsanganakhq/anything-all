@@ -64,7 +64,7 @@ export function EmptyState({ filter, router }) {
 
   const msgs = {
     friends:
-      "Follow more golfers to see their rounds, reviews and achievements here.",
+      "Add friends to see their rounds, reviews and activity here.",
     communities:
       "Join a community to see shared trips, discussions and meet-up plans.",
     achievements:

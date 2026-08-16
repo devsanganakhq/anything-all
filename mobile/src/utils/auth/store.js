@@ -32,21 +32,18 @@ export const useAuthStore = create((set) => ({
   isReady: false,
   auth: null,
   setAuth: (auth) => {
-    if (auth) {
-      SecureStore.setItemAsync(
-        authKey,
-        JSON.stringify(auth),
-        secureStoreOptions,
-      ).catch(() => {
-        // Swallow Keychain write errors — the app remains in-memory authed
-        // for this session and the next launch will re-auth via the WebView.
-        // Throwing here would propagate into the unhandled-rejection /
-        // TurboModule rethrow path and crash on iOS 26.x.
-      });
-    } else {
-      SecureStore.deleteItemAsync(authKey, secureStoreOptions).catch(() => {});
-    }
     set({ auth });
+    const persist = auth
+      ? SecureStore.setItemAsync(
+          authKey,
+          JSON.stringify(auth),
+          secureStoreOptions,
+        )
+      : SecureStore.deleteItemAsync(authKey, secureStoreOptions);
+    return persist.catch(() => {
+      // Swallow Keychain errors — in-memory auth is the source of truth
+      // for this session; throwing would crash on iOS 26 TurboModule rethrow.
+    });
   },
 }));
 

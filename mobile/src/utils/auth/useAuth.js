@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { create } from 'zustand';
 import { Modal, View } from 'react-native';
 import { useAuthModal, useAuthStore, authKey, secureStoreOptions } from './store';
+import { resetAppCache } from '@/utils/queryClient';
 
 
 /**
@@ -48,7 +49,9 @@ export const useAuth = () => {
   }, [open]);
 
   const signOut = useCallback(() => {
+    fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
     setAuth(null);
+    resetAppCache();
     close();
     router.replace("/");
   }, [close, setAuth]);

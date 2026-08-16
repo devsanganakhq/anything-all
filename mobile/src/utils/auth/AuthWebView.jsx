@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { BackHandler, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import { useAuthStore } from "./store";
+import { resetAppCache } from "@/utils/queryClient";
 
 // Native uses expo-web-success so the page can postMessage JWT back into RN
 // (WKWebView cookies are not reliably shared with the JS fetch cookie jar).
@@ -19,6 +20,17 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
   const { auth, setAuth, isReady } = useAuthStore();
   const isAuthenticated = isReady ? !!auth : null;
   const iframeRef = useRef(null);
+
+  const applyAuthSuccess = (data) => {
+    if (!data?.jwt) {
+      console.error("[AuthWebView] AUTH_SUCCESS missing jwt");
+      return;
+    }
+    // Persist the new session first, then drop cached queries so refetches
+    // attach the new Bearer token instead of the previous user's.
+    setAuth({ jwt: data.jwt, user: data.user });
+    resetAppCache();
+  };
 
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -57,10 +69,7 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
         return;
       }
       if (event.data.type === "AUTH_SUCCESS") {
-        setAuth({
-          jwt: event.data.jwt,
-          user: event.data.user,
-        });
+        applyAuthSuccess(event.data);
       } else if (event.data.type === "AUTH_ERROR") {
         console.error("Auth error:", event.data.error);
       }
@@ -72,14 +81,6 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
       window.removeEventListener("message", handleMessage);
     };
   }, [setAuth]);
-
-  const applyAuthSuccess = (data) => {
-    if (!data?.jwt) {
-      console.error("[AuthWebView] AUTH_SUCCESS missing jwt");
-      return;
-    }
-    setAuth({ jwt: data.jwt, user: data.user });
-  };
 
   if (Platform.OS === "web") {
     const handleIframeError = () => {
@@ -99,8 +100,9 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
 
   return (
     <WebView
-      sharedCookiesEnabled
-      thirdPartyCookiesEnabled
+      incognito
+      sharedCookiesEnabled={false}
+      thirdPartyCookiesEnabled={false}
       source={{
         uri: currentURI,
       }}

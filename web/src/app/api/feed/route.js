@@ -40,10 +40,11 @@ export async function GET(request) {
     let extraWhere = "";
 
     if (filter === "friends") {
+      extraWhere = `AND fp.author_id <> ${userId}`;
       authorSubquery = `
         SELECT friend_id AS author_id FROM friendships WHERE user_id = ${userId} AND status = 'accepted'
-        UNION SELECT user_id AS author_id FROM friendships WHERE friend_id = ${userId} AND status = 'accepted'
-        UNION SELECT ${userId}
+        UNION
+        SELECT user_id AS author_id FROM friendships WHERE friend_id = ${userId} AND status = 'accepted'
       `;
     } else if (filter === "clubs") {
       extraWhere = `AND fp.post_type IN ('club_update')`;
@@ -138,7 +139,13 @@ export async function GET(request) {
         JOIN users u ON fp.author_id = u.id
         LEFT JOIN courses      c  ON fp.course_id    = c.id
         LEFT JOIN communities  cm ON fp.community_id = cm.id
-        LEFT JOIN played_courses pc ON pc.user_id = fp.author_id AND pc.course_id = fp.course_id
+        LEFT JOIN LATERAL (
+          SELECT rating, review_text, date_played
+          FROM played_courses
+          WHERE user_id = fp.author_id AND course_id = fp.course_id
+          ORDER BY date_played DESC NULLS LAST, created_at DESC
+          LIMIT 1
+        ) pc ON true
 
         WHERE fp.author_id IN (${authorSubquery})
           AND fp.is_private   = false

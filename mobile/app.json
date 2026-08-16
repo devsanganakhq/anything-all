@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Anything mobile app",
+    "name": "Heathland Links",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -12,6 +12,8 @@
         "googleMapsApiKey": "AIzaSyASqVSa6Q98DvY5csNodKL0LCp6T6uFflM"
       },
       "infoPlist": {
+        "CFBundleDisplayName": "Heathland Links",
+        "CFBundleName": "Heathland Links",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
