@@ -29,8 +29,8 @@ export function InfoTab({ course, handleMap }) {
                 course.course_type.slice(1)
               : null,
           },
-          { label: "Holes", value: course.holes ?? 18 },
-          { label: "Par", value: course.par ?? 72 },
+          { label: "Holes", value: course.holes ?? null },
+          { label: "Par", value: course.par ?? null },
           { label: "Address", value: course.address },
           { label: "City", value: course.city },
           { label: "County", value: course.county },

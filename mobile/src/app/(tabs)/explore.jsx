@@ -57,6 +57,11 @@ import {
 } from "@/constants/theme";
 import { RANKING_COLLECTIONS, ACCENT_HEX } from "@/data/rankingCollections";
 import { CourseImagePlaceholder } from "@/components/CourseImagePlaceholder";
+import {
+  courseDisplayName,
+  formatCourseLocation,
+  formatCourseShareLabel,
+} from "@/utils/courseDisplayName";
 
 // ─── Destination images (editorial, not course photos) ────────────────────────
 const DEST_IMAGES = {
@@ -80,6 +85,27 @@ const FALLBACK_DEST = [
   { country: "Ireland", course_count: 420, flag: "🇮🇪" },
   { country: "Wales", course_count: 180, flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿" },
 ];
+
+const COUNTRY_FLAGS = {
+  England: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  Scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  Wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+  Ireland: "🇮🇪",
+  "Northern Ireland": "🇬🇧",
+  USA: "🇺🇸",
+  "United States": "🇺🇸",
+  Australia: "🇦🇺",
+  "New Zealand": "🇳🇿",
+  Spain: "🇪🇸",
+  Portugal: "🇵🇹",
+  Turkey: "🇹🇷",
+  France: "🇫🇷",
+  Canada: "🇨🇦",
+};
+
+function countryFlagEmoji(country) {
+  return COUNTRY_FLAGS[country] || null;
+}
 
 // ─── Marker colours by status ────────────────────────────────────────────────
 const MARKER = {
@@ -336,8 +362,7 @@ export default function ExploreScreen() {
       ? destinationsCol.courses.map((d) => ({
           country: d.country,
           course_count: d.course_count,
-          flag:
-            FALLBACK_DEST.find((f) => f.country === d.country)?.flag ?? "⛳",
+          flag: countryFlagEmoji(d.country),
         }))
       : FALLBACK_DEST;
 
@@ -737,29 +762,49 @@ export default function ExploreScreen() {
                 <MapPin color={Colors.green} size={16} strokeWidth={1.8} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: "700",
-                    color: Colors.textPrimary,
-                  }}
-                  numberOfLines={1}
-                >
-                  {item.name}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: Colors.textSecondary,
-                    marginTop: 2,
-                  }}
-                  numberOfLines={1}
-                >
-                  {[item.city, item.county, item.country]
-                    .filter(Boolean)
-                    .join(", ")}
-                  {item.course_type ? ` · ${item.course_type}` : ""}
-                </Text>
+                {(() => {
+                  const { title, subtitle } = courseDisplayName(item);
+                  const location = formatCourseLocation(item, {
+                    includeCounty: true,
+                  });
+                  return (
+                    <>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: "700",
+                          color: Colors.textPrimary,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {title}
+                      </Text>
+                      {subtitle ? (
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: Colors.textSecondary,
+                            marginTop: 2,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {subtitle}
+                        </Text>
+                      ) : null}
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: Colors.textSecondary,
+                          marginTop: 2,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {location}
+                        {item.course_type ? ` · ${item.course_type}` : ""}
+                      </Text>
+                    </>
+                  );
+                })()}
               </View>
               {item.community_rating > 0 && (
                 <View
@@ -791,6 +836,12 @@ export default function ExploreScreen() {
       { key: "PLAYED", label: "✓ PLAYED" },
       { key: "WISHLIST", label: "♥ SAVED" },
     ];
+    const selectedIdentity = selectedCourse
+      ? courseDisplayName(selectedCourse)
+      : null;
+    const selectedLocation = selectedCourse
+      ? formatCourseLocation(selectedCourse)
+      : "";
 
     return (
       <View style={{ flex: 1 }}>
@@ -931,7 +982,7 @@ export default function ExploreScreen() {
                 />
               ) : (
                 <CourseImagePlaceholder
-                  courseName={selectedCourse.name}
+                  courseName={selectedIdentity.title}
                   county={selectedCourse.county}
                   country={selectedCourse.country}
                   height={110}
@@ -1048,8 +1099,20 @@ export default function ExploreScreen() {
                 }}
                 numberOfLines={1}
               >
-                {selectedCourse.name}
+                {selectedIdentity.title}
               </Text>
+              {selectedIdentity.subtitle ? (
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: Colors.textSecondary,
+                    marginBottom: 4,
+                  }}
+                  numberOfLines={1}
+                >
+                  {selectedIdentity.subtitle}
+                </Text>
+              ) : null}
               <View
                 style={{
                   flexDirection: "row",
@@ -1067,9 +1130,7 @@ export default function ExploreScreen() {
                     strokeWidth={1.8}
                   />
                   <Text style={{ fontSize: 11, color: Colors.textSecondary }}>
-                    {[selectedCourse.city, selectedCourse.country]
-                      .filter(Boolean)
-                      .join(", ")}
+                    {selectedLocation}
                   </Text>
                 </View>
                 {selectedCourse.community_rating > 0 && (
@@ -1202,7 +1263,7 @@ export default function ExploreScreen() {
                       return;
                     }
                     router.push(
-                      `/activity/mark-played?courseId=${selectedCourse.id}&courseName=${encodeURIComponent(selectedCourse.name)}`,
+                      `/activity/mark-played?courseId=${selectedCourse.id}&courseName=${encodeURIComponent(formatCourseShareLabel(selectedCourse))}`,
                     );
                   }}
                   disabled={playedMutation.isPending}
@@ -1322,8 +1383,14 @@ export default function ExploreScreen() {
                   key={col.id}
                   col={col}
                   onPress={() => {
-                    setViewMode("MAP");
-                    setMapFilter("ALL");
+                    router.push({
+                      pathname: "/explore/list",
+                      params: {
+                        kind: "ranking",
+                        id: col.id,
+                        title: col.display_name || col.ranking_name,
+                      },
+                    });
                   }}
                 />
               ))}
@@ -1370,8 +1437,14 @@ export default function ExploreScreen() {
           }
           loading={discoverLoading}
           onViewAll={() => {
-            setViewMode("MAP");
-            setMapFilter("ALL");
+            router.push({
+              pathname: "/explore/list",
+              params: {
+                kind: "community",
+                id: "community-top-rated",
+                title: "Highest rated by members",
+              },
+            });
           }}
           router={router}
           offset={0}
@@ -1388,8 +1461,14 @@ export default function ExploreScreen() {
           }
           loading={discoverLoading}
           onViewAll={() => {
-            setViewMode("MAP");
-            setMapFilter("ALL");
+            router.push({
+              pathname: "/explore/list",
+              params: {
+                kind: "community",
+                id: "most-played",
+                title: "Most played",
+              },
+            });
           }}
           router={router}
           offset={1}
@@ -1398,7 +1477,7 @@ export default function ExploreScreen() {
         {/* ── TRENDING ── */}
         <CourseSection
           label="TRENDING"
-          subtitle="Gaining momentum right now"
+          subtitle="Most played in the last 7 days"
           courses={
             trendingCol?.courses?.length > 0
               ? trendingCol.courses
@@ -1406,8 +1485,14 @@ export default function ExploreScreen() {
           }
           loading={discoverLoading}
           onViewAll={() => {
-            setViewMode("MAP");
-            setMapFilter("ALL");
+            router.push({
+              pathname: "/explore/list",
+              params: {
+                kind: "community",
+                id: "trending",
+                title: "Trending this week",
+              },
+            });
           }}
           router={router}
           offset={2}
@@ -1447,8 +1532,14 @@ export default function ExploreScreen() {
                     key={dest.country}
                     dest={dest}
                     onPress={() => {
-                      setViewMode("MAP");
-                      setMapFilter("ALL");
+                      router.push({
+                        pathname: "/explore/list",
+                        params: {
+                          kind: "country",
+                          country: dest.country,
+                          title: dest.country,
+                        },
+                      });
                     }}
                   />
                 ))}
@@ -1790,8 +1881,13 @@ function RankingCollectionCard({ col, onPress }) {
 
 function CourseCard({ item, imgIndex, onPress }) {
   const [imgErr, setImgErr] = React.useState(false);
-  const thumbUrl = item.resolved_thumbnail_url;
+  const thumbUrl =
+    item.media_display_type === "club_logo" && !item.is_claimed
+      ? null
+      : item.resolved_thumbnail_url;
   const isLogo = item.media_display_type === "club_logo";
+  const { title, subtitle } = courseDisplayName(item);
+  const location = formatCourseLocation(item);
 
   return (
     <TouchableOpacity style={{ width: 210 }} onPress={onPress}>
@@ -1813,7 +1909,7 @@ function CourseCard({ item, imgIndex, onPress }) {
           />
         ) : (
           <CourseImagePlaceholder
-            courseName={item.name || item.club_name}
+            courseName={title}
             county={item.county}
             country={item.country}
             height={144}
@@ -1847,8 +1943,20 @@ function CourseCard({ item, imgIndex, onPress }) {
           style={{ fontSize: 13, fontWeight: "700", color: Colors.textPrimary }}
           numberOfLines={1}
         >
-          {item.name}
+          {title}
         </Text>
+        {subtitle ? (
+          <Text
+            style={{
+              fontSize: 11,
+              color: Colors.textSecondary,
+              marginTop: 2,
+            }}
+            numberOfLines={1}
+          >
+            {subtitle}
+          </Text>
+        ) : null}
         <View
           style={{
             flexDirection: "row",
@@ -1860,7 +1968,7 @@ function CourseCard({ item, imgIndex, onPress }) {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
             <MapPin color={Colors.textMuted} size={10} strokeWidth={1.8} />
             <Text style={{ fontSize: 11, color: Colors.textSecondary }}>
-              {item.county || item.city || item.country}
+              {location || item.county || item.city || item.country}
             </Text>
           </View>
           {item.par ? (
@@ -1897,7 +2005,13 @@ function CourseCard({ item, imgIndex, onPress }) {
 
 function DestinationCard({ dest, onPress }) {
   const img = DEST_IMAGES[dest.country];
-  const flags = { England: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", Scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿", Wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿", Ireland: "🇮🇪" };
+  const flag = dest.flag || countryFlagEmoji(dest.country);
+  const initials = (dest.country || "")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -1926,7 +2040,7 @@ function DestinationCard({ dest, onPress }) {
         }}
       >
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text style={{ fontSize: 16 }}>{flags[dest.country] || "⛳"}</Text>
+          <Text style={{ fontSize: 16 }}>{flag || initials}</Text>
           <Text
             style={{ fontSize: 14, fontWeight: "700", color: Colors.ivory }}
           >

@@ -99,7 +99,7 @@ export const RANKING_COLLECTIONS = [
     ranking_region: "Island of Ireland",
     ranking_year: 2026,
     accentColor: "gold",
-    icon: "🍀",
+    icon: "🇮🇪",
     description:
       "The best of the island of Ireland — Republic and Northern Ireland combined.",
     is_sample_data: false,

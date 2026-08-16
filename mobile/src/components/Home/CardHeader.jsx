@@ -71,7 +71,7 @@ export function CardHeader({ post, meta, onMenu }) {
         </Text>
       </View>
 
-      <TouchableOpacity onPress={() => onMenu()} style={{ padding: 4 }}>
+      <TouchableOpacity onPress={() => onMenu?.(post)} style={{ padding: 4 }}>
         <MoreHorizontal color={Colors.textMuted} size={19} strokeWidth={1.8} />
       </TouchableOpacity>
     </View>

@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { BackHandler, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import { useAuthStore } from "./store";
 
@@ -12,7 +12,7 @@ const tokenCallbackPath = "/api/auth/token";
 /**
  * This renders a WebView for authentication and handles both web and native platforms.
  */
-export const AuthWebView = ({ mode, proxyURL, baseURL }) => {
+export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
   const [currentURI, setURI] = useState(
     `${baseURL}/account/${mode}?callbackUrl=${encodeURIComponent(nativeCallbackPath)}`,
   );
@@ -38,6 +38,15 @@ export const AuthWebView = ({ mode, proxyURL, baseURL }) => {
       `${baseURL}/account/${mode}?callbackUrl=${encodeURIComponent(nativeCallbackPath)}`,
     );
   }, [mode, baseURL, isAuthenticated]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return undefined;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose?.();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onClose]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.addEventListener) {

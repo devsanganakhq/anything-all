@@ -170,7 +170,7 @@ export default function ForgotPasswordPage() {
 
 const pageStyle = {
   minHeight: "100vh",
-  background: "#1B3828",
+  background: "transparent",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",

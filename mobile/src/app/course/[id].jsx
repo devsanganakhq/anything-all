@@ -40,6 +40,10 @@ import { ReviewsTab } from "./ReviewsTab";
 import { PhotosTab } from "./PhotosTab";
 import { InfoTab } from "./InfoTab";
 import { BottomActionBar } from "./BottomActionBar";
+import {
+  courseDisplayName,
+  formatCourseShareLabel,
+} from "@/utils/courseDisplayName";
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CourseDetailScreen() {
@@ -142,17 +146,18 @@ export default function CourseDetailScreen() {
     if (!data?.course) return;
     try {
       await Share.share({
-        message: `${data.course.name} — ${data.course.club_name}. Discover it on Heathland Links.`,
+        message: `${formatCourseShareLabel(data.course)}. Discover it on Heathland Links.`,
         url: `https://heathlandlinks.com/course/${id}`,
-        title: data.course.name,
+        title: formatCourseShareLabel(data.course),
       });
     } catch {}
   }, [data, id]);
 
   const handleMap = useCallback(() => {
     if (!data?.course) return;
-    const { latitude, longitude, name } = data.course;
-    const url = `https://maps.apple.com/?ll=${latitude},${longitude}&q=${encodeURIComponent(name)}`;
+    const { latitude, longitude } = data.course;
+    const q = formatCourseShareLabel(data.course);
+    const url = `https://maps.apple.com/?ll=${latitude},${longitude}&q=${encodeURIComponent(q)}`;
     Linking.openURL(url).catch(() => {
       const gUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
       Linking.openURL(gUrl);
@@ -170,7 +175,7 @@ export default function CourseDetailScreen() {
     }
     router.push({
       pathname: "/activity/mark-played",
-      params: { courseId: id, courseName: data?.course?.name },
+      params: { courseId: id, courseName: formatCourseShareLabel(data?.course) },
     });
   }, [alreadyPlayed, id, data, router]);
 
@@ -242,6 +247,7 @@ export default function CourseDetailScreen() {
   }
 
   const course = data.course;
+  const { title: displayTitle } = courseDisplayName(course);
   const rankings = data.rankings ?? [];
   const reviews = data.reviews ?? [];
   const activity = data.recentActivity ?? [];
@@ -284,7 +290,7 @@ export default function CourseDetailScreen() {
       <StickyHeader
         insets={insets}
         stickyHeaderOpacity={stickyHeaderOpacity}
-        courseName={course.name}
+        courseName={displayTitle}
         onBack={() => router.back()}
         onShare={handleShare}
       />
@@ -310,7 +316,7 @@ export default function CourseDetailScreen() {
           rankings={rankings}
           RANKING_ACCENTS={RANKING_ACCENTS}
           RANKING_DEFAULT={RANKING_DEFAULT}
-          courseName={course.name}
+          courseName={displayTitle}
           county={course.county}
           country={course.country}
         />
@@ -323,6 +329,7 @@ export default function CourseDetailScreen() {
             rating={rating}
             reviews={reviews}
             followerCount={followerCount}
+            listCount={rankings.length}
           />
         </View>
 
@@ -373,7 +380,7 @@ export default function CourseDetailScreen() {
               courseId={id}
               alreadyPlayed={alreadyPlayed}
               course={{
-                name: course.name,
+                name: displayTitle,
                 county: course.county,
                 country: course.country,
               }}

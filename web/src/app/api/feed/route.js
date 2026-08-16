@@ -49,7 +49,10 @@ export async function GET(request) {
       extraWhere = `AND fp.post_type IN ('club_update')`;
       authorSubquery = `SELECT id AS author_id FROM users`;
     } else if (filter === "communities") {
-      extraWhere = `AND fp.post_type IN ('community_discussion')`;
+      extraWhere = `AND fp.post_type IN ('community_discussion')
+        AND fp.community_id IN (
+          SELECT community_id FROM community_members WHERE user_id = ${userId}
+        )`;
       authorSubquery = `SELECT id AS author_id FROM users`;
     } else if (filter === "achievements") {
       extraWhere = `AND fp.post_type IN ('achievement','ranking_progress','milestone','passport_complete','ranking_complete')`;

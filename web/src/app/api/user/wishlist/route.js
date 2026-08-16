@@ -17,7 +17,8 @@ export async function GET(request) {
         FROM wishlist wl
         JOIN courses c ON c.id = wl.course_id
         WHERE wl.user_id = $1
-        ORDER BY wl.created_at DESC
+        ORDER BY LOWER(COALESCE(NULLIF(TRIM(c.club_name), ''), c.name)) ASC,
+                 LOWER(c.name) ASC
         LIMIT $2 OFFSET $3`,
       [userId, limit, offset],
     );

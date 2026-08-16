@@ -207,7 +207,8 @@ export default function PassportScreen() {
       icon: TrendingUp,
       count: rankingProgress.length,
       color: Colors.purple,
-      route: "/(tabs)/explore",
+      route: null,
+      comingSoon: true,
     },
     {
       label: "Reviews",
@@ -477,10 +478,6 @@ export default function PassportScreen() {
             <View
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.12)" }}
             />
-            <HeroStat label="COUNTIES" value={stats.counties_played} />
-            <View
-              style={{ width: 1, backgroundColor: "rgba(245,241,235,0.12)" }}
-            />
             <HeroStat label="REVIEWS" value={stats.reviews_count} />
             <View
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.12)" }}
@@ -518,7 +515,12 @@ export default function PassportScreen() {
             <RankingProgressCard
               key={r.id}
               data={r}
-              onPress={() => router.push("/(tabs)/explore")}
+              onPress={() =>
+                Alert.alert(
+                  "Coming Soon",
+                  "Ranking progress detail is coming in a future update.",
+                )
+              }
             />
           ))}
         </ScrollView>
@@ -785,9 +787,30 @@ export default function PassportScreen() {
                       gap: 20,
                     }}
                   >
-                    <PodiumItem player={podium[1]} rank={2} size={58} />
-                    <PodiumItem player={podium[0]} rank={1} size={74} />
-                    <PodiumItem player={podium[2]} rank={3} size={58} />
+                    <PodiumItem
+                      player={podium[1]}
+                      rank={2}
+                      size={58}
+                      onPress={() =>
+                        podium[1]?.id && router.push(`/social/${podium[1].id}`)
+                      }
+                    />
+                    <PodiumItem
+                      player={podium[0]}
+                      rank={1}
+                      size={74}
+                      onPress={() =>
+                        podium[0]?.id && router.push(`/social/${podium[0].id}`)
+                      }
+                    />
+                    <PodiumItem
+                      player={podium[2]}
+                      rank={3}
+                      size={58}
+                      onPress={() =>
+                        podium[2]?.id && router.push(`/social/${podium[2].id}`)
+                      }
+                    />
                   </View>
                 </View>
               )}
@@ -804,8 +827,11 @@ export default function PassportScreen() {
                   }}
                 >
                   {lbRows.map((player, idx) => (
-                    <View
+                    <TouchableOpacity
                       key={`${player.id || player.rank}-${idx}`}
+                      onPress={() =>
+                        player.id && router.push(`/social/${player.id}`)
+                      }
                       style={{
                         flexDirection: "row",
                         alignItems: "center",
@@ -882,8 +908,8 @@ export default function PassportScreen() {
                         >
                           COURSES
                         </Text>
-                      </View>
-                    </View>
+                        </View>
+                    </TouchableOpacity>
                   ))}
                 </View>
               )}
@@ -1441,7 +1467,7 @@ function CountryBar({ countries, total }) {
 }
 
 // ─── Podium ───────────────────────────────────────────────────────────────────
-function PodiumItem({ player, rank, size }) {
+function PodiumItem({ player, rank, size, onPress }) {
   if (!player) {
     return <View style={{ width: size + 16, height: size + 60 }} />;
   }
@@ -1450,7 +1476,11 @@ function PodiumItem({ player, rank, size }) {
     ? "You"
     : (player.name || "Golfer").split(" ")[0];
   return (
-    <View style={{ alignItems: "center" }}>
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={!onPress}
+      style={{ alignItems: "center" }}
+    >
       <UserAvatar
         uri={player.avatar}
         name={player.name}
@@ -1494,6 +1524,6 @@ function PodiumItem({ player, rank, size }) {
       >
         {player.courses}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }

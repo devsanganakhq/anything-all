@@ -11,6 +11,7 @@ export function FeedHeader({
   filter,
   onFilterChange,
   onNotificationsPress,
+  hasUnread,
 }) {
   return (
     <View
@@ -80,19 +81,21 @@ export function FeedHeader({
           }}
         >
           <Bell color={Colors.green} size={19} strokeWidth={1.8} />
-          <View
-            style={{
-              position: "absolute",
-              top: 9,
-              right: 9,
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: "#6B4F8A",
-              borderWidth: 1.5,
-              borderColor: Colors.white,
-            }}
-          />
+          {hasUnread ? (
+            <View
+              style={{
+                position: "absolute",
+                top: 9,
+                right: 9,
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: "#6B4F8A",
+                borderWidth: 1.5,
+                borderColor: Colors.white,
+              }}
+            />
+          ) : null}
         </TouchableOpacity>
       </View>
 

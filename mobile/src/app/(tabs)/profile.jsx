@@ -645,12 +645,7 @@ export default function ProfileScreen() {
             <MenuItem
               icon={Bell}
               title="Notifications"
-              onPress={() =>
-                Alert.alert(
-                  "Coming Soon",
-                  "Notification preferences are coming in a future update.",
-                )
-              }
+              onPress={() => router.push("/notifications")}
             />
             <MenuItem
               icon={HelpCircle}
@@ -658,7 +653,7 @@ export default function ProfileScreen() {
               onPress={() =>
                 Alert.alert(
                   "Support & Help",
-                  "For help, email us at support@heathlandlinks.com or visit our website.",
+                  "For help, email us at Cameron@heathlandlinks.com or visit our website.",
                   [{ text: "OK" }],
                 )
               }

@@ -65,6 +65,17 @@ export default function HomeScreen() {
   const greeting =
     hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  const { data: notifData } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: async () => {
+      const r = await fetch("/api/user/notifications");
+      if (!r.ok) throw new Error("Notifications failed");
+      return r.json();
+    },
+    refetchInterval: 60_000,
+  });
+  const hasUnread = (notifData?.unread_count ?? 0) > 0;
+
   // Feed query
   const {
     data,
@@ -198,6 +209,7 @@ export default function HomeScreen() {
 
   const handlePostMenu = useCallback(
     (post) => {
+      if (!post) return;
       const userId = profileData?.profile?.id;
       const isOwn = post.author_id === userId;
       Alert.alert("Post Options", undefined, [
@@ -312,6 +324,7 @@ export default function HomeScreen() {
         filter={filter}
         onFilterChange={setFilter}
         onNotificationsPress={() => router.push("/notifications")}
+        hasUnread={hasUnread}
       />
 
       {/* ── Feed ────────────────────────────────────────────────────────── */}

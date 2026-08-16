@@ -17,7 +17,8 @@ export async function GET(request) {
         FROM played_courses pc
         JOIN courses c ON c.id = pc.course_id
         WHERE pc.user_id = $1
-        ORDER BY pc.date_played DESC NULLS LAST, pc.created_at DESC
+        ORDER BY LOWER(COALESCE(NULLIF(TRIM(c.club_name), ''), c.name)) ASC,
+                 LOWER(c.name) ASC
         LIMIT $2 OFFSET $3`,
       [userId, limit, offset],
     );

@@ -20,6 +20,10 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
+import {
+  courseDisplayName,
+  formatCourseLocation,
+} from "@/utils/courseDisplayName";
 
 export default function WishlistScreen() {
   const insets = useSafeAreaInsets();
@@ -104,34 +108,52 @@ export default function WishlistScreen() {
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "700",
-              color: Colors.textPrimary,
-            }}
-            numberOfLines={1}
-          >
-            {item.course_name}
-          </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 3,
-              marginTop: 3,
-            }}
-          >
-            <MapPin color={Colors.textMuted} size={11} strokeWidth={1.8} />
-            <Text
-              style={{ fontSize: 11, color: Colors.textSecondary }}
-              numberOfLines={1}
-            >
-              {[item.city, item.county, item.country]
-                .filter(Boolean)
-                .join(", ")}
-            </Text>
-          </View>
+          {(() => {
+            const { title, subtitle } = courseDisplayName(item);
+            const location = formatCourseLocation(item, { includeCounty: true });
+            return (
+              <>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "700",
+                    color: Colors.textPrimary,
+                  }}
+                  numberOfLines={1}
+                >
+                  {title}
+                </Text>
+                {subtitle ? (
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: Colors.textSecondary,
+                      marginTop: 2,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {subtitle}
+                  </Text>
+                ) : null}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 3,
+                    marginTop: 3,
+                  }}
+                >
+                  <MapPin color={Colors.textMuted} size={11} strokeWidth={1.8} />
+                  <Text
+                    style={{ fontSize: 11, color: Colors.textSecondary }}
+                    numberOfLines={1}
+                  >
+                    {location}
+                  </Text>
+                </View>
+              </>
+            );
+          })()}
           <View
             style={{
               flexDirection: "row",

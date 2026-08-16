@@ -1,7 +1,11 @@
 import React from "react";
-import { View, Text } from "react-native";
-import { Star, MapPin, Users } from "lucide-react-native";
+import { View, Text, Linking, TouchableOpacity } from "react-native";
+import { Star, MapPin, Users, Globe } from "lucide-react-native";
 import { Colors, Spacing, Radius } from "@/constants/theme";
+import {
+  courseDisplayName,
+  formatCourseLocation,
+} from "@/utils/courseDisplayName";
 
 export function StatStrip({ label, value, noBorder }) {
   return (
@@ -39,7 +43,24 @@ export function StatStrip({ label, value, noBorder }) {
   );
 }
 
-export function CourseIdentity({ course, rating, reviews, followerCount }) {
+export function CourseIdentity({
+  course,
+  rating,
+  reviews,
+  followerCount,
+  listCount,
+}) {
+  const { title, subtitle } = courseDisplayName(course);
+  const location = formatCourseLocation(course, { includeCounty: true });
+  const par = course.par == null || course.par === "" ? "—" : course.par;
+  const holes = course.holes == null || course.holes === "" ? "—" : course.holes;
+  const onLists = listCount ?? 0;
+  const website = course.website
+    ? course.website.startsWith("http")
+      ? course.website
+      : `https://${course.website}`
+    : null;
+
   return (
     <View
       style={{
@@ -101,7 +122,7 @@ export function CourseIdentity({ course, rating, reviews, followerCount }) {
         )}
       </View>
 
-      {/* Course name */}
+      {/* Club first; distinct course name below */}
       <Text
         style={{
           fontSize: 28,
@@ -109,40 +130,40 @@ export function CourseIdentity({ course, rating, reviews, followerCount }) {
           fontStyle: "italic",
           color: Colors.textPrimary,
           lineHeight: 34,
-          marginBottom: 4,
+          marginBottom: subtitle ? 4 : 8,
         }}
       >
-        {course.name}
+        {title}
       </Text>
-
-      {/* Club name */}
-      <Text
-        style={{
-          fontSize: 15,
-          fontWeight: "700",
-          color: Colors.textSecondary,
-          marginBottom: 8,
-        }}
-      >
-        {course.club_name}
-      </Text>
+      {subtitle ? (
+        <Text
+          style={{
+            fontSize: 15,
+            fontWeight: "700",
+            color: Colors.textSecondary,
+            marginBottom: 8,
+          }}
+        >
+          {subtitle}
+        </Text>
+      ) : null}
 
       {/* Location */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 4,
-          marginBottom: 20,
-        }}
-      >
-        <MapPin color={Colors.textMuted} size={13} strokeWidth={1.8} />
-        <Text style={{ fontSize: 13, color: Colors.textSecondary }}>
-          {[course.city, course.county, course.country]
-            .filter(Boolean)
-            .join(", ")}
-        </Text>
-      </View>
+      {location ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            marginBottom: 20,
+          }}
+        >
+          <MapPin color={Colors.textMuted} size={13} strokeWidth={1.8} />
+          <Text style={{ fontSize: 13, color: Colors.textSecondary }}>
+            {location}
+          </Text>
+        </View>
+      ) : null}
 
       {/* Stats strip */}
       <View
@@ -155,10 +176,33 @@ export function CourseIdentity({ course, rating, reviews, followerCount }) {
         }}
       >
         <StatStrip label="PLAYED" value={course.played_count ?? 0} noBorder />
-        <StatStrip label="ON LISTS" value={course.wishlist_count ?? 0} />
-        <StatStrip label="PAR" value={course.par ?? 72} />
-        <StatStrip label="HOLES" value={course.holes ?? 18} />
+        <StatStrip label="ON LISTS" value={onLists} />
+        <StatStrip label="PAR" value={par} />
+        <StatStrip label="HOLES" value={holes} />
       </View>
+      {website ? (
+        <TouchableOpacity
+          onPress={() => Linking.openURL(website)}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 20,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+            backgroundColor: Colors.greenLight,
+            borderRadius: Radius.md,
+          }}
+        >
+          <Globe size={16} color={Colors.green} strokeWidth={1.8} />
+          <Text
+            style={{ flex: 1, fontSize: 13, fontWeight: "600", color: Colors.green }}
+            numberOfLines={1}
+          >
+            Visit website
+          </Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }

@@ -84,7 +84,7 @@ export const COLLECTION_CONFIG = [
     is_active: true,
     is_sample_data: false,
     accentColor: "gold",
-    icon: "🍀",
+    icon: "🇮🇪",
     description:
       "The best of the island of Ireland — Republic and Northern Ireland combined.",
   },
@@ -96,7 +96,14 @@ const VERIFIED_STATUSES = ["verified", "manually_verified"];
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const preview = parseInt(searchParams.get("preview") || "8", 10);
+    const collectionId = searchParams.get("id");
+    const preview = Math.min(
+      200,
+      Math.max(
+        1,
+        parseInt(searchParams.get("preview") || (collectionId ? "200" : "8"), 10),
+      ),
+    );
 
     // ── 1. Named ranking collections — VERIFIED ROWS ONLY ────────────────────
     // Uses explicit ranking_year from COLLECTION_CONFIG so that:
@@ -118,6 +125,9 @@ export async function GET(request) {
               'position',          r.position,
               'id',                c.id,
               'name',              c.name,
+              'club_name',         c.club_name,
+              'display_name',      c.display_name,
+              'is_claimed',        c.is_claimed,
               'city',              c.city,
               'county',            c.county,
               'country',           c.country,
@@ -198,7 +208,7 @@ export async function GET(request) {
     // ── 2. Community-computed lists ───────────────────────────────────────────
     const topRated = await sql(
       `SELECT
-          c.id, c.name, c.city, c.county, c.country,
+          c.id, c.name, c.club_name, c.display_name, c.is_claimed, c.city, c.county, c.country,
           c.latitude, c.longitude,
           c.community_rating, c.played_count, c.course_type, c.holes, c.par,
           ROW_NUMBER() OVER (ORDER BY c.community_rating DESC NULLS LAST, c.played_count DESC NULLS LAST) AS position
@@ -210,7 +220,7 @@ export async function GET(request) {
 
     const mostPlayed = await sql(
       `SELECT
-          c.id, c.name, c.city, c.county, c.country,
+          c.id, c.name, c.club_name, c.display_name, c.is_claimed, c.city, c.county, c.country,
           c.latitude, c.longitude,
           c.community_rating, c.played_count, c.course_type, c.holes, c.par,
           ROW_NUMBER() OVER (ORDER BY c.played_count DESC NULLS LAST) AS position
@@ -222,19 +232,25 @@ export async function GET(request) {
 
     const trending = await sql(
       `SELECT
-          c.id, c.name, c.city, c.county, c.country,
+          c.id, c.name, c.club_name, c.display_name, c.is_claimed, c.city, c.county, c.country,
           c.latitude, c.longitude,
           c.community_rating, c.played_count, c.course_type, c.holes, c.par,
-          ROW_NUMBER() OVER (ORDER BY COALESCE(c.community_rating,0)*0.6 + COALESCE(c.played_count,0)*0.2 DESC) AS position
+          COUNT(pc.id)::int AS recent_plays,
+          ROW_NUMBER() OVER (ORDER BY COUNT(pc.id) DESC) AS position
         FROM public.courses c
-        ORDER BY COALESCE(c.community_rating,0)*0.6 + COALESCE(c.played_count,0)*0.2 DESC
+        INNER JOIN public.played_courses pc
+          ON pc.course_id = c.id
+         AND COALESCE(pc.date_played, pc.created_at::date)
+               >= (CURRENT_DATE - INTERVAL '7 days')
+        GROUP BY c.id
+        ORDER BY COUNT(pc.id) DESC
         LIMIT $1`,
       [preview],
     );
 
     const hiddenGems = await sql(
       `SELECT
-          c.id, c.name, c.city, c.county, c.country,
+          c.id, c.name, c.club_name, c.display_name, c.is_claimed, c.city, c.county, c.country,
           c.latitude, c.longitude,
           c.community_rating, c.played_count, c.course_type, c.holes, c.par,
           ROW_NUMBER() OVER (ORDER BY c.community_rating DESC NULLS LAST) AS position
@@ -314,6 +330,11 @@ export async function GET(request) {
         is_destinations: true,
       },
     ];
+
+    if (collectionId) {
+      const match = collections.find((c) => c.id === collectionId);
+      return Response.json({ collections: match ? [match] : [] });
+    }
 
     return Response.json({ collections });
   } catch (error) {

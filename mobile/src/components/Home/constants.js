@@ -25,7 +25,7 @@ export const FILTERS = [
   { key: "all", label: "All" },
   { key: "friends", label: "Friends" },
   { key: "clubs", label: "Clubs" },
-  { key: "communities", label: "Groups" },
+  { key: "communities", label: "Communities" },
   { key: "achievements", label: "Wins" },
 ];
 

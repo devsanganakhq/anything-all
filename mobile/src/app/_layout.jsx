@@ -53,7 +53,7 @@ export default function RootLayout() {
             <Stack.Screen name="auth/intro" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen
-              name="course/[id]"
+              name="explore/list"
               options={{ presentation: "card" }}
             />
             <Stack.Screen

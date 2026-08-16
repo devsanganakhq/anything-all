@@ -1644,6 +1644,7 @@ export default function CommunityDetailScreen() {
             <ChevronLeft color={Colors.ivory} size={20} strokeWidth={1.8} />
           </TouchableOpacity>
           <TouchableOpacity
+            onPress={handleJoin}
             style={{
               width: 36,
               height: 36,
