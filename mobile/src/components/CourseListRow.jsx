@@ -12,6 +12,8 @@ import {
 
 const LOGO_SIZE = 52;
 
+export const DEFAULT_COURSE_LOGO = require("../../assets/images/defaultCourseLogo.jpeg");
+
 /** Prefer the club's own logo; never the Heathland Links app icon. */
 export function resolveCourseLogoUrl(item) {
   if (!item) return null;
@@ -25,44 +27,31 @@ export function resolveCourseLogoUrl(item) {
   return null;
 }
 
-export function CourseListLogo({ url, label }) {
+export function CourseListLogo({ url, label, size = LOGO_SIZE }) {
   const [failed, setFailed] = useState(false);
   const showRemote = Boolean(url) && !failed;
-  const initial = (label || "G").trim().charAt(0).toUpperCase();
+  const radius = Math.round(size * 0.28);
 
   return (
     <View
+      accessibilityLabel={label ? `${label} logo` : "Course logo"}
       style={{
-        width: LOGO_SIZE,
-        height: LOGO_SIZE,
-        borderRadius: 12,
-        backgroundColor: showRemote ? Colors.white : Colors.greenLight,
-        borderWidth: 1,
-        borderColor: Colors.border,
+        width: size,
+        height: size,
+        borderRadius: radius,
+        backgroundColor: Colors.ivoryDeep,
         overflow: "hidden",
-        alignItems: "center",
-        justifyContent: "center",
         flexShrink: 0,
       }}
     >
-      {showRemote ? (
-        <Image
-          source={{ uri: url }}
-          style={{ width: LOGO_SIZE - 8, height: LOGO_SIZE - 8 }}
-          contentFit="contain"
-          onError={() => setFailed(true)}
-        />
-      ) : (
-        <Text
-          style={{
-            fontSize: 20,
-            fontWeight: "700",
-            color: Colors.green,
-          }}
-        >
-          {initial}
-        </Text>
-      )}
+      <Image
+        source={showRemote ? { uri: url } : DEFAULT_COURSE_LOGO}
+        style={{ width: size, height: size, borderRadius: radius }}
+        contentFit="cover"
+        onError={() => {
+          if (showRemote) setFailed(true);
+        }}
+      />
     </View>
   );
 }

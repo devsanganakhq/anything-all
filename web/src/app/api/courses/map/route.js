@@ -12,7 +12,8 @@
  *   4. no image → 'placeholder'  (client renders CourseImagePlaceholder)
  *
  * Filters:
- *   ?filter=ALL | PLAYED | WISHLIST
+ *   ?filter=ALL | MINE | PLAYED | WISHLIST
+ *     MINE — courses the signed-in user has played or saved (their golf map)
  *   ?country=Scotland
  *   ?ranking=Top 100 Britain & Ireland
  *   ?mvpOnly=true  — only courses with mvp_data_status = 'ready'
@@ -41,6 +42,12 @@ export async function GET(request) {
   try {
     userId = await getSessionUserId(request);
   } catch {}
+
+  // A guest has no played/saved courses, so any personal filter is empty
+  // rather than "every course".
+  if (!userId && filter !== "ALL") {
+    return Response.json({ courses: [], total: 0 });
+  }
 
   try {
     // ── Build WHERE conditions ─────────────────────────────────────────────
@@ -80,6 +87,15 @@ export async function GET(request) {
         JOIN wishlist wf ON wf.course_id = c.id AND wf.user_id = $1::int
         LEFT JOIN played_courses pf2 ON pf2.course_id = c.id AND pf2.user_id = $1::int`;
       conditions.push("pf2.id IS NULL");
+    } else if (userId && filter === "MINE") {
+      // EXISTS rather than joins so a course that is both played and saved
+      // is still returned once.
+      conditions.push(`(
+        EXISTS (SELECT 1 FROM played_courses pm
+                WHERE pm.course_id = c.id AND pm.user_id = $1::int)
+        OR EXISTS (SELECT 1 FROM wishlist wm
+                   WHERE wm.course_id = c.id AND wm.user_id = $1::int)
+      )`);
     }
 
     const where = `WHERE ${conditions.join(" AND ")}`;

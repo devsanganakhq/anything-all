@@ -2,7 +2,7 @@
  * Communities Tab — MY GROUPS + DISCOVER
  * Premium Heathland Links visual system
  */
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -47,29 +47,55 @@ const ROLE_CONFIG = {
   member: { label: "Member", bg: Colors.ivoryDeep, text: Colors.textSecondary },
 };
 
+const EMPTY_FILTERS = { query: "", debouncedQuery: "", category: "" };
+
 export default function CommunitiesScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
 
   const [tab, setTab] = useState("my");
-  const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("");
+  // Each tab keeps its own search + category so a filter applied in one tab
+  // never silently narrows the other tab's results.
+  const [filtersByTab, setFiltersByTab] = useState({
+    my: EMPTY_FILTERS,
+    discover: EMPTY_FILTERS,
+  });
   const debounceRef = useRef(null);
-  const [debouncedQ, setDebouncedQ] = useState("");
+
+  const { query, debouncedQuery, category } = filtersByTab[tab];
+  const hasActiveFilters = Boolean(query || category);
+
+  const patchFilters = useCallback((tabKey, patch) => {
+    setFiltersByTab((prev) => ({
+      ...prev,
+      [tabKey]: { ...prev[tabKey], ...patch },
+    }));
+  }, []);
+
+  useEffect(() => () => clearTimeout(debounceRef.current), []);
 
   const handleSearch = (text) => {
-    setQuery(text);
+    const tabKey = tab;
+    patchFilters(tabKey, { query: text });
     clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setDebouncedQ(text), 350);
+    debounceRef.current = setTimeout(
+      () => patchFilters(tabKey, { debouncedQuery: text }),
+      350,
+    );
+  };
+
+  const clearFilters = () => {
+    clearTimeout(debounceRef.current);
+    patchFilters(tab, EMPTY_FILTERS);
   };
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ["communities", tab, debouncedQ, category],
+    queryKey: ["communities", tab, debouncedQuery, category],
     queryFn: async () => {
       const params = new URLSearchParams({ filter: tab });
-      if (debouncedQ) params.set("q", debouncedQ);
+      if (debouncedQuery) params.set("q", debouncedQuery);
       if (category) params.set("category", category);
       const r = await fetch(`/api/communities/list?${params}`);
       if (!r.ok) throw new Error("Failed");
@@ -488,62 +514,60 @@ export default function CommunitiesScreen() {
         </View>
       </View>
 
-      {/* Category filter (only on Discover) */}
-      {tab === "discover" && (
-        <View
-          style={{
-            backgroundColor: Colors.white,
-            borderBottomWidth: 1,
-            borderBottomColor: Colors.border,
+      {/* Category filter — scoped to the active tab */}
+      <View
+        style={{
+          backgroundColor: Colors.white,
+          borderBottomWidth: 1,
+          borderBottomColor: Colors.border,
+        }}
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{
+            paddingHorizontal: Spacing.screenH,
+            paddingVertical: 10,
+            gap: 6,
           }}
         >
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={{ flexGrow: 0 }}
-            contentContainerStyle={{
-              paddingHorizontal: Spacing.screenH,
-              paddingVertical: 10,
-              gap: 6,
-            }}
-          >
-            {CATEGORIES.map((cat) => {
-              const active = category === cat.key;
-              return (
-                <TouchableOpacity
-                  key={cat.key}
-                  onPress={() => setCategory(active ? "" : cat.key)}
+          {CATEGORIES.map((cat) => {
+            const active = category === cat.key;
+            return (
+              <TouchableOpacity
+                key={cat.key}
+                onPress={() =>
+                  patchFilters(tab, { category: active ? "" : cat.key })
+                }
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: Radius.pill,
+                  backgroundColor: active ? Colors.green : Colors.ivoryDeep,
+                  borderWidth: 1,
+                  borderColor: active ? Colors.green : Colors.border,
+                }}
+              >
+                {cat.emoji && <Text style={{ fontSize: 11 }}>{cat.emoji}</Text>}
+                <Text
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 4,
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: Radius.pill,
-                    backgroundColor: active ? Colors.green : Colors.ivoryDeep,
-                    borderWidth: 1,
-                    borderColor: active ? Colors.green : Colors.border,
+                    fontSize: 10,
+                    fontWeight: "700",
+                    letterSpacing: 0.6,
+                    color: active ? Colors.ivory : Colors.textSecondary,
                   }}
                 >
-                  {cat.emoji && (
-                    <Text style={{ fontSize: 11 }}>{cat.emoji}</Text>
-                  )}
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      fontWeight: "700",
-                      letterSpacing: 0.6,
-                      color: active ? Colors.ivory : Colors.textSecondary,
-                    }}
-                  >
-                    {cat.label.toUpperCase()}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
+                  {cat.label.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {/* ── List ──────────────────────────────────────────────────────────── */}
       {isLoading ? (
@@ -586,7 +610,9 @@ export default function CommunitiesScreen() {
                   textAlign: "center",
                 }}
               >
-                {tab === "my" ? "No communities yet" : "No communities found"}
+                {tab === "my" && !hasActiveFilters
+                  ? "No communities yet"
+                  : "No communities found"}
               </Text>
               <Text
                 style={{
@@ -597,11 +623,37 @@ export default function CommunitiesScreen() {
                   lineHeight: 20,
                 }}
               >
-                {tab === "my"
-                  ? "Discover and join golf communities to connect with like-minded golfers."
-                  : "Try a different search or category."}
+                {hasActiveFilters
+                  ? "Try a different search or category."
+                  : tab === "my"
+                    ? "Discover and join golf communities to connect with like-minded golfers."
+                    : "There are no communities to show right now."}
               </Text>
-              {tab === "my" && (
+              {hasActiveFilters && (
+                <TouchableOpacity
+                  onPress={clearFilters}
+                  style={{
+                    marginTop: 20,
+                    paddingHorizontal: 24,
+                    paddingVertical: 12,
+                    borderRadius: Radius.pill,
+                    borderWidth: 1,
+                    borderColor: Colors.green,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "700",
+                      letterSpacing: 1.2,
+                      color: Colors.green,
+                    }}
+                  >
+                    CLEAR FILTERS
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {tab === "my" && !hasActiveFilters && (
                 <TouchableOpacity
                   onPress={() => setTab("discover")}
                   style={{

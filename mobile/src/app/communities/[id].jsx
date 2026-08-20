@@ -43,7 +43,6 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
 
-const DEMO_USER_ID = 7;
 const TABS = ["DISCUSSION", "CHAT", "MEMBERS", "ABOUT"];
 const REACTION_TYPES = [
   { key: "like", emoji: "👍", label: "Like" },
@@ -129,6 +128,16 @@ export default function CommunityDetailScreen() {
     enabled: !!expandedPost,
   });
 
+  const { data: meData } = useQuery({
+    queryKey: ["user-profile"],
+    queryFn: async () => {
+      const r = await fetch("/api/user/profile");
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   const community = detailData?.community ?? null;
   const moderators = detailData?.moderators ?? [];
   const locked = detailData?.locked ?? false;
@@ -140,6 +149,11 @@ export default function CommunityDetailScreen() {
   const isMember = community?.is_member ?? false;
   const myRole = community?.my_role ?? null;
   const isMod = ["admin", "moderator"].includes(myRole);
+  const myUserId = Number(
+    meData?.profile?.id ?? chatData?.currentUserId ?? 0,
+  ) || null;
+  const isMine = (userId) =>
+    myUserId != null && Number(userId) === myUserId;
 
   // Track last message id for polling
   useEffect(() => {
@@ -295,7 +309,7 @@ export default function CommunityDetailScreen() {
   };
 
   const handleChatLongPress = (msg) => {
-    const isOwn = msg.user_id === DEMO_USER_ID;
+    const isOwn = isMine(msg.user_id);
     const opts = [];
     if (isOwn || isMod) {
       opts.push({
@@ -313,7 +327,7 @@ export default function CommunityDetailScreen() {
   };
 
   const handlePostMenu = (post) => {
-    const isOwn = post.user_id === DEMO_USER_ID;
+    const isOwn = isMine(post.user_id);
     const opts = [];
     if (isOwn || isMod) {
       opts.push({
@@ -958,7 +972,7 @@ export default function CommunityDetailScreen() {
         }
       >
         {messages.map((msg, idx) => {
-          const isOwn = msg.user_id === DEMO_USER_ID;
+          const isOwn = isMine(msg.user_id);
           const prevMsg = messages[idx - 1];
           const showName =
             !isOwn && (idx === 0 || prevMsg?.user_id !== msg.user_id);
@@ -967,6 +981,7 @@ export default function CommunityDetailScreen() {
               key={msg.id}
               onLongPress={() => handleChatLongPress(msg)}
               style={{
+                width: "100%",
                 flexDirection: isOwn ? "row-reverse" : "row",
                 alignItems: "flex-end",
                 marginBottom: 8,

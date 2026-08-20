@@ -536,8 +536,17 @@ export default function PassportScreen() {
           <SectionRow
             label="My Golf Map"
             icon={Map}
-            detail="View all courses on the map"
-            onPress={() => router.push("/(tabs)/explore")}
+            detail="Played and saved courses on the map"
+            onPress={() =>
+              router.push({
+                pathname: "/(tabs)/explore",
+                params: {
+                  view: "MAP",
+                  filter: "MINE",
+                  open: String(Date.now()),
+                },
+              })
+            }
           />
         </View>
 

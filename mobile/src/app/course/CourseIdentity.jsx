@@ -6,6 +6,10 @@ import {
   courseDisplayName,
   formatCourseLocation,
 } from "@/utils/courseDisplayName";
+import {
+  CourseListLogo,
+  resolveCourseLogoUrl,
+} from "@/components/CourseListRow";
 
 export function StatStrip({ label, value, noBorder }) {
   return (
@@ -122,48 +126,64 @@ export function CourseIdentity({
         )}
       </View>
 
-      {/* Club first; distinct course name below */}
-      <Text
+      {/* Club logo + name */}
+      <View
         style={{
-          fontSize: 28,
-          fontWeight: "300",
-          fontStyle: "italic",
-          color: Colors.textPrimary,
-          lineHeight: 34,
-          marginBottom: subtitle ? 4 : 8,
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 14,
+          marginBottom: 20,
         }}
       >
-        {title}
-      </Text>
-      {subtitle ? (
-        <Text
-          style={{
-            fontSize: 15,
-            fontWeight: "700",
-            color: Colors.textSecondary,
-            marginBottom: 8,
-          }}
-        >
-          {subtitle}
-        </Text>
-      ) : null}
-
-      {/* Location */}
-      {location ? (
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 4,
-            marginBottom: 20,
-          }}
-        >
-          <MapPin color={Colors.textMuted} size={13} strokeWidth={1.8} />
-          <Text style={{ fontSize: 13, color: Colors.textSecondary }}>
-            {location}
+        <CourseListLogo
+          url={resolveCourseLogoUrl(course)}
+          label={title}
+          size={72}
+        />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontSize: 28,
+              fontWeight: "300",
+              fontStyle: "italic",
+              color: Colors.textPrimary,
+              lineHeight: 34,
+              marginBottom: subtitle ? 4 : 8,
+            }}
+          >
+            {title}
           </Text>
+          {subtitle ? (
+            <Text
+              style={{
+                fontSize: 15,
+                fontWeight: "700",
+                color: Colors.textSecondary,
+                marginBottom: 8,
+              }}
+            >
+              {subtitle}
+            </Text>
+          ) : null}
+          {location ? (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <MapPin color={Colors.textMuted} size={13} strokeWidth={1.8} />
+              <Text
+                style={{ flex: 1, fontSize: 13, color: Colors.textSecondary }}
+                numberOfLines={2}
+              >
+                {location}
+              </Text>
+            </View>
+          ) : null}
         </View>
-      ) : null}
+      </View>
 
       {/* Stats strip */}
       <View

@@ -46,7 +46,7 @@ import {
 } from "lucide-react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import {
   Colors,
   Spacing,
@@ -107,6 +107,29 @@ const COUNTRY_FLAGS = {
 function countryFlagEmoji(country) {
   return COUNTRY_FLAGS[country] || null;
 }
+
+// ─── Map filters ─────────────────────────────────────────────────────────────
+const MAP_FILTERS = [
+  { key: "ALL", label: "ALL" },
+  { key: "MINE", label: "MY COURSES" },
+  { key: "PLAYED", label: "✓ PLAYED" },
+  { key: "WISHLIST", label: "♥ SAVED" },
+];
+
+const MAP_EMPTY_COPY = {
+  MINE: {
+    title: "Your golf map is empty",
+    body: "Courses you mark as played or save to your wish list will appear here.",
+  },
+  PLAYED: {
+    title: "No played courses yet",
+    body: "Mark a course as played and it will show up on your map.",
+  },
+  WISHLIST: {
+    title: "No saved courses yet",
+    body: "Save courses to your wish list to plan your next round.",
+  },
+};
 
 // ─── Status badge used on course cards ───────────────────────────────────────
 function StatusBadge({ played, wishlisted }) {
@@ -178,10 +201,27 @@ export default function ExploreScreen() {
   const qc = useQueryClient();
   const mapRef = useRef(null);
 
-  const [viewMode, setViewMode] = useState("LIST");
-  const [mapFilter, setMapFilter] = useState("ALL");
+  const {
+    view: paramView,
+    filter: paramFilter,
+    open: paramOpen,
+  } = useLocalSearchParams();
+
+  const [viewMode, setViewMode] = useState(
+    paramView === "MAP" ? "MAP" : "LIST",
+  );
+  const [mapFilter, setMapFilter] = useState(() =>
+    MAP_FILTERS.some((f) => f.key === paramFilter) ? paramFilter : "ALL",
+  );
   const [selectedCourse, setSelectedCourse] = useState(null);
   const slideAnim = useRef(new Animated.Value(300)).current;
+
+  // This tab stays mounted, so incoming params have to be applied on every
+  // navigation. `open` is a nonce the caller changes to force a re-apply.
+  useEffect(() => {
+    if (paramView === "MAP" || paramView === "LIST") setViewMode(paramView);
+    if (MAP_FILTERS.some((f) => f.key === paramFilter)) setMapFilter(paramFilter);
+  }, [paramView, paramFilter, paramOpen]);
 
   // ── Search state ─────────────────────────────────────────────────────────
   const [searchActive, setSearchActive] = useState(false);
@@ -227,7 +267,11 @@ export default function ExploreScreen() {
   });
 
   // ── Map data (courses + user status) ────────────────────────────────────
-  const { data: mapData, refetch: refetchMap } = useQuery({
+  const {
+    data: mapData,
+    refetch: refetchMap,
+    isFetching: mapFetching,
+  } = useQuery({
     queryKey: ["courses-map", mapFilter],
     queryFn: async () => {
       const res = await fetch(`/api/courses/map?filter=${mapFilter}`);
