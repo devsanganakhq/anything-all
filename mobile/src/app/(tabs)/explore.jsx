@@ -88,24 +88,28 @@ const FALLBACK_DEST = [
 ];
 
 const COUNTRY_FLAGS = {
-  England: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
-  Scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-  Wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-  Ireland: "🇮🇪",
-  "Northern Ireland": "🇬🇧",
-  USA: "🇺🇸",
-  "United States": "🇺🇸",
-  Australia: "🇦🇺",
-  "New Zealand": "🇳🇿",
-  Spain: "🇪🇸",
-  Portugal: "🇵🇹",
-  Turkey: "🇹🇷",
-  France: "🇫🇷",
-  Canada: "🇨🇦",
+  england: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+  scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
+  ireland: "🇮🇪",
+  "northern ireland": "🇬🇧",
+  usa: "🇺🇸",
+  "united states": "🇺🇸",
+  australia: "🇦🇺",
+  "new zealand": "🇳🇿",
+  spain: "🇪🇸",
+  portugal: "🇵🇹",
+  turkey: "🇹🇷",
+  france: "🇫🇷",
+  canada: "🇨🇦",
+  netherlands: "🇳🇱",
+  "the netherlands": "🇳🇱",
+  holland: "🇳🇱",
 };
 
 function countryFlagEmoji(country) {
-  return COUNTRY_FLAGS[country] || null;
+  if (!country) return null;
+  return COUNTRY_FLAGS[String(country).trim().toLowerCase()] || null;
 }
 
 // ─── Map filters ─────────────────────────────────────────────────────────────

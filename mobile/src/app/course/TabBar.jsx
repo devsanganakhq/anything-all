@@ -1,9 +1,19 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native";
 import { Colors, Spacing } from "@/constants/theme";
 import { TABS } from "@/constants/courseConstants";
 
 export function TabBar({ activeTab, setActiveTab, hasRankings, rankings }) {
+  const scrollRef = useRef(null);
+  const tabX = useRef({});
+
+  useEffect(() => {
+    const x = tabX.current[activeTab];
+    if (typeof x === "number") {
+      scrollRef.current?.scrollTo({ x: Math.max(x - 16, 0), animated: true });
+    }
+  }, [activeTab]);
+
   return (
     <View
       style={{
@@ -13,6 +23,7 @@ export function TabBar({ activeTab, setActiveTab, hasRankings, rankings }) {
       }}
     >
       <ScrollView
+        ref={scrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
@@ -24,6 +35,9 @@ export function TabBar({ activeTab, setActiveTab, hasRankings, rankings }) {
             <TouchableOpacity
               key={tab}
               onPress={() => setActiveTab(tab)}
+              onLayout={(e) => {
+                tabX.current[tab] = e.nativeEvent.layout.x;
+              }}
               style={{
                 paddingHorizontal: 14,
                 paddingVertical: 14,

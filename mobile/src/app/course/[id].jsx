@@ -27,6 +27,7 @@ import {
   RANKING_ACCENTS,
   RANKING_DEFAULT,
   STATUS_CONFIG,
+  STICKY_HEADER_H,
 } from "@/constants/courseConstants";
 import { FloatingControls } from "./FloatingControls";
 import { StickyHeader } from "./StickyHeader";
@@ -60,6 +61,8 @@ export default function CourseDetailScreen() {
 
   // Animated scroll value — drives parallax, sticky header, controls opacity
   const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef(null);
+  const tabBarOffsetY = useRef(0);
 
   // ── Derived animated values ────────────────────────────────────────────
   const heroParallax = scrollY.interpolate({
@@ -163,6 +166,17 @@ export default function CourseDetailScreen() {
       Linking.openURL(gUrl);
     });
   }, [data]);
+
+  const goToReviews = useCallback(() => {
+    setActiveTab("REVIEWS");
+    const y = Math.max(
+      tabBarOffsetY.current - insets.top - STICKY_HEADER_H,
+      0,
+    );
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y, animated: true });
+    });
+  }, [insets.top]);
 
   const handleMarkPlayed = useCallback(() => {
     if (alreadyPlayed) {
@@ -297,6 +311,7 @@ export default function CourseDetailScreen() {
 
       {/* ── Main scroll ───────────────────────────────────────────────────── */}
       <Animated.ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -330,16 +345,24 @@ export default function CourseDetailScreen() {
             reviews={reviews}
             followerCount={followerCount}
             listCount={rankings.length}
+            onPressReviews={goToReviews}
           />
         </View>
 
         {/* ── [2] Tab bar (STICKY) ─────────────────────────────────────────── */}
-        <TabBar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          hasRankings={hasRankings}
-          rankings={rankings}
-        />
+        <View
+          onLayout={(e) => {
+            tabBarOffsetY.current = e.nativeEvent.layout.y;
+          }}
+          style={{ backgroundColor: Colors.white }}
+        >
+          <TabBar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            hasRankings={hasRankings}
+            rankings={rankings}
+          />
+        </View>
 
         {/* ── [3] Tab content ───────────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: Spacing.screenH, paddingTop: 22 }}>

@@ -53,6 +53,7 @@ export function CourseIdentity({
   reviews,
   followerCount,
   listCount,
+  onPressReviews,
 }) {
   const { title, subtitle } = courseDisplayName(course);
   const location = formatCourseLocation(course, { includeCounty: true });
@@ -82,33 +83,41 @@ export function CourseIdentity({
           marginBottom: 10,
         }}
       >
-        {rating > 0 && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-            {[1, 2, 3, 4, 5].map((s) => (
-              <Star
-                key={s}
-                size={13}
-                color={Colors.gold}
-                fill={s <= Math.round(rating) ? Colors.gold : "transparent"}
-                strokeWidth={1.5}
-              />
-            ))}
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: "700",
-                color: Colors.textPrimary,
-                marginLeft: 3,
-              }}
-            >
-              {rating.toFixed(1)}
+        {(rating > 0 || reviews.length > 0) && (
+          <TouchableOpacity
+            onPress={onPressReviews}
+            disabled={!onPressReviews}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+          >
+            {rating > 0 && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Star
+                    key={s}
+                    size={13}
+                    color={Colors.gold}
+                    fill={s <= Math.round(rating) ? Colors.gold : "transparent"}
+                    strokeWidth={1.5}
+                  />
+                ))}
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: Colors.textPrimary,
+                    marginLeft: 3,
+                  }}
+                >
+                  {rating.toFixed(1)}
+                </Text>
+              </View>
+            )}
+            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>
+              ({reviews.length} {reviews.length === 1 ? "review" : "reviews"})
             </Text>
-          </View>
-        )}
-        {reviews.length > 0 && (
-          <Text style={{ fontSize: 12, color: Colors.textSecondary }}>
-            ({reviews.length} {reviews.length === 1 ? "review" : "reviews"})
-          </Text>
+          </TouchableOpacity>
         )}
         {followerCount > 0 && (
           <>

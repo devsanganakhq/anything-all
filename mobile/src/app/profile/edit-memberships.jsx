@@ -40,6 +40,7 @@ import {
   MemberClubIcon,
   VISIBILITY_LABELS,
 } from "@/components/ClubIcons";
+import { courseDisplayName } from "@/utils/courseDisplayName";
 
 // ── Visibility cycle order ────────────────────────────────────────────────────
 const VISIBILITY_ORDER = ["private", "friends", "public"];
@@ -52,17 +53,18 @@ const VIS_COLOR = {
 
 // ── Course search (uses existing courses API) ─────────────────────────────────
 function useCourseSearch(query) {
+  const q = (query || "").trim();
   return useQuery({
-    queryKey: ["course-search", query],
+    queryKey: ["course-search", "memberships", q],
     queryFn: async () => {
-      if (!query || query.trim().length < 2) return { courses: [] };
       const r = await fetch(
-        `/api/courses/list?q=${encodeURIComponent(query)}&limit=20`,
+        `/api/courses/list?q=${encodeURIComponent(q)}&limit=20`,
       );
       if (!r.ok) throw new Error("Search failed");
-      return r.json();
+      const json = await r.json();
+      return Array.isArray(json) ? json : json.courses ?? [];
     },
-    enabled: query.trim().length >= 2,
+    enabled: q.length >= 2,
   });
 }
 
@@ -93,7 +95,7 @@ export default function EditMembershipsScreen() {
     },
   });
 
-  const { data: searchData, isFetching: searching } =
+  const { data: searchHits = [], isFetching: searching } =
     useCourseSearch(debouncedQ);
 
   const memberships = membershipData?.memberships ?? [];
@@ -101,10 +103,15 @@ export default function EditMembershipsScreen() {
   const additionals = memberships
     .filter((m) => m.membership_type === "additional")
     .sort((a, b) => a.display_order - b.display_order);
-  const takenNames = memberships.map((m) => m.club_name.toLowerCase());
-  const searchResults = (searchData?.courses ?? []).filter(
-    (c) => !takenNames.includes(c.name.toLowerCase()),
+  const takenNames = memberships.map((m) =>
+    (m.club_name || "").toLowerCase(),
   );
+  const searchResults = searchHits.filter((c) => {
+    const names = [c.name, c.club_name, c.display_name]
+      .map((n) => (n || "").toLowerCase())
+      .filter(Boolean);
+    return !names.some((n) => takenNames.includes(n));
+  });
 
   // ── Mutations ───────────────────────────────────────────────────────────────
   const addMutation = useMutation({
@@ -215,7 +222,7 @@ export default function EditMembershipsScreen() {
   const selectClub = (course) => {
     addMutation.mutate({
       clubId: course.id,
-      clubName: course.name,
+      clubName: courseDisplayName(course).title,
       membershipType: searchTarget,
     });
   };
@@ -558,67 +565,72 @@ export default function EditMembershipsScreen() {
                 </TouchableOpacity>
               </View>
             )}
-          {searchResults.map((course) => (
-            <TouchableOpacity
-              key={course.id}
-              onPress={() => selectClub(course)}
-              style={{
-                backgroundColor: Colors.white,
-                borderRadius: Radius.md,
-                padding: 14,
-                marginBottom: 8,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 12,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                ...Shadow.card,
-              }}
-            >
-              <View
+          {searchResults.map((course) => {
+            const { title, subtitle } = courseDisplayName(course);
+            const location = [course.city, course.county, course.country]
+              .filter(Boolean)
+              .join(", ");
+            return (
+              <TouchableOpacity
+                key={course.id}
+                onPress={() => selectClub(course)}
                 style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  backgroundColor: Colors.greenLight,
-                  justifyContent: "center",
+                  backgroundColor: Colors.white,
+                  borderRadius: Radius.md,
+                  padding: 14,
+                  marginBottom: 8,
+                  flexDirection: "row",
                   alignItems: "center",
+                  gap: 12,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  ...Shadow.card,
                 }}
               >
-                {searchTarget === "home" ? (
-                  <HomeClubIcon size={16} color={Colors.green} />
-                ) : (
-                  <MemberClubIcon size={16} color={Colors.green} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
+                <View
                   style={{
-                    fontSize: 14,
-                    fontWeight: "700",
-                    color: Colors.textPrimary,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: Colors.greenLight,
+                    justifyContent: "center",
+                    alignItems: "center",
                   }}
-                  numberOfLines={1}
                 >
-                  {course.name}
-                </Text>
-                {(course.city || course.country) && (
+                  {searchTarget === "home" ? (
+                    <HomeClubIcon size={16} color={Colors.green} />
+                  ) : (
+                    <MemberClubIcon size={16} color={Colors.green} />
+                  )}
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text
                     style={{
-                      fontSize: 11,
-                      color: Colors.textSecondary,
-                      marginTop: 1,
+                      fontSize: 14,
+                      fontWeight: "700",
+                      color: Colors.textPrimary,
                     }}
+                    numberOfLines={1}
                   >
-                    {[course.city, course.county, course.country]
-                      .filter(Boolean)
-                      .join(", ")}
+                    {title}
                   </Text>
-                )}
-              </View>
-              <Plus color={Colors.green} size={16} strokeWidth={2} />
-            </TouchableOpacity>
-          ))}
+                  {(subtitle || location) && (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: Colors.textSecondary,
+                        marginTop: 1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {[subtitle, location].filter(Boolean).join(" · ")}
+                    </Text>
+                  )}
+                </View>
+                <Plus color={Colors.green} size={16} strokeWidth={2} />
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       </View>
     );

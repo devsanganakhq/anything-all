@@ -14,7 +14,7 @@ export async function GET(request) {
 
     if (q.trim().length >= 2) {
       conditions.push(
-        `(LOWER(name) LIKE LOWER($${idx}) OR LOWER(club_name) LIKE LOWER($${idx}) OR LOWER(city) LIKE LOWER($${idx}) OR LOWER(county) LIKE LOWER($${idx}))`,
+        `(LOWER(name) LIKE LOWER($${idx}) OR LOWER(COALESCE(club_name,'')) LIKE LOWER($${idx}) OR LOWER(COALESCE(display_name,'')) LIKE LOWER($${idx}) OR LOWER(COALESCE(city,'')) LIKE LOWER($${idx}) OR LOWER(COALESCE(county,'')) LIKE LOWER($${idx}))`,
       );
       params.push(`%${q.trim()}%`);
       idx++;
