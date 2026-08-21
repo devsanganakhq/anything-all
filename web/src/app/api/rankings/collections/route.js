@@ -106,20 +106,13 @@ export async function GET(request) {
     );
 
     // ── 1. Named ranking collections — VERIFIED ROWS ONLY ────────────────────
-    // Uses explicit ranking_year from COLLECTION_CONFIG so that:
-    //   a) we never accidentally serve 2024 SAMPLE_DATA
-    //   b) incomplete collections show their real verified count, not inflated
-    // Two sub-queries per collection:
-    //   verified_count — total active verified rows for the configured year
-    //   courses        — the top <preview> of those rows
+    // Group by ranking_name only so split source/region rows still count as one list.
+    // course_count is the unique course total; preview only slices the card payload.
+    const courseLimit = collectionId ? 200 : preview;
     const namedRows = await sql(
       `SELECT
           r.ranking_name,
-          r.ranking_source,
-          r.ranking_region,
-          r.ranking_year,
-          COUNT(*)::int AS verified_count,
-          COUNT(*) FILTER (WHERE r.position <= $1)::int AS preview_count,
+          COUNT(DISTINCT r.id)::int AS verified_count,
           json_agg(
             json_build_object(
               'position',          r.position,
@@ -142,28 +135,27 @@ export async function GET(request) {
               'verification_status', r.verification_status,
               'research_batch',    r.research_batch
             )
-            ORDER BY r.position
-          ) FILTER (WHERE r.position <= $1) AS courses,
+            ORDER BY r.position NULLS LAST, c.name
+          ) AS all_courses,
 
           -- Quarantined rows at this collection+year (admin info only)
           (SELECT COUNT(*)::int
            FROM public.rankings rq
            WHERE rq.ranking_name = r.ranking_name
-             AND rq.ranking_year = r.ranking_year
+             AND rq.ranking_year = ANY($2)
              AND rq.is_active = false
              AND rq.verification_status = 'unverified'
           ) AS unverified_count
 
         FROM public.rankings r
         JOIN public.courses  c ON c.id = r.course_id
-        WHERE r.ranking_name = ANY($2)
-          AND r.ranking_year = ANY($3)
+        WHERE r.ranking_name = ANY($1)
+          AND r.ranking_year = ANY($2)
           AND r.is_active = true
-          AND r.verification_status = ANY($4)
-        GROUP BY r.ranking_name, r.ranking_source, r.ranking_region, r.ranking_year
-        ORDER BY ARRAY_POSITION($2, r.ranking_name)`,
+          AND r.verification_status = ANY($3)
+        GROUP BY r.ranking_name
+        ORDER BY ARRAY_POSITION($1, r.ranking_name)`,
       [
-        preview,
         CANONICAL_NAMES,
         COLLECTION_CONFIG.map((c) => c.ranking_year),
         VERIFIED_STATUSES,
@@ -176,10 +168,24 @@ export async function GET(request) {
 
     const namedCollections = COLLECTION_CONFIG.map((cfg) => {
       const db = dbByName[cfg.ranking_name];
-      const verifiedCount = db ? db.verified_count : 0;
+      const allCourses = Array.isArray(db?.all_courses) ? db.all_courses : [];
+      const seenPositions = new Set();
+      const seenIds = new Set();
+      const uniqueCourses = [];
+      for (const course of allCourses) {
+        const positionKey =
+          course.position == null ? `id:${course.id}` : `pos:${course.position}`;
+        const idKey = course.id == null ? null : String(course.id);
+        if (seenPositions.has(positionKey)) continue;
+        if (idKey && seenIds.has(idKey)) continue;
+        seenPositions.add(positionKey);
+        if (idKey) seenIds.add(idKey);
+        uniqueCourses.push(course);
+      }
+      const verifiedCount = uniqueCourses.length;
       const unverifiedCount = db ? db.unverified_count : 0;
       const isComplete = verifiedCount >= cfg.expected_size;
-      const missingCount = cfg.expected_size - verifiedCount;
+      const missingCount = Math.max(0, cfg.expected_size - verifiedCount);
       return {
         id: cfg.id,
         ranking_source: cfg.ranking_source,
@@ -191,6 +197,7 @@ export async function GET(request) {
         is_sample_data: false, // quarantined rows are never served
         expected_size: cfg.expected_size,
         verified_count: verifiedCount,
+        course_count: verifiedCount,
         unverified_count: unverifiedCount,
         missing_count: missingCount,
         is_complete: isComplete,
@@ -202,7 +209,7 @@ export async function GET(request) {
         accentColor: cfg.accentColor,
         icon: cfg.icon,
         description: cfg.description,
-        courses: db ? db.courses || [] : [],
+        courses: uniqueCourses.slice(0, courseLimit),
       };
     });
 

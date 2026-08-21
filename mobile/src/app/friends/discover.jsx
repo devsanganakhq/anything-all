@@ -27,10 +27,12 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useOpenUserProfile } from "@/utils/openUserProfile";
 
 export default function DiscoverGolfersScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const openUserProfile = useOpenUserProfile();
   const qc = useQueryClient();
   const [query, setQuery] = useState("");
   const debounceRef = useRef(null);
@@ -109,7 +111,7 @@ export default function DiscoverGolfersScreen() {
 
       return (
         <TouchableOpacity
-          onPress={() => router.push(`/social/${u.id}`)}
+          onPress={() => openUserProfile(u.id)}
           style={{
             backgroundColor: Colors.white,
             borderRadius: Radius.lg,
@@ -369,7 +371,7 @@ export default function DiscoverGolfersScreen() {
         </TouchableOpacity>
       );
     },
-    [router, friendRequestMutation, cancelRequestMutation, followMutation],
+    [openUserProfile, friendRequestMutation, cancelRequestMutation, followMutation],
   );
 
   return (

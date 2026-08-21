@@ -160,6 +160,10 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
           return true;
         }
 
+        if (url.includes("/account/forgot-password")) {
+          return false;
+        }
+
         if (url === currentURI) return true;
 
         const hasParams = url.includes("?");

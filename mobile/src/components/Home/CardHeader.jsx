@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity } from "react-native";
 import { MoreHorizontal } from "lucide-react-native";
 import { Colors, Radius } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PressableUser } from "@/components/PressableUser";
 
 export function CardHeader({ post, meta, onMenu }) {
   const TypeIcon = meta.icon;
@@ -16,8 +17,10 @@ export function CardHeader({ post, meta, onMenu }) {
         paddingBottom: 8,
       }}
     >
-      {/* Avatar */}
-      <TouchableOpacity activeOpacity={0.85}>
+      <PressableUser
+        userId={post.author_id}
+        style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+      >
         <UserAvatar
           uri={post.author_avatar}
           name={post.author_name}
@@ -25,25 +28,25 @@ export function CardHeader({ post, meta, onMenu }) {
           borderWidth={2}
           borderColor={Colors.greenLight}
         />
-      </TouchableOpacity>
 
-      <View style={{ flex: 1, marginLeft: 12 }}>
-        <Text
-          style={{
-            fontSize: 15,
-            fontWeight: "700",
-            color: Colors.textPrimary,
-            lineHeight: 19,
-          }}
-        >
-          {post.author_name}
-        </Text>
-        <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 1 }}>
-          {post.author_home_club
-            ? `${post.author_home_club}  ·  ${post.time_ago}`
-            : post.time_ago}
-        </Text>
-      </View>
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <Text
+            style={{
+              fontSize: 15,
+              fontWeight: "700",
+              color: Colors.textPrimary,
+              lineHeight: 19,
+            }}
+          >
+            {post.author_name}
+          </Text>
+          <Text style={{ fontSize: 11, color: Colors.textMuted, marginTop: 1 }}>
+            {post.author_home_club
+              ? `${post.author_home_club}  ·  ${post.time_ago}`
+              : post.time_ago}
+          </Text>
+        </View>
+      </PressableUser>
 
       {/* Type badge */}
       <View

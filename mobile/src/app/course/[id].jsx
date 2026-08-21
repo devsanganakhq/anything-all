@@ -46,6 +46,19 @@ import {
   formatCourseShareLabel,
 } from "@/utils/courseDisplayName";
 
+function uniqueRankingsByName(rows = []) {
+  const byName = new Map();
+  for (const row of rows) {
+    const name = row?.ranking_name;
+    if (!name) continue;
+    const prev = byName.get(name);
+    if (!prev || (Number(row.ranking_year) || 0) > (Number(prev.ranking_year) || 0)) {
+      byName.set(name, row);
+    }
+  }
+  return [...byName.values()];
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function CourseDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -262,7 +275,7 @@ export default function CourseDetailScreen() {
 
   const course = data.course;
   const { title: displayTitle } = courseDisplayName(course);
-  const rankings = data.rankings ?? [];
+  const rankings = uniqueRankingsByName(data.rankings);
   const reviews = data.reviews ?? [];
   const activity = data.recentActivity ?? [];
   const followerCount = data.followerCount ?? 0;

@@ -38,6 +38,7 @@ import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { HomeClubIcon, MemberClubIcon } from "@/components/ClubIcons";
 import { Alert } from "react-native";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useOpenUserProfile } from "@/utils/openUserProfile";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = SCREEN_W * 0.72;
@@ -112,6 +113,7 @@ function memberSinceLabel(profile) {
 export default function PassportScreen() {
   const insets = useRef(useSafeAreaInsets()).current;
   const router = useRouter();
+  const openUserProfile = useOpenUserProfile();
   const [lbTab, setLbTab] = useState("OVERALL");
 
   const { data, isLoading, isError } = useQuery({
@@ -800,25 +802,19 @@ export default function PassportScreen() {
                       player={podium[1]}
                       rank={2}
                       size={58}
-                      onPress={() =>
-                        podium[1]?.id && router.push(`/social/${podium[1].id}`)
-                      }
+                      onPress={() => openUserProfile(podium[1]?.id)}
                     />
                     <PodiumItem
                       player={podium[0]}
                       rank={1}
                       size={74}
-                      onPress={() =>
-                        podium[0]?.id && router.push(`/social/${podium[0].id}`)
-                      }
+                      onPress={() => openUserProfile(podium[0]?.id)}
                     />
                     <PodiumItem
                       player={podium[2]}
                       rank={3}
                       size={58}
-                      onPress={() =>
-                        podium[2]?.id && router.push(`/social/${podium[2].id}`)
-                      }
+                      onPress={() => openUserProfile(podium[2]?.id)}
                     />
                   </View>
                 </View>
@@ -838,9 +834,7 @@ export default function PassportScreen() {
                   {lbRows.map((player, idx) => (
                     <TouchableOpacity
                       key={`${player.id || player.rank}-${idx}`}
-                      onPress={() =>
-                        player.id && router.push(`/social/${player.id}`)
-                      }
+                      onPress={() => openUserProfile(player.id)}
                       style={{
                         flexDirection: "row",
                         alignItems: "center",

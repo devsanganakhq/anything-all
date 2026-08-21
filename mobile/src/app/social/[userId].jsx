@@ -37,10 +37,12 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { HomeClubIcon, MemberClubIcon } from "@/components/ClubIcons";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useOpenUserProfile } from "@/utils/openUserProfile";
 
 export default function GolferProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const openUserProfile = useOpenUserProfile();
   const { userId } = useLocalSearchParams();
   const targetId = parseInt(userId, 10);
   const qc = useQueryClient();
@@ -799,7 +801,7 @@ export default function GolferProfileScreen() {
                 {mutualFriends.map((mf) => (
                   <TouchableOpacity
                     key={mf.id}
-                    onPress={() => router.push(`/social/${mf.id}`)}
+                    onPress={() => openUserProfile(mf.id)}
                     style={{ alignItems: "center", width: 60 }}
                   >
                     <UserAvatar

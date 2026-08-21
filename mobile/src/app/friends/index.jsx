@@ -32,6 +32,7 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useOpenUserProfile } from "@/utils/openUserProfile";
 
 const TABS = [
   { key: "friends", label: "FRIENDS" },
@@ -42,6 +43,7 @@ const TABS = [
 export default function FriendsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const openUserProfile = useOpenUserProfile();
   const qc = useQueryClient();
   const [tab, setTab] = useState("friends");
   const [query, setQuery] = useState("");
@@ -176,7 +178,7 @@ export default function FriendsScreen() {
       Alert.alert(f.friend_name, undefined, [
         {
           text: "View Profile",
-          onPress: () => router.push(`/social/${f.friend_id}`),
+          onPress: () => openUserProfile(f.friend_id),
         },
         {
           text: "Remove Friend",
@@ -198,13 +200,13 @@ export default function FriendsScreen() {
         { text: "Cancel", style: "cancel" },
       ]);
     },
-    [router, removeMutation],
+    [router, openUserProfile, removeMutation],
   );
 
   const handleFollowingMenu = useCallback(
     (u) => {
       Alert.alert(u.name, undefined, [
-        { text: "View Profile", onPress: () => router.push(`/social/${u.id}`) },
+        { text: "View Profile", onPress: () => openUserProfile(u.id) },
         {
           text: u.is_following ? "Unfollow" : "Follow",
           style: u.is_following ? "destructive" : "default",
@@ -213,7 +215,7 @@ export default function FriendsScreen() {
         { text: "Cancel", style: "cancel" },
       ]);
     },
-    [router, followMutation],
+    [openUserProfile, followMutation],
   );
 
   // ── Renders ──────────────────────────────────────────────────────────────────
@@ -227,7 +229,7 @@ export default function FriendsScreen() {
   const renderFriend = useCallback(
     ({ item: f }) => (
       <TouchableOpacity
-        onPress={() => router.push(`/social/${f.friend_id}`)}
+        onPress={() => openUserProfile(f.friend_id)}
         style={styles.card}
       >
         <UserAvatar
@@ -274,7 +276,7 @@ export default function FriendsScreen() {
         </View>
       </TouchableOpacity>
     ),
-    [router, handleFriendMenu],
+    [openUserProfile, handleFriendMenu],
   );
 
   const renderInbound = useCallback(
@@ -282,7 +284,7 @@ export default function FriendsScreen() {
       <View style={[styles.card, { flexDirection: "column", gap: 12 }]}>
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           <TouchableOpacity
-            onPress={() => router.push(`/social/${r.friend_id}`)}
+            onPress={() => openUserProfile(r.friend_id)}
           >
             <UserAvatar
               uri={r.friend_photo}
@@ -384,7 +386,7 @@ export default function FriendsScreen() {
   const renderFollowing = useCallback(
     ({ item: u }) => (
       <TouchableOpacity
-        onPress={() => router.push(`/social/${u.id}`)}
+        onPress={() => openUserProfile(u.id)}
         style={styles.card}
       >
         <UserAvatar uri={u.avatar} name={u.name} size={46} />
@@ -417,7 +419,7 @@ export default function FriendsScreen() {
         </TouchableOpacity>
       </TouchableOpacity>
     ),
-    [router, handleFollowingMenu],
+    [openUserProfile, handleFollowingMenu],
   );
 
   // Build data for Requests tab: inbound section header + items, then outbound

@@ -12,6 +12,7 @@ import { Trophy } from "lucide-react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Colors, Spacing, Radius } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PressableUser } from "@/components/PressableUser";
 
 const podiumColors = { 1: Colors.gold, 2: "#B8BEC6", 3: "#C4965A" };
 
@@ -183,7 +184,8 @@ export default function LeaderboardScreen() {
             </>
           )}
           renderItem={({ item }) => (
-            <View
+            <PressableUser
+              userId={item.id}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -251,7 +253,7 @@ export default function LeaderboardScreen() {
                   COURSES
                 </Text>
               </View>
-            </View>
+            </PressableUser>
           )}
           contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
           ListEmptyComponent={
@@ -284,7 +286,7 @@ function PodiumItem({ player, rank, size }) {
     ? "You"
     : (player.name || "Golfer").split(" ")[0];
   return (
-    <View style={{ alignItems: "center" }}>
+    <PressableUser userId={player.id} style={{ alignItems: "center" }}>
       <UserAvatar
         uri={player.avatar}
         name={player.name}
@@ -328,6 +330,6 @@ function PodiumItem({ player, rank, size }) {
       >
         {player.courses}
       </Text>
-    </View>
+    </PressableUser>
   );
 }

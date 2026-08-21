@@ -14,6 +14,7 @@ import { X, Send } from "lucide-react-native";
 import KeyboardAvoidingAnimatedView from "@/components/KeyboardAvoidingAnimatedView";
 import { Colors, Radius } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PressableUser } from "@/components/PressableUser";
 
 export function CommentsModal({ post, onClose, queryClient, filter }) {
   const insets = useSafeAreaInsets();
@@ -104,21 +105,25 @@ export function CommentsModal({ post, onClose, queryClient, filter }) {
             gap: 10,
           }}
         >
-          <UserAvatar
-            uri={post.author_avatar}
-            name={post.author_name}
-            size={32}
-          />
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: "700",
-                color: Colors.textPrimary,
-              }}
-            >
-              {post.author_name}
-            </Text>
+          <PressableUser
+            userId={post.author_id}
+            style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}
+          >
+            <UserAvatar
+              uri={post.author_avatar}
+              name={post.author_name}
+              size={32}
+            />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: "700",
+                  color: Colors.textPrimary,
+                }}
+              >
+                {post.author_name}
+              </Text>
             {post.caption && (
               <Text
                 style={{
@@ -131,7 +136,8 @@ export function CommentsModal({ post, onClose, queryClient, filter }) {
                 {post.caption}
               </Text>
             )}
-          </View>
+            </View>
+          </PressableUser>
           <Text style={{ fontSize: 11, color: Colors.textMuted }}>
             {post.time_ago}
           </Text>
@@ -172,29 +178,33 @@ export function CommentsModal({ post, onClose, queryClient, filter }) {
                 gap: 10,
               }}
             >
-              <UserAvatar
-                uri={item.author_avatar}
-                name={item.author_name}
-                size={36}
-              />
-              <View style={{ flex: 1 }}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 8,
-                    marginBottom: 3,
-                  }}
-                >
-                  <Text
+              <PressableUser
+                userId={item.user_id}
+                style={{ flexDirection: "row", flex: 1, gap: 10 }}
+              >
+                <UserAvatar
+                  uri={item.author_avatar}
+                  name={item.author_name}
+                  size={36}
+                />
+                <View style={{ flex: 1 }}>
+                  <View
                     style={{
-                      fontSize: 13,
-                      fontWeight: "700",
-                      color: Colors.textPrimary,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 3,
                     }}
                   >
-                    {item.author_name}
-                  </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: Colors.textPrimary,
+                      }}
+                    >
+                      {item.author_name}
+                    </Text>
                   <Text style={{ fontSize: 10, color: Colors.textMuted }}>
                     {item.time_ago}
                   </Text>
@@ -218,6 +228,7 @@ export function CommentsModal({ post, onClose, queryClient, filter }) {
                   </Text>
                 </View>
               </View>
+              </PressableUser>
             </View>
           )}
         />

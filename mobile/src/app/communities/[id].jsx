@@ -42,6 +42,8 @@ import { Image } from "expo-image";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PressableUser } from "@/components/PressableUser";
+import { useOpenUserProfile } from "@/utils/openUserProfile";
 
 const TABS = ["DISCUSSION", "CHAT", "MEMBERS", "ABOUT"];
 const REACTION_TYPES = [
@@ -59,6 +61,7 @@ const POST_TYPES = [
 export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const openUserProfile = useOpenUserProfile();
   const { id } = useLocalSearchParams();
   const qc = useQueryClient();
   const commId = parseInt(id, 10);
@@ -524,26 +527,35 @@ export default function CommunityDetailScreen() {
                 marginBottom: 10,
               }}
             >
-              <UserAvatar
-                uri={post.author_photo}
-                name={post.author_name}
-                size={36}
-              />
-              <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "700",
-                    color: Colors.textPrimary,
-                  }}
-                >
-                  {post.author_name}
-                </Text>
-                <Text style={{ fontSize: 11, color: Colors.textSecondary }}>
-                  {post.author_club ? `${post.author_club} · ` : ""}
-                  {post.time_ago}
-                </Text>
-              </View>
+              <PressableUser
+                userId={post.user_id}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  flex: 1,
+                }}
+              >
+                <UserAvatar
+                  uri={post.author_photo}
+                  name={post.author_name}
+                  size={36}
+                />
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "700",
+                      color: Colors.textPrimary,
+                    }}
+                  >
+                    {post.author_name}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: Colors.textSecondary }}>
+                    {post.author_club ? `${post.author_club} · ` : ""}
+                    {post.time_ago}
+                  </Text>
+                </View>
+              </PressableUser>
               <View
                 style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
               >
@@ -857,11 +869,13 @@ export default function CommunityDetailScreen() {
                   key={c.id}
                   style={{ flexDirection: "row", marginBottom: 10 }}
                 >
-                  <UserAvatar
-                    uri={c.author_avatar}
-                    name={c.author_name}
-                    size={28}
-                  />
+                  <PressableUser userId={c.user_id}>
+                    <UserAvatar
+                      uri={c.author_avatar}
+                      name={c.author_name}
+                      size={28}
+                    />
+                  </PressableUser>
                   <View
                     style={{
                       flex: 1,
@@ -991,11 +1005,13 @@ export default function CommunityDetailScreen() {
               {!isOwn && (
                 <View style={{ width: 30, height: 30 }}>
                   {showName ? (
-                    <UserAvatar
-                      uri={msg.sender_avatar}
-                      name={msg.sender_name}
-                      size={30}
-                    />
+                    <PressableUser userId={msg.user_id}>
+                      <UserAvatar
+                        uri={msg.sender_avatar}
+                        name={msg.sender_name}
+                        size={30}
+                      />
+                    </PressableUser>
                   ) : null}
                 </View>
               )}
@@ -1187,7 +1203,7 @@ export default function CommunityDetailScreen() {
           }
           return (
             <TouchableOpacity
-              onPress={() => router.push(`/social/${item.id}`)}
+              onPress={() => openUserProfile(item.id)}
               style={{
                 backgroundColor: Colors.white,
                 borderRadius: Radius.md,
@@ -1560,8 +1576,9 @@ export default function CommunityDetailScreen() {
             MODERATION TEAM
           </Text>
           {moderators.map((mod) => (
-            <View
+            <PressableUser
               key={mod.id}
+              userId={mod.id}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -1611,7 +1628,7 @@ export default function CommunityDetailScreen() {
                   {mod.role === "admin" ? "OWNER" : "MOD"}
                 </Text>
               </View>
-            </View>
+            </PressableUser>
           ))}
         </View>
       )}

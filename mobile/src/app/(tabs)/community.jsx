@@ -18,6 +18,7 @@ import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
+import { useOpenUserProfile } from "@/utils/openUserProfile";
 
 const GROUPS = [
   {
@@ -333,8 +334,10 @@ function GroupCard({ group }) {
 }
 
 function FriendCard({ friend }) {
+  const openUserProfile = useOpenUserProfile();
   return (
     <TouchableOpacity
+      onPress={() => openUserProfile(friend.id)}
       style={{
         backgroundColor: Colors.white,
         borderRadius: Radius.lg,

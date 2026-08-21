@@ -27,6 +27,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
+import { useOpenUserProfile } from "@/utils/openUserProfile";
 
 const TYPE_CONFIG = {
   friend_request: {
@@ -53,6 +54,7 @@ const TYPE_CONFIG = {
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const openUserProfile = useOpenUserProfile();
   const qc = useQueryClient();
 
   const { data, isLoading, refetch } = useQuery({
@@ -109,7 +111,7 @@ export default function NotificationsScreen() {
       if (!n.read_at) markReadMutation.mutate(n.id);
 
       if (n.notification_type === "friend_request" && n.from_user_id) {
-        router.push(`/social/${n.from_user_id}`);
+        openUserProfile(n.from_user_id);
       } else if (
         ["activity_like", "activity_comment"].includes(n.notification_type)
       ) {
@@ -118,10 +120,10 @@ export default function NotificationsScreen() {
       } else if (n.notification_type === "community_invite" && n.community_id) {
         router.push(`/communities/${n.community_id}`);
       } else if (n.from_user_id) {
-        router.push(`/social/${n.from_user_id}`);
+        openUserProfile(n.from_user_id);
       }
     },
-    [router, markReadMutation],
+    [router, openUserProfile, markReadMutation],
   );
 
   const renderItem = useCallback(

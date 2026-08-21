@@ -1,5 +1,12 @@
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import { COLLECTION_CONFIG } from "@/app/api/rankings/collections/route";
+
+const VERIFIED_STATUSES = ["verified", "manually_verified"];
+const CANONICAL_NAMES = COLLECTION_CONFIG.map((c) => c.ranking_name);
+const RANKING_YEARS = [
+  ...new Set(COLLECTION_CONFIG.map((c) => c.ranking_year)),
+];
 
 export async function GET(request, { params }) {
   const { id } = params;
@@ -24,15 +31,26 @@ export async function GET(request, { params }) {
       return Response.json({ error: "Course not found" }, { status: 404 });
     }
 
-    // All active rankings for this course, ordered by year desc then position
-    const rankings = await sql`
-      SELECT id, ranking_name, ranking_source, ranking_year, position,
-             ranking_region, verification_status, source_url
-      FROM   rankings
-      WHERE  course_id = ${id}
-        AND  is_active  = true
-      ORDER BY ranking_year DESC, position ASC
-    `;
+    // One verified row per public collection — duplicate imports of the
+    // same list (year/source/region splits) must not appear twice.
+    const rankings = await sql(
+      `SELECT id, ranking_name, ranking_source, ranking_year, position,
+              ranking_region, verification_status, source_url
+       FROM (
+         SELECT DISTINCT ON (ranking_name)
+                id, ranking_name, ranking_source, ranking_year, position,
+                ranking_region, verification_status, source_url
+         FROM   rankings
+         WHERE  course_id = $1
+           AND  is_active = true
+           AND  verification_status = ANY($2)
+           AND  ranking_name = ANY($3)
+           AND  ranking_year = ANY($4)
+         ORDER BY ranking_name, ranking_year DESC, id ASC
+       ) unique_rankings
+       ORDER BY ranking_year DESC, position ASC`,
+      [id, VERIFIED_STATUSES, CANONICAL_NAMES, RANKING_YEARS],
+    );
 
     const photos = await sql`
       SELECT mp.*, u.first_name, u.last_name

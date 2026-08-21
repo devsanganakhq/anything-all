@@ -9,6 +9,12 @@ export default function SignInPage() {
 
   const { signInWithCredentials } = useAuth();
 
+  // Native app WebView always attaches expo-web-success as callbackUrl.
+  const isNativeApp =
+    typeof window !== "undefined" &&
+    (window.location.search.includes("expo-web-success") ||
+      new URLSearchParams(window.location.search).get("source") === "app");
+
   // ── Read any ?error= param the auth system may have put in the URL ─────────
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -17,13 +23,14 @@ export default function SignInPage() {
     if (code) {
       const messages = {
         CredentialsSignin: "Incorrect email or password. Please try again.",
-        Configuration:
-          "Sign-in failed — please try again or reset your password.",
+        Configuration: isNativeApp
+          ? "Sign-in failed — please try again."
+          : "Sign-in failed — please try again or reset your password.",
         Default: "Sign-in failed. Please try again.",
       };
       setError(messages[code] ?? messages.Default);
     }
-  }, []);
+  }, [isNativeApp]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -167,21 +174,22 @@ export default function SignInPage() {
           disabled={loading}
         />
 
-        {/* Forgot Password link — sits directly below the password field */}
-        <div style={{ marginTop: -10, marginBottom: 20, textAlign: "right" }}>
-          <a
-            href="/account/forgot-password"
-            style={{
-              fontSize: 12,
-              color: "#1B3828",
-              fontWeight: 600,
-              textDecoration: "underline",
-              textUnderlineOffset: 2,
-            }}
-          >
-            Forgot password?
-          </a>
-        </div>
+        {!isNativeApp && (
+          <div style={{ marginTop: -10, marginBottom: 20, textAlign: "right" }}>
+            <a
+              href="/account/forgot-password"
+              style={{
+                fontSize: 12,
+                color: "#1B3828",
+                fontWeight: 600,
+                textDecoration: "underline",
+                textUnderlineOffset: 2,
+              }}
+            >
+              Forgot password?
+            </a>
+          </div>
+        )}
 
         {/* Error banner */}
         {error && (

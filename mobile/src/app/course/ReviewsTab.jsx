@@ -5,6 +5,7 @@ import { Colors, Radius, Shadow } from "@/constants/theme";
 import { SectionLabel, EmptySection } from "./SharedComponents";
 import { formatDate } from "./utils";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PressableUser } from "@/components/PressableUser";
 
 export function ReviewsTab({
   reviews,
@@ -144,21 +145,30 @@ export function ReviewsTab({
                   marginBottom: 10,
                 }}
               >
-                <UserAvatar
-                  uri={rev.profile_photo_url}
-                  name={`${rev.first_name || ""} ${rev.last_name || ""}`.trim()}
-                  size={38}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "700",
-                      color: Colors.textPrimary,
-                    }}
-                  >
-                    {rev.first_name} {rev.last_name}
-                  </Text>
+                <PressableUser
+                  userId={rev.user_id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                    flex: 1,
+                  }}
+                >
+                  <UserAvatar
+                    uri={rev.profile_photo_url}
+                    name={`${rev.first_name || ""} ${rev.last_name || ""}`.trim()}
+                    size={38}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "700",
+                        color: Colors.textPrimary,
+                      }}
+                    >
+                      {rev.first_name} {rev.last_name}
+                    </Text>
                   <View style={{ flexDirection: "row", gap: 2, marginTop: 2 }}>
                     {[...Array(rev.rating || 5)].map((_, i) => (
                       <Star
@@ -168,8 +178,9 @@ export function ReviewsTab({
                         fill={Colors.gold}
                       />
                     ))}
+                    </View>
                   </View>
-                </View>
+                </PressableUser>
                 <Text style={{ fontSize: 10, color: Colors.textMuted }}>
                   {formatDate(rev.created_at)}
                 </Text>

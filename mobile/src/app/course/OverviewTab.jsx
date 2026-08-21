@@ -6,6 +6,7 @@ import { SectionLabel } from "./SharedComponents";
 import { timeAgo } from "./utils";
 import { ACTIVITY_LABELS } from "@/constants/courseConstants";
 import { UserAvatar } from "@/components/UserAvatar";
+import { PressableUser } from "@/components/PressableUser";
 
 export function OverviewTab({
   description,
@@ -221,21 +222,30 @@ export function OverviewTab({
                   gap: 10,
                 }}
               >
-                <UserAvatar
-                  uri={item.profile_photo_url}
-                  name={`${item.first_name || ""} ${item.last_name || ""}`.trim()}
-                  size={34}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "600",
-                      color: Colors.textPrimary,
-                    }}
-                  >
-                    {item.first_name} {item.last_name}
-                  </Text>
+                <PressableUser
+                  userId={item.user_id}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                    flex: 1,
+                  }}
+                >
+                  <UserAvatar
+                    uri={item.profile_photo_url}
+                    name={`${item.first_name || ""} ${item.last_name || ""}`.trim()}
+                    size={34}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "600",
+                        color: Colors.textPrimary,
+                      }}
+                    >
+                      {item.first_name} {item.last_name}
+                    </Text>
                   <Text
                     style={{
                       fontSize: 11,
@@ -243,8 +253,9 @@ export function OverviewTab({
                     }}
                   >
                     {ACTIVITY_LABELS[item.activity_type] ?? item.activity_type}
-                  </Text>
-                </View>
+                    </Text>
+                  </View>
+                </PressableUser>
                 <Text style={{ fontSize: 10, color: Colors.textMuted }}>
                   {timeAgo(item.created_at)}
                 </Text>
