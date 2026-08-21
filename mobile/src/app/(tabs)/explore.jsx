@@ -105,6 +105,7 @@ const COUNTRY_FLAGS = {
   netherlands: "🇳🇱",
   "the netherlands": "🇳🇱",
   holland: "🇳🇱",
+  "isle of man": "🇮🇲",
 };
 
 function countryFlagEmoji(country) {

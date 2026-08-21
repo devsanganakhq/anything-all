@@ -7,6 +7,7 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -670,6 +671,21 @@ export default function ProfileScreen() {
         <View style={{ alignItems: "center", paddingBottom: 16 }}>
           <Text style={{ fontSize: 11, color: Colors.textMuted }}>
             Heathland Links · v1.0.0
+          </Text>
+          <Text
+            style={{
+              fontSize: 11,
+              color: Colors.textMuted,
+              marginTop: 6,
+            }}
+          >
+            Crafted with 💚@
+            <Text
+              style={{ fontWeight: "700", color: Colors.textPrimary }}
+              onPress={() => Linking.openURL("https://www.sanganakhq.com/")}
+            >
+              SanganakHQ
+            </Text>
           </Text>
         </View>
       </ScrollView>

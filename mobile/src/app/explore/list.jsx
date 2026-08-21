@@ -27,6 +27,15 @@ import {
   MapCoursePreviewCard,
   markPlayedHref,
 } from "@/components/MapCoursePreviewCard";
+import { courseDisplayName } from "@/utils/courseDisplayName";
+
+function sortCoursesByName(rows) {
+  return [...rows].sort((a, b) => {
+    const titleA = courseDisplayName(a).title;
+    const titleB = courseDisplayName(b).title;
+    return titleA.localeCompare(titleB, undefined, { sensitivity: "base" });
+  });
+}
 
 function hasCoords(course) {
   const lat = Number(course?.latitude);
@@ -115,11 +124,11 @@ export default function ExploreCourseListScreen() {
     queryFn: async () => {
       if (kind === "country") {
         const res = await fetch(
-          `/api/courses/list?country=${encodeURIComponent(country || "")}&limit=200`,
+          `/api/courses/list?country=${encodeURIComponent(country || "")}&limit=200&sort=name`,
         );
         if (!res.ok) throw new Error("Failed to load courses");
         const rows = await res.json();
-        return Array.isArray(rows) ? rows : [];
+        return sortCoursesByName(Array.isArray(rows) ? rows : []);
       }
       const res = await fetch(
         `/api/rankings/collections?id=${encodeURIComponent(id || "")}&preview=200`,

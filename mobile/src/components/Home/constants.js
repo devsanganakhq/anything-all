@@ -127,4 +127,5 @@ export const COUNTRY_FLAGS = {
   japan: "🇯🇵",
   "united kingdom": "🇬🇧",
   uk: "🇬🇧",
+  "isle of man": "🇮🇲",
 };

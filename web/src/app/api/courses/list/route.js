@@ -31,18 +31,30 @@ export async function GET(request) {
     }
 
     params.push(limit);
+    const sort = searchParams.get("sort") || "";
+    const sortByName = sort === "name" || (Boolean(country) && !q.trim());
     const whereClause =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const orderClause = sortByName
+      ? `ORDER BY
+          LOWER(COALESCE(
+            NULLIF(TRIM(club_name), ''),
+            NULLIF(TRIM(name), ''),
+            NULLIF(TRIM(display_name), ''),
+            ''
+          )) ASC,
+          name ASC`
+      : `ORDER BY
+          EXISTS (
+            SELECT 1 FROM rankings r
+            WHERE r.course_id = courses.id AND r.is_active = true
+          ) DESC,
+          (latitude IS NOT NULL AND longitude IS NOT NULL) DESC,
+          community_rating DESC NULLS LAST,
+          played_count DESC,
+          name`;
     const query = `SELECT * FROM courses ${whereClause}
-      ORDER BY
-        EXISTS (
-          SELECT 1 FROM rankings r
-          WHERE r.course_id = courses.id AND r.is_active = true
-        ) DESC,
-        (latitude IS NOT NULL AND longitude IS NOT NULL) DESC,
-        community_rating DESC NULLS LAST,
-        played_count DESC,
-        name
+      ${orderClause}
       LIMIT $${idx}`;
 
     const courses = await sql(query, params);
