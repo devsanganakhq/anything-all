@@ -8,7 +8,7 @@ import { getSessionUserId } from "@/app/api/utils/getUserId";
 export async function GET(request) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -26,16 +26,16 @@ export async function GET(request) {
     const users = await sql(
       `SELECT
           u.id,
-          u.first_name || ' ' || u.last_name  AS name,
+          NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '') AS name,
           u.profile_photo_url                  AS avatar,
           u.location,
           u.home_club_name                     AS home_club,
           u.bio,
 
-          CASE WHEN (u.privacy_settings->>'stats_visible')::boolean
+          CASE WHEN COALESCE((u.privacy_settings->>'stats_visible')::boolean, true)
             THEN u.handicap ELSE NULL END AS handicap,
 
-          CASE WHEN (u.privacy_settings->>'stats_visible')::boolean
+          CASE WHEN COALESCE((u.privacy_settings->>'stats_visible')::boolean, true)
             THEN (SELECT COUNT(*)::int FROM played_courses WHERE user_id=u.id)
             ELSE NULL END AS courses_played,
 
@@ -63,15 +63,18 @@ export async function GET(request) {
 
         FROM users u
         WHERE u.id != $1
-          AND (u.privacy_settings IS NULL OR (u.privacy_settings->>'profile_visible')::boolean = true)
+          AND COALESCE(u.is_suspended, false) = false
+          AND COALESCE((u.privacy_settings->>'profile_visible')::boolean, true) = true
           AND u.id NOT IN (
             SELECT friend_id FROM friendships WHERE user_id=$1 AND status='blocked'
             UNION SELECT user_id FROM friendships WHERE friend_id=$1 AND status='blocked'
           )
           AND ($2 = '' OR
-            LOWER(u.first_name || ' ' || u.last_name) LIKE LOWER($3) OR
-            LOWER(COALESCE(u.home_club_name,''))       LIKE LOWER($3) OR
-            LOWER(COALESCE(u.location,''))             LIKE LOWER($3)
+            CONCAT_WS(' ', u.first_name, u.last_name) ILIKE $3 OR
+            COALESCE(u.first_name, '') ILIKE $3 OR
+            COALESCE(u.last_name, '') ILIKE $3 OR
+            COALESCE(u.home_club_name, '') ILIKE $3 OR
+            COALESCE(u.location, '') ILIKE $3
           )
         ORDER BY
           CASE

@@ -26,7 +26,7 @@ export const FILTERS = [
   { key: "friends", label: "Friends" },
   { key: "clubs", label: "Clubs" },
   { key: "communities", label: "Communities" },
-  { key: "achievements", label: "Wins" },
+  { key: "achievements", label: "Achievements" },
 ];
 
 export const POST_TYPE_META = {

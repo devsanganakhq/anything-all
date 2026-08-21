@@ -420,40 +420,65 @@ export default function ExploreScreen() {
     }).start(() => setSelectedCourse(null));
   }, [slideAnim]);
 
-  // Frame markers when map data arrives (UK/Ireland courses can sit outside default zoom)
+  const frameMapToCoords = useCallback((coords) => {
+    const map = mapRef.current;
+    if (!map || !coords.length) return;
+    if (coords.length === 1) {
+      map.animateToRegion(
+        {
+          ...coords[0],
+          latitudeDelta: 1.2,
+          longitudeDelta: 1.2,
+        },
+        500,
+      );
+      return;
+    }
+    map.fitToCoordinates(coords, {
+      edgePadding: { top: 120, right: 56, bottom: 140, left: 56 },
+      animated: true,
+    });
+  }, []);
+
+  // Frame markers when map data arrives. Personal filters follow the user's
+  // pins (played first); All Courses still prefers the UK/Ireland overview.
   useEffect(() => {
     if (viewMode !== "MAP" || mapCourses.length === 0) return;
-    const coords = mapCourses
-      .map((c) => ({
-        latitude: Number(c.latitude),
-        longitude: Number(c.longitude),
-      }))
-      .filter(
-        (c) => Number.isFinite(c.latitude) && Number.isFinite(c.longitude),
+    const withCoords = (courses) =>
+      courses
+        .map((c) => ({
+          latitude: Number(c.latitude),
+          longitude: Number(c.longitude),
+        }))
+        .filter(
+          (c) => Number.isFinite(c.latitude) && Number.isFinite(c.longitude),
+        );
+
+    let fitCoords;
+    if (mapFilter === "ALL") {
+      const UK_BBOX = {
+        minLat: 49.5,
+        maxLat: 61,
+        minLng: -11,
+        maxLng: 2.2,
+      };
+      const all = withCoords(mapCourses);
+      const localCoords = all.filter(
+        (c) =>
+          c.latitude >= UK_BBOX.minLat &&
+          c.latitude <= UK_BBOX.maxLat &&
+          c.longitude >= UK_BBOX.minLng &&
+          c.longitude <= UK_BBOX.maxLng,
       );
-    const UK_BBOX = {
-      minLat: 49.5,
-      maxLat: 61,
-      minLng: -11,
-      maxLng: 2.2,
-    };
-    const localCoords = coords.filter(
-      (c) =>
-        c.latitude >= UK_BBOX.minLat &&
-        c.latitude <= UK_BBOX.maxLat &&
-        c.longitude >= UK_BBOX.minLng &&
-        c.longitude <= UK_BBOX.maxLng,
-    );
-    const fitCoords = localCoords.length ? localCoords : null;
-    if (!fitCoords) return;
-    const t = setTimeout(() => {
-      mapRef.current?.fitToCoordinates(fitCoords, {
-        edgePadding: { top: 100, right: 48, bottom: 120, left: 48 },
-        animated: true,
-      });
-    }, 350);
+      fitCoords = localCoords.length ? localCoords : all;
+    } else {
+      const played = withCoords(mapCourses.filter((c) => c.user_played));
+      fitCoords = played.length ? played : withCoords(mapCourses);
+    }
+    if (!fitCoords.length) return;
+    const t = setTimeout(() => frameMapToCoords(fitCoords), 400);
     return () => clearTimeout(t);
-  }, [viewMode, mapFilter, mapCourses.length]);
+  }, [viewMode, mapFilter, mapCourses, paramOpen, frameMapToCoords]);
 
   // ── Map legend ───────────────────────────────────────────────────────────
   const MapLegend = () => (
@@ -809,9 +834,31 @@ export default function ExploreScreen() {
           ))}
         </MapView>
 
-        {/* Locate button */}
+        {/* Locate button — personal maps go to your pins; All Courses stays on UK */}
         <TouchableOpacity
-          onPress={() =>
+          onPress={() => {
+            if (mapFilter !== "ALL") {
+              const played = mapCourses.filter(
+                (c) =>
+                  c.user_played &&
+                  Number.isFinite(Number(c.latitude)) &&
+                  Number.isFinite(Number(c.longitude)),
+              );
+              const source = played.length ? played : mapCourses;
+              const coords = source
+                .map((c) => ({
+                  latitude: Number(c.latitude),
+                  longitude: Number(c.longitude),
+                }))
+                .filter(
+                  (c) =>
+                    Number.isFinite(c.latitude) && Number.isFinite(c.longitude),
+                );
+              if (coords.length) {
+                frameMapToCoords(coords);
+                return;
+              }
+            }
             mapRef.current?.animateToRegion(
               {
                 latitude: 54.0,
@@ -820,8 +867,8 @@ export default function ExploreScreen() {
                 longitudeDelta: 9.0,
               },
               600,
-            )
-          }
+            );
+          }}
           style={{
             position: "absolute",
             right: Spacing.screenH,

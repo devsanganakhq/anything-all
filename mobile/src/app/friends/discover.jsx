@@ -42,7 +42,7 @@ export default function DiscoverGolfersScreen() {
     debounceRef.current = setTimeout(() => setDebouncedQuery(text), 350);
   };
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ["social", "search", debouncedQuery],
     queryFn: async () => {
       const r = await fetch(
@@ -461,6 +461,59 @@ export default function DiscoverGolfersScreen() {
           style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
         >
           <ActivityIndicator color={Colors.green} />
+        </View>
+      ) : isError ? (
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 24,
+          }}
+        >
+          <Search color={Colors.textMuted} size={44} strokeWidth={1.4} />
+          <Text
+            style={{
+              fontSize: 17,
+              fontWeight: "700",
+              color: Colors.textPrimary,
+              marginTop: 16,
+            }}
+          >
+            Couldn't load golfers
+          </Text>
+          <Text
+            style={{
+              fontSize: 13,
+              color: Colors.textSecondary,
+              marginTop: 8,
+              textAlign: "center",
+              lineHeight: 20,
+            }}
+          >
+            Check your connection and try again.
+          </Text>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={{
+              marginTop: 20,
+              backgroundColor: Colors.green,
+              borderRadius: Radius.sm,
+              paddingVertical: 10,
+              paddingHorizontal: 20,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: "700",
+                color: Colors.ivory,
+                letterSpacing: 0.5,
+              }}
+            >
+              TRY AGAIN
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
