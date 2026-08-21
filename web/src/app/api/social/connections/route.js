@@ -7,15 +7,16 @@ import { getSessionUserId } from "@/app/api/utils/getUserId";
 export async function GET(request) {
   let viewerId;
   try {
-    viewerId = await getSessionUserId();
+    viewerId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);
-  const targetId = parseInt(searchParams.get("userId") || "0", 10);
+  const rawUserId = searchParams.get("userId");
+  const targetId = rawUserId ? parseInt(rawUserId, 10) : viewerId;
   const type = searchParams.get("type") || "friends";
-  if (!targetId)
+  if (!targetId || Number.isNaN(targetId))
     return Response.json({ error: "userId required" }, { status: 400 });
 
   try {
@@ -32,7 +33,7 @@ export async function GET(request) {
       users = await sql(
         `SELECT
             CASE WHEN f.user_id=$1 THEN u2.id   ELSE u1.id   END AS id,
-            CASE WHEN f.user_id=$1 THEN u2.first_name||' '||u2.last_name ELSE u1.first_name||' '||u1.last_name END AS name,
+            CASE WHEN f.user_id=$1 THEN NULLIF(TRIM(CONCAT_WS(' ', u2.first_name, u2.last_name)), '') ELSE NULLIF(TRIM(CONCAT_WS(' ', u1.first_name, u1.last_name)), '') END AS name,
             CASE WHEN f.user_id=$1 THEN u2.profile_photo_url ELSE u1.profile_photo_url END AS avatar,
             CASE WHEN f.user_id=$1 THEN u2.location ELSE u1.location END AS location,
             CASE WHEN f.user_id=$1 THEN u2.home_club_name ELSE u1.home_club_name END AS home_club,
@@ -49,7 +50,7 @@ export async function GET(request) {
       );
     } else if (type === "followers") {
       users = await sql(
-        `SELECT u.id, u.first_name||' '||u.last_name AS name, u.profile_photo_url AS avatar, u.location, u.home_club_name AS home_club,
+        `SELECT u.id, NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '') AS name, u.profile_photo_url AS avatar, u.location, u.home_club_name AS home_club,
             fl.created_at AS connected_at,
             (SELECT status FROM friendships WHERE (user_id=$2 AND friend_id=u.id) OR (user_id=u.id AND friend_id=$2) LIMIT 1) AS friendship_status,
             EXISTS(SELECT 1 FROM follows WHERE follower_id=$2 AND followee_type='user' AND followee_id=u.id) AS is_following,
@@ -62,7 +63,7 @@ export async function GET(request) {
       );
     } else if (type === "following") {
       users = await sql(
-        `SELECT u.id, u.first_name||' '||u.last_name AS name, u.profile_photo_url AS avatar, u.location, u.home_club_name AS home_club,
+        `SELECT u.id, NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '') AS name, u.profile_photo_url AS avatar, u.location, u.home_club_name AS home_club,
             fl.created_at AS connected_at,
             (SELECT status FROM friendships WHERE (user_id=$2 AND friend_id=u.id) OR (user_id=u.id AND friend_id=$2) LIMIT 1) AS friendship_status,
             EXISTS(SELECT 1 FROM follows WHERE follower_id=$2 AND followee_type='user' AND followee_id=u.id) AS is_following,
@@ -75,7 +76,7 @@ export async function GET(request) {
       );
     } else if (type === "mutual") {
       users = await sql(
-        `SELECT u.id, u.first_name||' '||u.last_name AS name, u.profile_photo_url AS avatar, u.location, u.home_club_name AS home_club,
+        `SELECT u.id, NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), '') AS name, u.profile_photo_url AS avatar, u.location, u.home_club_name AS home_club,
             (SELECT status FROM friendships WHERE (user_id=$2 AND friend_id=u.id) OR (user_id=u.id AND friend_id=$2) LIMIT 1) AS friendship_status,
             EXISTS(SELECT 1 FROM follows WHERE follower_id=$2 AND followee_type='user' AND followee_id=u.id) AS is_following,
             (SELECT COUNT(*)::int FROM played_courses WHERE user_id=u.id) AS courses_played

@@ -33,7 +33,6 @@ import { useRouter } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { UserAvatar } from "@/components/UserAvatar";
 
-const DEMO_USER_ID = 7;
 const TABS = [
   { key: "friends", label: "FRIENDS" },
   { key: "requests", label: "REQUESTS" },
@@ -80,11 +79,18 @@ export default function FriendsScreen() {
   });
 
   const { data: followingData, isLoading: loadingFollowing } = useQuery({
-    queryKey: ["social", "connections", DEMO_USER_ID, "following"],
+    queryKey: ["social", "connections", "following"],
     queryFn: async () => {
-      const r = await fetch(
-        `/api/social/connections?userId=${DEMO_USER_ID}&type=following`,
-      );
+      const r = await fetch("/api/social/connections?type=following");
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+  });
+
+  const { data: followersData, isLoading: loadingFollowers } = useQuery({
+    queryKey: ["social", "connections", "followers"],
+    queryFn: async () => {
+      const r = await fetch("/api/social/connections?type=followers");
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
@@ -100,6 +106,9 @@ export default function FriendsScreen() {
     filterName(f.friend_name, query),
   );
   const following = (followingData?.users ?? []).filter((f) =>
+    filterName(f.name, query),
+  );
+  const followers = (followersData?.users ?? []).filter((f) =>
     filterName(f.name, query),
   );
 
@@ -136,13 +145,15 @@ export default function FriendsScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["friends"] }),
   });
 
-  const unfollowMutation = useMutation({
+  const followMutation = useMutation({
     mutationFn: async (followeeId) => {
-      await fetch("/api/social/follow", {
+      const r = await fetch("/api/social/follow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ followeeId, followeeType: "user" }),
       });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
     },
     onSuccess: () =>
       qc.invalidateQueries({ queryKey: ["social", "connections"] }),
@@ -195,14 +206,14 @@ export default function FriendsScreen() {
       Alert.alert(u.name, undefined, [
         { text: "View Profile", onPress: () => router.push(`/social/${u.id}`) },
         {
-          text: "Unfollow",
-          style: "destructive",
-          onPress: () => unfollowMutation.mutate(u.id),
+          text: u.is_following ? "Unfollow" : "Follow",
+          style: u.is_following ? "destructive" : "default",
+          onPress: () => followMutation.mutate(u.id),
         },
         { text: "Cancel", style: "cancel" },
       ]);
     },
-    [router, unfollowMutation],
+    [router, followMutation],
   );
 
   // ── Renders ──────────────────────────────────────────────────────────────────
@@ -210,7 +221,7 @@ export default function FriendsScreen() {
     tab === "friends"
       ? loadingFriends
       : tab === "following"
-        ? loadingFollowing
+        ? loadingFollowing || loadingFollowers
         : loadingIn;
 
   const renderFriend = useCallback(
@@ -425,8 +436,23 @@ export default function FriendsScreen() {
       : []),
   ];
 
+  const followsData = [
+    ...(followers.length
+      ? [
+          { __type: "header", label: `FOLLOWERS (${followers.length})` },
+          ...followers.map((u) => ({ ...u, __type: "follow" })),
+        ]
+      : []),
+    ...(following.length
+      ? [
+          { __type: "header", label: `FOLLOWING (${following.length})` },
+          ...following.map((u) => ({ ...u, __type: "follow" })),
+        ]
+      : []),
+  ];
+
   const currentData =
-    tab === "friends" ? friends : tab === "requests" ? requestsData : following;
+    tab === "friends" ? friends : tab === "requests" ? requestsData : followsData;
 
   const currentEmpty =
     tab === "friends"
@@ -443,8 +469,8 @@ export default function FriendsScreen() {
           }
         : {
             icon: Rss,
-            title: "Not following anyone",
-            msg: "Follow golfers to see their rounds and updates in your feed.",
+            title: "No follows yet",
+            msg: "People who follow you, and golfers you follow, will appear here.",
           };
 
   return (
@@ -515,7 +541,7 @@ export default function FriendsScreen() {
               fontSize: 14,
               color: Colors.textPrimary,
             }}
-            placeholder={`Search ${tab === "following" ? "following" : "friends"}…`}
+            placeholder={`Search ${tab === "following" ? "follows" : "friends"}…`}
             placeholderTextColor={Colors.textMuted}
             value={query}
             onChangeText={setQuery}
@@ -527,7 +553,15 @@ export default function FriendsScreen() {
           {TABS.map((t) => {
             const active = tab === t.key;
             const badge =
-              t.key === "requests" && requestCount > 0 ? requestCount : null;
+              t.key === "requests" && requestCount > 0
+                ? requestCount
+                : t.key === "following" &&
+                    (followersData?.users?.length || 0) +
+                      (followingData?.users?.length || 0) >
+                      0
+                  ? (followersData?.users?.length || 0) +
+                    (followingData?.users?.length || 0)
+                  : null;
             return (
               <TouchableOpacity
                 key={t.key}
@@ -590,7 +624,9 @@ export default function FriendsScreen() {
       ) : (
         <FlatList
           data={currentData}
-          keyExtractor={(item, i) => `${tab}-${item.id || item.friend_id || i}`}
+          keyExtractor={(item, i) =>
+            `${tab}-${item.__type || "row"}-${item.id || item.friend_id || "h"}-${i}`
+          }
           contentContainerStyle={{
             paddingHorizontal: Spacing.screenH,
             paddingTop: 14,
@@ -679,7 +715,8 @@ export default function FriendsScreen() {
             }
             if (item.__type === "inbound") return renderInbound({ item });
             if (item.__type === "outbound") return renderOutbound({ item });
-            if (tab === "following") return renderFollowing({ item });
+            if (item.__type === "follow" || tab === "following")
+              return renderFollowing({ item });
             return renderFriend({ item });
           }}
         />

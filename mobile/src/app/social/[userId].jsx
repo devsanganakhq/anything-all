@@ -38,15 +38,12 @@ import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { HomeClubIcon, MemberClubIcon } from "@/components/ClubIcons";
 import { UserAvatar } from "@/components/UserAvatar";
 
-const DEMO_USER_ID = 7;
-
 export default function GolferProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { userId } = useLocalSearchParams();
   const targetId = parseInt(userId, 10);
   const qc = useQueryClient();
-  const isSelf = targetId === DEMO_USER_ID;
 
   // ── Fetch profile ─────────────────────────────────────────────────────────
   const { data, isLoading, isError, refetch } = useQuery({
@@ -60,6 +57,7 @@ export default function GolferProfileScreen() {
   });
 
   const profile = data?.profile ?? null;
+  const isSelf = profile?.is_self === true;
   const achievements = data?.achievements ?? [];
   const recentCourses = data?.recentCourses ?? [];
   const mutualFriends = data?.mutualFriends ?? [];

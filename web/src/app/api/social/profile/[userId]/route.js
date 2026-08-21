@@ -7,7 +7,7 @@ import { getSessionUserIdOrNull } from "@/app/api/utils/getUserId";
 
 export async function GET(request, { params }) {
   const targetId = parseInt(params.userId, 10);
-  const viewerId = await getSessionUserIdOrNull();
+  const viewerId = await getSessionUserIdOrNull(request);
   if (!targetId || isNaN(targetId))
     return Response.json({ error: "Invalid userId" }, { status: 400 });
 
@@ -85,6 +85,7 @@ export async function GET(request, { params }) {
           private: true,
           is_following: user.is_following,
           friendship_status: user.friendship_status,
+          is_self: isSelf,
         },
       });
     }
@@ -149,7 +150,7 @@ export async function GET(request, { params }) {
 
     const { privacy_settings, ...publicUser } = user;
     return Response.json({
-      profile: { ...publicUser, private: false },
+      profile: { ...publicUser, private: false, is_self: isSelf },
       achievements,
       recentCourses,
       mutualFriends,
