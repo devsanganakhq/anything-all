@@ -7,6 +7,7 @@ import { styles } from "./styles";
 export function FloatingControls({
   insets,
   floatingCtrlOpacity,
+  pointerEvents = "box-none",
   onBack,
   onShare,
   onWishlist,
@@ -15,7 +16,7 @@ export function FloatingControls({
 }) {
   return (
     <Animated.View
-      pointerEvents="box-none"
+      pointerEvents={pointerEvents}
       style={{
         position: "absolute",
         top: insets.top + 10,
@@ -36,7 +37,11 @@ export function FloatingControls({
       </TouchableOpacity>
 
       <View style={{ flexDirection: "row", gap: 10 }}>
-        <TouchableOpacity onPress={onShare} style={styles.floatBtn}>
+        <TouchableOpacity
+          onPress={onShare}
+          style={styles.floatBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Share2 color="#FFF" size={18} strokeWidth={2} />
         </TouchableOpacity>
         <TouchableOpacity

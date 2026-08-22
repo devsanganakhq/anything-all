@@ -7,13 +7,14 @@ import { STICKY_HEADER_H } from "@/constants/courseConstants";
 export function StickyHeader({
   insets,
   stickyHeaderOpacity,
+  pointerEvents = "box-none",
   courseName,
   onBack,
   onShare,
 }) {
   return (
     <Animated.View
-      pointerEvents="box-none"
+      pointerEvents={pointerEvents}
       style={{
         position: "absolute",
         top: 0,
@@ -49,7 +50,10 @@ export function StickyHeader({
       >
         {courseName}
       </Text>
-      <TouchableOpacity onPress={onShare}>
+      <TouchableOpacity
+        onPress={onShare}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
         <Share2 color={Colors.ivory} size={18} strokeWidth={2} />
       </TouchableOpacity>
     </Animated.View>

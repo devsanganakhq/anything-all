@@ -636,12 +636,7 @@ export default function ProfileScreen() {
             <MenuItem
               icon={Shield}
               title="Privacy & Security"
-              onPress={() =>
-                Alert.alert(
-                  "Coming Soon",
-                  "Privacy and security settings are coming in a future update.",
-                )
-              }
+              onPress={() => router.push("/profile/privacy")}
             />
             <MenuItem
               icon={Bell}

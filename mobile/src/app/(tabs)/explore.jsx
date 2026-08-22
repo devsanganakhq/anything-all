@@ -64,18 +64,6 @@ import {
   formatCourseShareLabel,
 } from "@/utils/courseDisplayName";
 
-// ─── Destination images (editorial, not course photos) ────────────────────────
-const DEST_IMAGES = {
-  Scotland:
-    "https://images.unsplash.com/photo-1590732503206-89686008b49e?q=80&w=800&auto=format&fit=crop",
-  Ireland:
-    "https://images.unsplash.com/photo-1510525009512-ad7fc2a4c1cb?q=80&w=800&auto=format&fit=crop",
-  England:
-    "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?q=80&w=800&auto=format&fit=crop",
-  Wales:
-    "https://images.unsplash.com/photo-1609563110787-5e3fc66f8e18?q=80&w=800&auto=format&fit=crop",
-};
-
 // Keep COURSE_IMAGES as an empty fallback array so existing ref sites degrade gracefully
 // while we migrate to CourseThumbnail below
 const COURSE_IMAGES = [];
@@ -1600,7 +1588,6 @@ function CourseCard({ item, imgIndex, onPress }) {
 }
 
 function DestinationCard({ dest, onPress }) {
-  const img = DEST_IMAGES[dest.country];
   const flag = dest.flag || countryFlagEmoji(dest.country);
   const initials = (dest.country || "")
     .split(" ")
@@ -1617,24 +1604,12 @@ function DestinationCard({ dest, onPress }) {
         borderRadius: Radius.lg,
         overflow: "hidden",
         backgroundColor: Colors.green,
+        justifyContent: "flex-end",
+        padding: 12,
       }}
       activeOpacity={0.8}
     >
-      {img && (
-        <Image
-          source={{ uri: img }}
-          style={{ width: "100%", height: "100%", opacity: 0.45 }}
-          contentFit="cover"
-        />
-      )}
-      <View
-        style={{
-          position: "absolute",
-          inset: 0,
-          justifyContent: "flex-end",
-          padding: 12,
-        }}
-      >
+      <View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
           <Text style={{ fontSize: 16 }}>{flag || initials}</Text>
           <Text

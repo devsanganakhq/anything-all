@@ -62,6 +62,7 @@ export default function RootLayout() {
             <Stack.Screen name="notifications/index" />
             <Stack.Screen name="profile/edit-club" />
             <Stack.Screen name="profile/edit" />
+            <Stack.Screen name="profile/privacy" />
             <Stack.Screen
               name="passport/played"
               options={{ presentation: "card" }}

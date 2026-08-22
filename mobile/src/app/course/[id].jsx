@@ -5,7 +5,7 @@
  * passport played/wishlist lists, and feed cards.
  */
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -127,6 +127,14 @@ export default function CourseDetailScreen() {
     outputRange: [0, 1],
     extrapolate: "clamp",
   });
+  const [stickyActive, setStickyActive] = useState(false);
+  useEffect(() => {
+    const id = scrollY.addListener(({ value }) => {
+      const next = value >= HERO_HEIGHT - 70;
+      setStickyActive((prev) => (prev === next ? prev : next));
+    });
+    return () => scrollY.removeListener(id);
+  }, [scrollY]);
 
   // ── Data fetch ────────────────────────────────────────────────────────
   const { data, isLoading, isError } = useQuery({
@@ -333,6 +341,7 @@ export default function CourseDetailScreen() {
       <FloatingControls
         insets={insets}
         floatingCtrlOpacity={floatingCtrlOpacity}
+        pointerEvents={stickyActive ? "none" : "box-none"}
         onBack={() => router.back()}
         onShare={handleShare}
         onWishlist={() => wishlistMutation.mutate()}
@@ -344,6 +353,7 @@ export default function CourseDetailScreen() {
       <StickyHeader
         insets={insets}
         stickyHeaderOpacity={stickyHeaderOpacity}
+        pointerEvents={stickyActive ? "box-none" : "none"}
         courseName={displayTitle}
         onBack={() => router.back()}
         onShare={handleShare}
