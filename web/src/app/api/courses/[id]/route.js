@@ -62,10 +62,48 @@ export async function GET(request, { params }) {
     `;
 
     const reviews = await sql`
-      SELECT r.*, u.first_name, u.last_name, u.profile_photo_url
+      SELECT r.*, u.first_name, u.last_name, u.profile_photo_url,
+             COALESCE((
+               SELECT json_agg(
+                 json_build_object(
+                   'id', cp.id,
+                   'image_url', cp.image_url,
+                   'thumbnail_url', COALESCE(cp.thumbnail_url, cp.image_url),
+                   'caption', cp.caption
+                 )
+                 ORDER BY cp.uploaded_at
+               )
+               FROM course_photos cp
+               WHERE cp.deleted_at IS NULL
+                 AND cp.moderation_status = 'approved'
+                 AND (
+                   cp.review_id = r.id
+                   OR (
+                     cp.review_id IS NULL
+                     AND cp.course_id = r.course_id
+                     AND cp.user_id = r.user_id
+                   )
+                 )
+             ), '[]'::json) AS photos
       FROM   played_courses r
       JOIN   users u ON r.user_id = u.id
-      WHERE  r.course_id = ${id} AND r.review_text IS NOT NULL
+      WHERE  r.course_id = ${id}
+        AND  (
+          (r.review_text IS NOT NULL AND TRIM(r.review_text) <> '')
+          OR EXISTS (
+            SELECT 1 FROM course_photos cp
+            WHERE cp.deleted_at IS NULL
+              AND cp.moderation_status = 'approved'
+              AND (
+                cp.review_id = r.id
+                OR (
+                  cp.review_id IS NULL
+                  AND cp.course_id = r.course_id
+                  AND cp.user_id = r.user_id
+                )
+              )
+          )
+        )
       ORDER  BY r.created_at DESC
       LIMIT  20
     `;

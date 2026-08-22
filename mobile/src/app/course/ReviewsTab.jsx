@@ -1,11 +1,35 @@
-import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
-import { Star, CalendarDays, PenLine } from "lucide-react-native";
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Modal,
+  Pressable,
+} from "react-native";
+import { Star, CalendarDays, PenLine, X } from "lucide-react-native";
+import { Image } from "expo-image";
 import { Colors, Radius, Shadow } from "@/constants/theme";
 import { SectionLabel, EmptySection } from "./SharedComponents";
 import { formatDate } from "./utils";
 import { UserAvatar } from "@/components/UserAvatar";
 import { PressableUser } from "@/components/PressableUser";
+
+function photosForReview(rev) {
+  const raw = rev?.photos;
+  if (Array.isArray(raw)) return raw.filter((p) => p?.image_url || p?.thumbnail_url);
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.filter((p) => p?.image_url || p?.thumbnail_url)
+        : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
 
 export function ReviewsTab({
   reviews,
@@ -13,6 +37,7 @@ export function ReviewsTab({
   alreadyPlayed,
   handleMarkPlayed,
 }) {
+  const [lightbox, setLightbox] = useState(null);
   return (
     <>
       {/* Rating summary */}
@@ -125,7 +150,9 @@ export function ReviewsTab({
 
       {reviews.length > 0 ? (
         <View style={{ gap: 12, marginBottom: 24 }}>
-          {reviews.map((rev) => (
+          {reviews.map((rev) => {
+            const photos = photosForReview(rev);
+            return (
             <View
               key={rev.id}
               style={{
@@ -170,7 +197,7 @@ export function ReviewsTab({
                       {rev.first_name} {rev.last_name}
                     </Text>
                   <View style={{ flexDirection: "row", gap: 2, marginTop: 2 }}>
-                    {[...Array(rev.rating || 5)].map((_, i) => (
+                    {[...Array(rev.rating || 0)].map((_, i) => (
                       <Star
                         key={i}
                         size={10}
@@ -209,17 +236,55 @@ export function ReviewsTab({
                   </Text>
                 </View>
               )}
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: Colors.textSecondary,
-                  lineHeight: 20,
-                }}
-              >
-                {rev.review_text}
-              </Text>
+              {rev.review_text ? (
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: Colors.textSecondary,
+                    lineHeight: 20,
+                  }}
+                >
+                  {rev.review_text}
+                </Text>
+              ) : null}
+              {photos.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ flexGrow: 0, marginTop: rev.review_text ? 12 : 4 }}
+                  contentContainerStyle={{ gap: 8 }}
+                >
+                  {photos.map((photo) => {
+                    const uri = photo.thumbnail_url || photo.image_url;
+                    return (
+                      <TouchableOpacity
+                        key={photo.id || uri}
+                        onPress={() =>
+                          setLightbox({
+                            uri: photo.image_url || uri,
+                            caption: photo.caption,
+                          })
+                        }
+                        activeOpacity={0.85}
+                      >
+                        <Image
+                          source={{ uri }}
+                          style={{
+                            width: 88,
+                            height: 88,
+                            borderRadius: Radius.sm,
+                            backgroundColor: Colors.ivoryDeep,
+                          }}
+                          contentFit="cover"
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              ) : null}
             </View>
-          ))}
+            );
+          })}
         </View>
       ) : (
         <EmptySection
@@ -257,6 +322,50 @@ export function ReviewsTab({
           </Text>
         </TouchableOpacity>
       )}
+
+      <Modal
+        visible={!!lightbox}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLightbox(null)}
+      >
+        <Pressable
+          onPress={() => setLightbox(null)}
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.92)",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: 20,
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => setLightbox(null)}
+            style={{ position: "absolute", top: 56, right: 20, zIndex: 2 }}
+          >
+            <X color="#fff" size={24} strokeWidth={2} />
+          </TouchableOpacity>
+          {lightbox?.uri ? (
+            <Image
+              source={{ uri: lightbox.uri }}
+              style={{ width: "100%", height: "70%" }}
+              contentFit="contain"
+            />
+          ) : null}
+          {lightbox?.caption ? (
+            <Text
+              style={{
+                color: "#fff",
+                fontSize: 13,
+                marginTop: 16,
+                textAlign: "center",
+              }}
+            >
+              {lightbox.caption}
+            </Text>
+          ) : null}
+        </Pressable>
+      </Modal>
     </>
   );
 }
