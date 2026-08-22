@@ -340,8 +340,7 @@ export function PhotosTab({ courseId, alreadyPlayed, course }) {
                   lineHeight: 20,
                 }}
               >
-                Your photos have been submitted for approval. They will appear
-                on the course page once reviewed by our team.
+                Your photos are now live on the course page.
               </Text>
               <TouchableOpacity
                 onPress={closeSheet}
@@ -387,8 +386,8 @@ export function PhotosTab({ courseId, alreadyPlayed, course }) {
                 >
                   {course?.name}
                 </Text>
-                . Up to {MAX_PHOTOS} photos · reviewed before appearing
-                publicly.
+                . Up to {MAX_PHOTOS} photos. They appear on the course page
+                as soon as you upload.
               </Text>
 
               <View

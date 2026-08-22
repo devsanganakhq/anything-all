@@ -2,13 +2,16 @@ import React from "react";
 import { View, Text, Animated, TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
 import { Award } from "lucide-react-native";
-import { HERO_HEIGHT } from "@/constants/courseConstants";
+import { HERO_HEIGHT, SCREEN_W } from "@/constants/courseConstants";
 import { styles, StyleSheet_absoluteFill } from "./styles";
 import { Spacing } from "@/constants/theme";
 import { CourseImagePlaceholder } from "@/components/CourseImagePlaceholder";
 
+const HERO_IMAGE_HEIGHT = HERO_HEIGHT + 80;
+
 export function CourseHero({
   heroImage,
+  heroFit = "cover",
   heroParallax,
   heroOverlayOpacity,
   courseType,
@@ -22,19 +25,27 @@ export function CourseHero({
   country,
 }) {
   return (
-    <View style={{ height: HERO_HEIGHT, overflow: "hidden" }}>
+    <View
+      style={{
+        height: HERO_HEIGHT,
+        overflow: "hidden",
+        backgroundColor: "#0e1e15",
+      }}
+    >
       {heroImage ? (
         /* ── Parallax photo ─────────────────────────────────────────────── */
         <Animated.View
           style={{
             transform: [{ translateY: heroParallax }],
-            height: HERO_HEIGHT + 80,
+            width: SCREEN_W,
+            height: HERO_IMAGE_HEIGHT,
           }}
         >
           <Image
             source={{ uri: heroImage }}
-            style={{ width: "100%", height: "100%" }}
-            contentFit="cover"
+            style={{ width: SCREEN_W, height: HERO_IMAGE_HEIGHT }}
+            contentFit={heroFit}
+            contentPosition="center"
             transition={300}
           />
         </Animated.View>

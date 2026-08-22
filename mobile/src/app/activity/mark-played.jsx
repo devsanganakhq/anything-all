@@ -124,7 +124,7 @@ export default function MarkPlayedScreen() {
 
       const photoMsg =
         selectedPhotos.length > 0 && termsAccepted
-          ? "\n\nYour photos have been submitted for approval."
+          ? "\n\nYour photos are now live on the course page."
           : "";
       Alert.alert(
         "Round Recorded",
@@ -306,8 +306,8 @@ export default function MarkPlayedScreen() {
               lineHeight: 18,
             }}
           >
-            Share your photos from this round. Up to {MAX_PHOTOS} photos ·
-            reviewed before appearing publicly.
+            Share your photos from this round. Up to {MAX_PHOTOS} photos.
+            They appear on the course page as soon as you save.
           </Text>
 
           {/* Photo previews + picker */}
@@ -475,8 +475,8 @@ export default function MarkPlayedScreen() {
                 }}
               >
                 {selectedPhotos.length} photo
-                {selectedPhotos.length !== 1 ? "s" : ""} will be submitted for
-                review after this round is recorded.
+                {selectedPhotos.length !== 1 ? "s" : ""} will be published on
+                the course page when this round is recorded.
               </Text>
             </View>
           )}

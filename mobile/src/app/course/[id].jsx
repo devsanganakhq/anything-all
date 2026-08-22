@@ -46,6 +46,35 @@ import {
   formatCourseShareLabel,
 } from "@/utils/courseDisplayName";
 
+function isLikelyLogoUrl(url) {
+  const value = String(url || "").toLowerCase();
+  return (
+    value.includes("logo") ||
+    value.includes("crest") ||
+    value.includes("badge") ||
+    value.endsWith(".svg")
+  );
+}
+
+function resolveCourseHero(course) {
+  if (
+    course.official_profile_status === "paid" &&
+    course.official_hero_image_url
+  ) {
+    return { uri: course.official_hero_image_url, fit: "cover" };
+  }
+
+  const photoUrl = course.course_image_url || null;
+  const logoUrl = course.official_logo_url || null;
+  if (photoUrl && photoUrl !== logoUrl && !isLikelyLogoUrl(photoUrl)) {
+    return { uri: photoUrl, fit: "cover" };
+  }
+  if (logoUrl) {
+    return { uri: logoUrl, fit: "contain" };
+  }
+  return { uri: null, fit: "cover" };
+}
+
 function uniqueRankingsByName(rows = []) {
   const byName = new Map();
   for (const row of rows) {
@@ -282,14 +311,12 @@ export default function CourseDetailScreen() {
   const statusConfig = STATUS_CONFIG[course.course_status] || null;
   const hasRankings = rankings.length > 0;
 
-  // ── Hero image — priority logic ─────────────────────────────────────────
+  // ── Hero image — photos cover the banner; logos sit contained ───────────
   // A. Paid official profile with official_hero_image_url
-  // B. Fallback to course_image_url (legacy field)
-  // C. null → CourseHero renders the branded placeholder
-  const heroImage =
-    course.official_profile_status === "paid" && course.official_hero_image_url
-      ? course.official_hero_image_url
-      : course.course_image_url || null;
+  // B. course_image_url when it is a real photo (not the club crest)
+  // C. official logo, contained so it is not stretched
+  // D. null → CourseHero renders the branded placeholder
+  const { uri: heroImage, fit: heroFit } = resolveCourseHero(course);
 
   const description =
     course.description ||
@@ -337,6 +364,7 @@ export default function CourseDetailScreen() {
         {/* ── [0] Hero ─────────────────────────────────────────────────────── */}
         <CourseHero
           heroImage={heroImage}
+          heroFit={heroFit}
           heroParallax={heroParallax}
           heroOverlayOpacity={heroOverlayOpacity}
           courseType={course.course_type}

@@ -47,8 +47,9 @@ export function CourseImagePlaceholder({
     >
       <Image
         source={DEFAULT_COURSE_BANNER}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
+        style={StyleSheet.absoluteFillObject}
+        contentFit="contain"
+        contentPosition="center"
         transition={200}
       />
 

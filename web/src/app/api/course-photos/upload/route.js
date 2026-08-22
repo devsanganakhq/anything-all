@@ -1,8 +1,8 @@
 /**
  * POST /api/course-photos/upload
  *
- * Upload one or more photos for a course. Photos are created with
- * moderation_status = 'pending' and never shown publicly until approved.
+ * Upload one or more photos for a course. Mark-as-played and course
+ * gallery uploads are published immediately (moderation_status = 'approved').
  *
  * Body (JSON):
  *   { courseId, photos: [{ imageUrl, thumbnailUrl?, caption? }], reviewId?,
@@ -23,7 +23,7 @@ const CURRENT_TERMS_VERSION = "1.0";
 export async function POST(request) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Authentication required" }, { status: 401 });
   }
@@ -104,7 +104,7 @@ export async function POST(request) {
            (course_id, user_id, review_id, image_url, thumbnail_url, caption,
             photo_type, moderation_status, is_featured, is_official,
             terms_accepted_at, terms_version, uploaded_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'community','pending',false,false,$7,$8,NOW())
+         VALUES ($1,$2,$3,$4,$5,$6,'community','approved',false,false,$7,$8,NOW())
          RETURNING id`,
         [
           courseId,
@@ -124,8 +124,7 @@ export async function POST(request) {
       success: true,
       photoIds: insertedIds,
       count: insertedIds.length,
-      message:
-        "Your photos have been submitted for approval. They will appear on the course page once reviewed by our team.",
+      message: "Your photos are now live on the course page.",
     });
   } catch (err) {
     console.error("POST /api/course-photos/upload", err);
