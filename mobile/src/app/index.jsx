@@ -20,13 +20,12 @@ export default function WelcomeScreen() {
     if (isReady && isAuthenticated) {
       router.replace("/(tabs)/home");
     }
-  }, [isReady, isAuthenticated]);
+  }, [isReady, isAuthenticated, router]);
 
   if (!isReady || isAuthenticated) return null;
 
   // The artwork has "THE DIGITAL GOLF PASSPORT" baked in at the very bottom.
   // Push buttons up enough to sit evenly above that footer text.
-  // footerReserve = home-indicator inset + ~80px for the footer label height + breathing room.
   const footerReserve = Math.max(insets.bottom, 16) + 80;
 
   return (
@@ -78,7 +77,6 @@ export default function WelcomeScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Explicit 14 px gap — buttons never touch or merge */}
         <View style={{ height: 14 }} />
 
         {/* LOG IN — transparent, cream outline */}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import useAuth from "@/utils/useAuth";
+import PasswordField from "../PasswordField";
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("");
@@ -117,15 +118,15 @@ export default function SignUpPage() {
         />
 
         {/* Password */}
-        <label style={labelStyle}>Password</label>
-        <input
-          required
-          type="password"
+        <PasswordField
+          label="Password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="Create a password"
-          style={inputStyle}
           autoComplete="new-password"
+          disabled={loading}
+          inputStyle={inputStyle}
+          labelStyle={labelStyle}
         />
 
         {error && (

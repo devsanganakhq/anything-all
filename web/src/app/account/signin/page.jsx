@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import useAuth from "@/utils/useAuth";
+import PasswordField from "../PasswordField";
 
 export default function SignInPage() {
   const [email, setEmail] = useState("");
@@ -159,19 +160,18 @@ export default function SignInPage() {
         />
 
         {/* Password */}
-        <label style={labelStyle}>Password</label>
-        <input
-          required
-          type="password"
+        <PasswordField
+          label="Password"
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
             setError(null);
           }}
           placeholder="Your password"
-          style={inputStyle}
           autoComplete="current-password"
           disabled={loading}
+          inputStyle={inputStyle}
+          labelStyle={labelStyle}
         />
 
         {!isNativeApp && (
