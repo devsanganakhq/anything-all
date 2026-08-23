@@ -116,15 +116,59 @@ export async function GET(request) {
           -- Comments
           (SELECT COUNT(*)::int FROM feed_comments WHERE post_id = fp.id) AS comment_count,
 
-          -- Primary photo
-          (SELECT media_url FROM feed_post_media WHERE post_id = fp.id AND media_type='photo' ORDER BY display_order LIMIT 1) AS primary_photo,
-          (SELECT COUNT(*)::int FROM feed_post_media WHERE post_id = fp.id AND media_type='photo') AS photo_count,
+          -- Primary photo: feed_post_media, else approved course photos for this round
+          COALESCE(
+            (SELECT media_url FROM feed_post_media WHERE post_id = fp.id AND media_type='photo' ORDER BY display_order LIMIT 1),
+            (SELECT COALESCE(cp.image_url, cp.thumbnail_url)
+               FROM course_photos cp
+              WHERE cp.user_id = fp.author_id
+                AND cp.course_id = fp.course_id
+                AND cp.moderation_status = 'approved'
+                AND fp.post_type IN ('review', 'played_course', 'photos')
+                AND (
+                  ((fp.metadata->>'review_id') IS NOT NULL
+                    AND cp.review_id = (fp.metadata->>'review_id')::int)
+                  OR (fp.metadata->>'review_id') IS NULL
+                )
+              ORDER BY cp.uploaded_at DESC
+              LIMIT 1)
+          ) AS primary_photo,
+          COALESCE(
+            NULLIF((SELECT COUNT(*)::int FROM feed_post_media WHERE post_id = fp.id AND media_type='photo'), 0),
+            (SELECT COUNT(*)::int FROM course_photos cp
+              WHERE cp.user_id = fp.author_id
+                AND cp.course_id = fp.course_id
+                AND cp.moderation_status = 'approved'
+                AND fp.post_type IN ('review', 'played_course', 'photos')
+                AND (
+                  ((fp.metadata->>'review_id') IS NOT NULL
+                    AND cp.review_id = (fp.metadata->>'review_id')::int)
+                  OR (fp.metadata->>'review_id') IS NULL
+                )),
+            0
+          ) AS photo_count,
 
           -- Up to 5 photo URLs for carousel
-          (SELECT json_agg(x.media_url ORDER BY x.display_order)
-           FROM (SELECT media_url, display_order FROM feed_post_media
-                 WHERE post_id = fp.id AND media_type = 'photo'
-                 ORDER BY display_order LIMIT 5) x) AS photo_urls,
+          COALESCE(
+            (SELECT json_agg(x.media_url ORDER BY x.display_order)
+             FROM (SELECT media_url, display_order FROM feed_post_media
+                   WHERE post_id = fp.id AND media_type = 'photo'
+                   ORDER BY display_order LIMIT 5) x),
+            (SELECT json_agg(x.image_url ORDER BY x.uploaded_at DESC)
+             FROM (SELECT COALESCE(cp.image_url, cp.thumbnail_url) AS image_url, cp.uploaded_at
+                     FROM course_photos cp
+                    WHERE cp.user_id = fp.author_id
+                      AND cp.course_id = fp.course_id
+                      AND cp.moderation_status = 'approved'
+                      AND fp.post_type IN ('review', 'played_course', 'photos')
+                      AND (
+                        ((fp.metadata->>'review_id') IS NOT NULL
+                          AND cp.review_id = (fp.metadata->>'review_id')::int)
+                        OR (fp.metadata->>'review_id') IS NULL
+                      )
+                    ORDER BY cp.uploaded_at DESC
+                    LIMIT 5) x)
+          ) AS photo_urls,
 
           -- Time ago
           CASE

@@ -6,6 +6,7 @@ import { CardHeader } from "./CardHeader";
 import { ActivityHeadline } from "./ActivityHeadline";
 import { ReactionBar } from "./ReactionBar";
 import { CardPhoto } from "./CardPhoto";
+import { ReviewPhotos } from "./ReviewPhotos";
 import { CourseBlock } from "./PostBlocks/CourseBlock";
 import { WishlistBlock } from "./PostBlocks/WishlistBlock";
 import { PhotosBlock } from "./PostBlocks/PhotosBlock";
@@ -101,11 +102,23 @@ export function FeedCard({
           </View>
         )}
 
-      {/* Primary photo (for non-photo types that have one) */}
-      {post.primary_photo &&
-        !["photos", "golf_trip"].includes(post.post_type) && (
-          <CardPhoto url={post.primary_photo} count={post.photo_count} />
+      {/* Review / played-course user photos (attached with the round) */}
+      {(post.post_type === "review" || post.post_type === "played_course") &&
+        (post.photo_urls?.length > 0 || post.primary_photo) && (
+          <ReviewPhotos
+            urls={
+              post.photo_urls?.length
+                ? post.photo_urls
+                : [post.primary_photo]
+            }
+          />
         )}
+
+      {/* Primary photo (for other non-photo types that have one) */}
+      {post.primary_photo &&
+        !["photos", "golf_trip", "review", "played_course"].includes(
+          post.post_type,
+        ) && <CardPhoto url={post.primary_photo} count={post.photo_count} />}
 
       {/* Reaction bar */}
       <ReactionBar

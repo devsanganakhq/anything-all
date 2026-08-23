@@ -13,6 +13,7 @@
  * @param {string}  [opts.caption]    – optional human-readable summary
  * @param {object}  [opts.metadata]   – arbitrary JSON payload
  * @param {boolean} [opts.isPrivate]  – default false
+ * @param {string[]} [opts.mediaUrls] – optional photo URLs → feed_post_media
  * @returns {Promise<{id: number}>}   – inserted row id
  */
 
@@ -43,6 +44,7 @@ export async function createFeedPost({
   caption = null,
   metadata = {},
   isPrivate = false,
+  mediaUrls = null,
 }) {
   if (!userId) throw new Error("createFeedPost: userId is required");
   if (!VALID_TYPES.has(postType))
@@ -67,7 +69,33 @@ export async function createFeedPost({
     ],
   );
 
-  return { id: rows[0]?.id };
+  const postId = rows[0]?.id;
+  if (postId && Array.isArray(mediaUrls) && mediaUrls.length) {
+    await attachFeedPostMedia(postId, mediaUrls);
+  }
+
+  return { id: postId };
+}
+
+/**
+ * Attach photo URLs to a feed post (feed_post_media).
+ * @param {number} postId
+ * @param {string[]|{url:string,caption?:string}[]} mediaUrls
+ */
+export async function attachFeedPostMedia(postId, mediaUrls = []) {
+  if (!postId || !mediaUrls?.length) return;
+
+  let order = 0;
+  for (const item of mediaUrls) {
+    const url = typeof item === "string" ? item : item?.url;
+    if (!url) continue;
+    const caption = typeof item === "string" ? null : item?.caption || null;
+    await sql(
+      `INSERT INTO feed_post_media (post_id, media_url, media_type, caption, display_order)
+       VALUES ($1, $2, 'photo', $3, $4)`,
+      [postId, url, caption, order++],
+    );
+  }
 }
 
 /**

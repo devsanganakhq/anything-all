@@ -58,7 +58,11 @@ export async function POST(request) {
         postType: "played_course",
         courseId,
         caption: buildCaption("played_course", { firstName, courseName }),
-        metadata: { rating, date_played: datePlayed },
+        metadata: {
+          rating,
+          date_played: datePlayed,
+          review_id: playedCourse[0].id,
+        },
       });
     }
 
@@ -76,7 +80,11 @@ export async function POST(request) {
           postType: "review",
           courseId,
           caption: `"${reviewText.slice(0, 200)}"`,
-          metadata: { rating, review_text: reviewText },
+          metadata: {
+            rating,
+            review_text: reviewText,
+            review_id: playedCourse[0].id,
+          },
         });
       }
     }

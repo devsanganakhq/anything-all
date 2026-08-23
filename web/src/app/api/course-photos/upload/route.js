@@ -3,6 +3,7 @@
  *
  * Upload one or more photos for a course. Mark-as-played and course
  * gallery uploads are published immediately (moderation_status = 'approved').
+ * Photos are also attached to the matching feed post so they appear on Home.
  *
  * Body (JSON):
  *   { courseId, photos: [{ imageUrl, thumbnailUrl?, caption? }], reviewId?,
@@ -16,6 +17,10 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import {
+  createFeedPost,
+  buildCaption,
+} from "@/app/api/utils/createFeedPost";
 
 const MAX_PHOTOS_PER_BATCH = 10;
 const CURRENT_TERMS_VERSION = "1.0";
@@ -62,7 +67,8 @@ export async function POST(request) {
 
   try {
     // Verify course exists
-    const courseRows = await sql`SELECT id FROM courses WHERE id = ${courseId}`;
+    const courseRows =
+      await sql`SELECT id, name FROM courses WHERE id = ${courseId}`;
     if (!courseRows.length) {
       return Response.json({ error: "Course not found" }, { status: 404 });
     }
@@ -94,9 +100,11 @@ export async function POST(request) {
 
     const acceptedAt = new Date().toISOString();
     const tv = termsVersion || CURRENT_TERMS_VERSION;
+    const linkedReviewId = reviewId || playedRows[0].id;
 
-    // Insert all photos in a single transaction
+    // Insert all photos
     const insertedIds = [];
+    const mediaUrls = [];
     for (const p of photos) {
       const thumbnailUrl = p.thumbnailUrl || ucThumb(p.imageUrl, 400);
       const rows = await sql(
@@ -109,7 +117,7 @@ export async function POST(request) {
         [
           courseId,
           userId,
-          reviewId || null,
+          linkedReviewId || null,
           p.imageUrl,
           thumbnailUrl,
           p.caption || null,
@@ -118,7 +126,17 @@ export async function POST(request) {
         ],
       );
       insertedIds.push(rows[0].id);
+      mediaUrls.push(p.imageUrl);
     }
+
+    // Attach photos to the matching feed post (review preferred)
+    await attachPhotosToFeedPost({
+      userId,
+      courseId,
+      reviewId: linkedReviewId,
+      mediaUrls,
+      courseName: courseRows[0].name,
+    });
 
     return Response.json({
       success: true,
@@ -129,6 +147,106 @@ export async function POST(request) {
   } catch (err) {
     console.error("POST /api/course-photos/upload", err);
     return Response.json({ error: "Failed to upload photos" }, { status: 500 });
+  }
+}
+
+async function attachPhotosToFeedPost({
+  userId,
+  courseId,
+  reviewId,
+  mediaUrls,
+  courseName,
+}) {
+  if (!mediaUrls?.length) return;
+
+  try {
+    let posts = [];
+    if (reviewId) {
+      posts = await sql(
+        `SELECT id, post_type FROM feed_posts
+          WHERE author_id = $1 AND course_id = $2
+            AND post_type IN ('review', 'played_course', 'photos')
+            AND (
+              (metadata->>'review_id')::int = $3
+              OR metadata->>'review_id' IS NULL
+            )
+          ORDER BY
+            CASE post_type
+              WHEN 'review' THEN 0
+              WHEN 'photos' THEN 1
+              ELSE 2
+            END,
+            created_at DESC
+          LIMIT 1`,
+        [userId, courseId, reviewId],
+      );
+    }
+    if (!posts.length) {
+      posts = await sql(
+        `SELECT id, post_type FROM feed_posts
+          WHERE author_id = $1 AND course_id = $2
+            AND post_type IN ('review', 'played_course', 'photos')
+          ORDER BY
+            CASE post_type
+              WHEN 'review' THEN 0
+              WHEN 'photos' THEN 1
+              ELSE 2
+            END,
+            created_at DESC
+          LIMIT 1`,
+        [userId, courseId],
+      );
+    }
+
+    let postId = posts[0]?.id;
+    if (!postId) {
+      const authorRows = await sql(
+        `SELECT first_name FROM users WHERE id = $1`,
+        [userId],
+      );
+      const firstName = authorRows[0]?.first_name || "A golfer";
+      await createFeedPost({
+        userId,
+        postType: "photos",
+        courseId,
+        caption: buildCaption("photos", {
+          firstName,
+          courseName,
+          count: mediaUrls.length,
+        }),
+        metadata: {
+          review_id: reviewId || null,
+          photo_count: mediaUrls.length,
+        },
+        mediaUrls,
+      });
+      return;
+    }
+
+    const existing = await sql(
+      `SELECT COALESCE(MAX(display_order), -1)::int AS max_order
+         FROM feed_post_media WHERE post_id = $1`,
+      [postId],
+    );
+    let order = (existing[0]?.max_order ?? -1) + 1;
+    for (const url of mediaUrls) {
+      await sql(
+        `INSERT INTO feed_post_media (post_id, media_url, media_type, display_order)
+         VALUES ($1, $2, 'photo', $3)`,
+        [postId, url, order++],
+      );
+    }
+
+    if (reviewId) {
+      await sql(
+        `UPDATE feed_posts
+            SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb
+          WHERE id = $1`,
+        [postId, JSON.stringify({ review_id: reviewId })],
+      );
+    }
+  } catch (err) {
+    console.error("attachPhotosToFeedPost:", err);
   }
 }
 
