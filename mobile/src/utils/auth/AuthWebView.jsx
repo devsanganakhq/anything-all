@@ -4,6 +4,7 @@ import { BackHandler, Platform } from "react-native";
 import { WebView } from "react-native-webview";
 import { useAuthStore } from "./store";
 import { resetAppCache } from "@/utils/queryClient";
+import { identifyUser } from "@/utils/posthog";
 
 // Native uses expo-web-success so the page can postMessage JWT back into RN
 // (WKWebView cookies are not reliably shared with the JS fetch cookie jar).
@@ -29,6 +30,9 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
     // Persist the new session first, then drop cached queries so refetches
     // attach the new Bearer token instead of the previous user's.
     setAuth({ jwt: data.jwt, user: data.user });
+    if (data.user) {
+      identifyUser(data.user);
+    }
     resetAppCache();
   };
 

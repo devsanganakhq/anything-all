@@ -5,6 +5,7 @@ import { create } from 'zustand';
 import { Modal, View } from 'react-native';
 import { useAuthModal, useAuthStore, authKey, secureStoreOptions } from './store';
 import { resetAppCache } from '@/utils/queryClient';
+import { identifyUser, resetUser } from '@/utils/posthog';
 
 
 /**
@@ -29,10 +30,14 @@ export const useAuth = () => {
       new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
     ])
       .then((stored) => {
+        const nextAuth = stored ? JSON.parse(stored) : null;
         useAuthStore.setState({
-          auth: stored ? JSON.parse(stored) : null,
+          auth: nextAuth,
           isReady: true,
         });
+        if (nextAuth?.user) {
+          identifyUser(nextAuth.user);
+        }
       })
       .catch(() => {
         useAuthStore.setState({ auth: null, isReady: true });
@@ -51,6 +56,7 @@ export const useAuth = () => {
   const signOut = useCallback(() => {
     fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
     setAuth(null);
+    resetUser();
     resetAppCache();
     close();
     router.replace("/");

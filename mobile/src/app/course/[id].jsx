@@ -46,6 +46,8 @@ import {
   courseDisplayName,
   formatCourseShareLabel,
 } from "@/utils/courseDisplayName";
+import { capture } from "@/utils/posthog";
+import { AnalyticsEvents } from "@/utils/analyticsEvents";
 
 function isLikelyLogoUrl(url) {
   const value = String(url || "").toLowerCase();
@@ -160,6 +162,16 @@ export default function CourseDetailScreen() {
     }
   }, [data]);
 
+  // Track course profile views once data is available
+  React.useEffect(() => {
+    if (!data?.course) return;
+    const { title } = courseDisplayName(data.course);
+    capture(AnalyticsEvents.COURSE_VIEWED, {
+      course_id: id,
+      course_name: title,
+    });
+  }, [data?.course?.id, id]);
+
   // ── Mutations ─────────────────────────────────────────────────────────
   const wishlistMutation = useMutation({
     mutationFn: async () => {
@@ -172,7 +184,14 @@ export default function CourseDetailScreen() {
       return res.json();
     },
     onSuccess: (result) => {
-      setWishlisted(result.wishlisted ?? !wishlisted);
+      const next = result.wishlisted ?? !wishlisted;
+      setWishlisted(next);
+      const { title } = courseDisplayName(data?.course);
+      capture(AnalyticsEvents.WISHLIST_TOGGLED, {
+        course_id: id,
+        course_name: title,
+        wishlisted: next,
+      });
       queryClient.invalidateQueries({ queryKey: ["course", id] });
       queryClient.invalidateQueries({ queryKey: ["passport-stats"] });
       queryClient.invalidateQueries({ queryKey: ["passport-wishlist"] });
@@ -194,6 +213,12 @@ export default function CourseDetailScreen() {
     },
     onSuccess: (result) => {
       setFollowing(result.following);
+      const { title } = courseDisplayName(data?.course);
+      capture(AnalyticsEvents.COURSE_FOLLOWED, {
+        course_id: id,
+        course_name: title,
+        following: result.following,
+      });
       queryClient.invalidateQueries({ queryKey: ["course", id] });
     },
   });
@@ -207,8 +232,13 @@ export default function CourseDetailScreen() {
         url: "https://heathlandlinks.com/",
         title: formatCourseShareLabel(data.course),
       });
+      const { title } = courseDisplayName(data.course);
+      capture(AnalyticsEvents.COURSE_SHARED, {
+        course_id: id,
+        course_name: title,
+      });
     } catch {}
-  }, [data]);
+  }, [data, id]);
 
   const handleMap = useCallback(() => {
     if (!data?.course) return;
@@ -233,6 +263,12 @@ export default function CourseDetailScreen() {
   }, [insets.top]);
 
   const goToClaimClub = useCallback(() => {
+    const { title } = courseDisplayName(data?.course);
+    capture(AnalyticsEvents.CLAIM_CLUB_CTA_TAPPED, {
+      course_id: id,
+      course_name: title,
+      source: "hero",
+    });
     setActiveTab("INFO");
     const scrollToClaim = (tries = 0) => {
       const tabY = Math.max(
@@ -255,7 +291,21 @@ export default function CourseDetailScreen() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => scrollToClaim());
     });
-  }, [insets.top]);
+  }, [insets.top, data?.course, id]);
+
+  const openClaimModal = useCallback(() => {
+    const { title } = courseDisplayName(data?.course);
+    capture(AnalyticsEvents.CLAIM_CLUB_CTA_TAPPED, {
+      course_id: id,
+      course_name: title,
+      source: "info_tab",
+    });
+    capture(AnalyticsEvents.CLAIM_CLUB_MODAL_OPENED, {
+      course_id: id,
+      course_name: title,
+    });
+    setClaimModalVisible(true);
+  }, [data?.course, id]);
 
   const handleMarkPlayed = useCallback(() => {
     if (alreadyPlayed) {
@@ -266,6 +316,11 @@ export default function CourseDetailScreen() {
       );
       return;
     }
+    const { title } = courseDisplayName(data?.course);
+    capture(AnalyticsEvents.MARK_PLAYED_STARTED, {
+      course_id: id,
+      course_name: title,
+    });
     router.push({
       pathname: "/activity/mark-played",
       params: { courseId: id, courseName: formatCourseShareLabel(data?.course) },
@@ -505,7 +560,7 @@ export default function CourseDetailScreen() {
                 claimCardOffsetY.current =
                   tabContentOffsetY.current + e.nativeEvent.layout.y;
               }}
-              onOpenClaimModal={() => setClaimModalVisible(true)}
+              onOpenClaimModal={openClaimModal}
             />
           )}
         </View>

@@ -28,6 +28,7 @@
     "color2k": "2.0.3",
     "date-fns": "4.1.0",
     "expo": "54.0.34",
+    "expo-application": "~7.0.8",
     "expo-asset": "~12.0.13",
     "expo-audio": "~1.1.1",
     "expo-av": "~16.0.8",
@@ -51,6 +52,7 @@
     "expo-image-picker": "~17.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "8.0.12",
+    "expo-localization": "~17.0.8",
     "expo-location": "~19.0.8",
     "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.23",
@@ -71,6 +73,7 @@
     "lucide-react-native": "0.525.0",
     "moti": "0.30.0",
     "papaparse": "5.5.3",
+    "posthog-react-native": "^4.63.5",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -112,7 +115,8 @@
     "postcss": "8.5.18",
     "tailwind-scrollbar": "3.1.0",
     "tailwindcss": "3",
-    "tailwindcss-animate": "1.0.7"
+    "tailwindcss-animate": "1.0.7",
+    "typescript": "~5.9.2"
   },
   "jest": {
     "preset": "jest-expo"
