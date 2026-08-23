@@ -5,6 +5,7 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function POST(request) {
   let userId;
@@ -42,11 +43,12 @@ export async function POST(request) {
       `INSERT INTO friendships (user_id, friend_id, status) VALUES ($1, $2, 'pending')`,
       [userId, friendId],
     );
-    await sql(
-      `INSERT INTO notifications (user_id, notification_type, from_user_id, message)
-       VALUES ($1, 'friend_request', $2, 'sent you a friend request')`,
-      [friendId, userId],
-    );
+    await createNotification({
+      userId: friendId,
+      notificationType: "friend_request",
+      fromUserId: userId,
+      message: "sent you a friend request",
+    });
     return Response.json({ success: true });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

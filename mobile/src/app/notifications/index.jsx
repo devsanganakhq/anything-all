@@ -17,6 +17,7 @@ import {
   MessageCircle,
   UserPlus,
   UserCheck,
+  UserMinus,
   Rss,
   Users,
   Bell,
@@ -47,7 +48,25 @@ const TYPE_CONFIG = {
     color: Colors.green,
     label: "Comment",
   },
+  feed_like: { icon: Heart, color: Colors.error, label: "Reaction" },
+  feed_comment: {
+    icon: MessageCircle,
+    color: Colors.green,
+    label: "Comment",
+  },
   community_invite: { icon: Users, color: Colors.purple, label: "Community" },
+  community_join: { icon: UserPlus, color: Colors.purple, label: "Joined" },
+  community_leave: { icon: UserMinus, color: Colors.purple, label: "Left" },
+  community_post_like: {
+    icon: Heart,
+    color: Colors.error,
+    label: "Reaction",
+  },
+  community_post_comment: {
+    icon: MessageCircle,
+    color: Colors.green,
+    label: "Comment",
+  },
   message: { icon: MessageCircle, color: Colors.green, label: "Message" },
 };
 
@@ -113,11 +132,25 @@ export default function NotificationsScreen() {
       if (n.notification_type === "friend_request" && n.from_user_id) {
         openUserProfile(n.from_user_id);
       } else if (
-        ["activity_like", "activity_comment"].includes(n.notification_type)
+        [
+          "activity_like",
+          "activity_comment",
+          "feed_like",
+          "feed_comment",
+        ].includes(n.notification_type)
       ) {
         // Navigate to home feed (closest we can do without specific post routing)
         router.push("/(tabs)");
-      } else if (n.notification_type === "community_invite" && n.community_id) {
+      } else if (
+        [
+          "community_invite",
+          "community_join",
+          "community_leave",
+          "community_post_like",
+          "community_post_comment",
+        ].includes(n.notification_type) &&
+        n.community_id
+      ) {
         router.push(`/communities/${n.community_id}`);
       } else if (n.from_user_id) {
         openUserProfile(n.from_user_id);

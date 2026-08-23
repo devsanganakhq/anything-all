@@ -267,6 +267,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   from_user_id INTEGER REFERENCES users(id),
   activity_id INTEGER REFERENCES activity_feed(id),
   community_id INTEGER REFERENCES communities(id),
+  feed_post_id INTEGER,
+  community_post_id INTEGER,
   message TEXT,
   read_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -356,6 +358,29 @@ CREATE TABLE IF NOT EXISTS community_posts (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ
 );
+
+-- Notifications FKs added after feed_posts / community_posts exist
+DO $$ BEGIN
+  ALTER TABLE notifications
+    ADD COLUMN IF NOT EXISTS feed_post_id INTEGER;
+  ALTER TABLE notifications
+    ADD COLUMN IF NOT EXISTS community_post_id INTEGER;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE notifications
+    ADD CONSTRAINT notifications_feed_post_id_fkey
+    FOREIGN KEY (feed_post_id) REFERENCES feed_posts(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE notifications
+    ADD CONSTRAINT notifications_community_post_id_fkey
+    FOREIGN KEY (community_post_id) REFERENCES community_posts(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS community_post_comments (
   id SERIAL PRIMARY KEY,

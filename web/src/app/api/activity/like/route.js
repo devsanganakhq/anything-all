@@ -1,4 +1,5 @@
 import sql from "@/app/api/utils/sql";
+import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function POST(request) {
   const userId = 1; // Mock user ID
@@ -35,11 +36,14 @@ export async function POST(request) {
         SELECT user_id FROM activity_feed WHERE id = ${activityId}
       `;
 
-      if (activity[0] && activity[0].user_id !== userId) {
-        await sql`
-          INSERT INTO notifications (user_id, notification_type, from_user_id, activity_id, message)
-          VALUES (${activity[0].user_id}, 'activity_like', ${userId}, ${activityId}, 'liked your activity')
-        `;
+      if (activity[0]) {
+        await createNotification({
+          userId: activity[0].user_id,
+          notificationType: "activity_like",
+          fromUserId: userId,
+          activityId,
+          message: "liked your activity",
+        });
       }
 
       return Response.json({ liked: true });

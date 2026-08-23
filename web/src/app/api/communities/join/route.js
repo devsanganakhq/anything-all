@@ -9,6 +9,7 @@
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 import { createFeedPost } from "@/app/api/utils/createFeedPost";
+import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function POST(request) {
   const userId = await getSessionUserId();
@@ -51,6 +52,14 @@ export async function POST(request) {
         [communityId],
       );
 
+      await createNotification({
+        userId: community.created_by,
+        notificationType: "community_leave",
+        fromUserId: userId,
+        communityId: parseInt(communityId, 10),
+        message: `left ${community.name}`,
+      });
+
       return Response.json({ success: true, action: "left" });
     }
 
@@ -65,17 +74,13 @@ export async function POST(request) {
            VALUES ($1, 'community', $2) ON CONFLICT DO NOTHING`,
           [userId, communityId],
         );
-        // Notify owner
-        await sql(
-          `INSERT INTO notifications (user_id, notification_type, from_user_id, community_id, message)
-           VALUES ($1, 'community_invite', $2, $3, $4)`,
-          [
-            community.created_by,
-            userId,
-            communityId,
-            `requested to join ${community.name}`,
-          ],
-        );
+        await createNotification({
+          userId: community.created_by,
+          notificationType: "community_invite",
+          fromUserId: userId,
+          communityId: parseInt(communityId, 10),
+          message: `requested to join ${community.name}`,
+        });
         return Response.json({ success: true, action: "requested" });
       }
 
@@ -88,6 +93,14 @@ export async function POST(request) {
         `UPDATE communities SET member_count=member_count+1 WHERE id=$1`,
         [communityId],
       );
+
+      await createNotification({
+        userId: community.created_by,
+        notificationType: "community_join",
+        fromUserId: userId,
+        communityId: parseInt(communityId, 10),
+        message: `joined ${community.name}`,
+      });
 
       // Activity feed
       try {

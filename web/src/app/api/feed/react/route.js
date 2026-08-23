@@ -7,6 +7,7 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function POST(request) {
   const { postId, reaction } = await request.json();
@@ -16,9 +17,9 @@ export async function POST(request) {
     return Response.json({ error: "postId required" }, { status: 400 });
 
   try {
-    // Check if post exists and is visible
+    // Check if post exists and is visible; need author for notifications
     const post = await sql(
-      `SELECT id FROM feed_posts WHERE id = $1 AND is_private = false`,
+      `SELECT id, author_id FROM feed_posts WHERE id = $1 AND is_private = false`,
       [postId],
     );
     if (!post.length)
@@ -49,6 +50,14 @@ export async function POST(request) {
         [postId, userId, reaction],
       );
       userReaction = reaction;
+
+      await createNotification({
+        userId: post[0].author_id,
+        notificationType: "feed_like",
+        fromUserId: userId,
+        message: "liked your post",
+        feedPostId: parseInt(postId, 10),
+      });
     }
 
     // Return updated counts

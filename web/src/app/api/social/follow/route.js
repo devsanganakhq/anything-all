@@ -5,6 +5,7 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function POST(request) {
   let userId;
@@ -56,10 +57,12 @@ export async function POST(request) {
     );
 
     if (followeeType === "user") {
-      await sql(
-        `INSERT INTO notifications (user_id, notification_type, from_user_id, message) VALUES ($1,'mention',$2,'started following you')`,
-        [followeeId, userId],
-      );
+      await createNotification({
+        userId: followeeId,
+        notificationType: "mention",
+        fromUserId: userId,
+        message: "started following you",
+      });
     }
 
     const countRow = await sql(

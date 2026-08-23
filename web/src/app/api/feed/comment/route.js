@@ -6,6 +6,7 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -55,12 +56,27 @@ export async function POST(request) {
   }
 
   try {
+    const post = await sql(
+      `SELECT id, author_id FROM feed_posts WHERE id = $1`,
+      [postId],
+    );
+    if (!post.length)
+      return Response.json({ error: "Post not found" }, { status: 404 });
+
     const result = await sql(
       `INSERT INTO feed_comments (post_id, user_id, comment_text)
        VALUES ($1, $2, $3)
        RETURNING id, post_id, user_id, comment_text, created_at`,
       [postId, userId, text.trim()],
     );
+
+    await createNotification({
+      userId: post[0].author_id,
+      notificationType: "feed_comment",
+      fromUserId: userId,
+      message: "commented on your post",
+      feedPostId: parseInt(postId, 10),
+    });
 
     // Fetch author info for the returned comment
     const author = await sql(

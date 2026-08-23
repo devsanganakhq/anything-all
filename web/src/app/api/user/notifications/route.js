@@ -10,6 +10,16 @@ export async function GET(request) {
   const userId = await getSessionUserId(request);
 
   try {
+    // Ensure newer FK columns exist on older DBs
+    try {
+      await sql(
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS feed_post_id INTEGER`,
+      );
+      await sql(
+        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS community_post_id INTEGER`,
+      );
+    } catch (_) {}
+
     const notifications = await sql(
       `SELECT
           n.id,
@@ -17,6 +27,8 @@ export async function GET(request) {
           n.from_user_id,
           n.activity_id,
           n.community_id,
+          n.feed_post_id,
+          n.community_post_id,
           n.message,
           n.read_at,
           n.created_at,

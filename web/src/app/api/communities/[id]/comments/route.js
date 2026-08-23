@@ -5,6 +5,7 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function GET(request, { params }) {
   const { id: communityId } = params;
@@ -69,11 +70,27 @@ export async function POST(request, { params }) {
         { status: 403 },
       );
 
+    const post = await sql(
+      `SELECT id, user_id, community_id FROM community_posts WHERE id=$1`,
+      [parseInt(postId, 10)],
+    );
+    if (!post.length)
+      return Response.json({ error: "Post not found" }, { status: 404 });
+
     const result = await sql(
       `INSERT INTO community_post_comments (post_id, user_id, comment_text)
        VALUES ($1, $2, $3) RETURNING id, comment_text, created_at`,
       [parseInt(postId, 10), userId, text.trim()],
     );
+
+    await createNotification({
+      userId: post[0].user_id,
+      notificationType: "community_post_comment",
+      fromUserId: userId,
+      communityId: post[0].community_id || parseInt(communityId, 10),
+      communityPostId: parseInt(postId, 10),
+      message: "commented on your community post",
+    });
 
     const author = await sql(
       `SELECT first_name||' '||last_name AS author_name, profile_photo_url AS author_avatar FROM users WHERE id=$1`,

@@ -4,6 +4,7 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function POST(request) {
   let userId;
@@ -33,11 +34,12 @@ export async function POST(request) {
           { status: 404 },
         );
 
-      await sql(
-        `INSERT INTO notifications (user_id, notification_type, from_user_id, message)
-         VALUES ($1, 'friend_accepted', $2, 'accepted your friend request')`,
-        [result[0].user_id, userId],
-      );
+      await createNotification({
+        userId: result[0].user_id,
+        notificationType: "friend_accepted",
+        fromUserId: userId,
+        message: "accepted your friend request",
+      });
       return Response.json({ success: true, status: "accepted" });
     } else if (action === "decline") {
       await sql(
