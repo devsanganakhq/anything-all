@@ -70,6 +70,22 @@ const TYPE_CONFIG = {
   message: { icon: MessageCircle, color: Colors.green, label: "Message" },
 };
 
+function notificationMessage(n) {
+  const name = n.community_name;
+  if (name) {
+    if (n.notification_type === "community_join") {
+      return `joined community ${name}`;
+    }
+    if (n.notification_type === "community_leave") {
+      return `left community ${name}`;
+    }
+    if (n.notification_type === "community_invite") {
+      return `requested to join community ${name}`;
+    }
+  }
+  return n.message;
+}
+
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -255,7 +271,7 @@ export default function NotificationsScreen() {
               <Text style={{ fontWeight: "700" }}>
                 {n.from_user_name || "Heathland Links"}
               </Text>{" "}
-              {n.message}
+              {notificationMessage(n)}
             </Text>
             <Text
               style={{ fontSize: 11, color: Colors.textMuted, marginTop: 3 }}

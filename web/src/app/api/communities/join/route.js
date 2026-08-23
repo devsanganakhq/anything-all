@@ -57,7 +57,7 @@ export async function POST(request) {
         notificationType: "community_leave",
         fromUserId: userId,
         communityId: parseInt(communityId, 10),
-        message: `left ${community.name}`,
+        message: `left community ${community.name}`,
       });
 
       return Response.json({ success: true, action: "left" });
@@ -79,7 +79,7 @@ export async function POST(request) {
           notificationType: "community_invite",
           fromUserId: userId,
           communityId: parseInt(communityId, 10),
-          message: `requested to join ${community.name}`,
+          message: `requested to join community ${community.name}`,
         });
         return Response.json({ success: true, action: "requested" });
       }
@@ -99,7 +99,7 @@ export async function POST(request) {
         notificationType: "community_join",
         fromUserId: userId,
         communityId: parseInt(communityId, 10),
-        message: `joined ${community.name}`,
+        message: `joined community ${community.name}`,
       });
 
       // Activity feed
@@ -121,7 +121,7 @@ export async function POST(request) {
           userId,
           postType: "community_discussion",
           communityId: parseInt(communityId),
-          caption: `${firstName} joined ${community.name}.`,
+          caption: `${firstName} joined community ${community.name}.`,
           metadata: { community_name: community.name, event: "joined" },
         });
       } catch (_) {}
