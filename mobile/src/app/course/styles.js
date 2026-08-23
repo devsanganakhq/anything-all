@@ -30,7 +30,6 @@ export const styles = {
     paddingVertical: 7,
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.35)",
-    opacity: 0.55,
   },
   claimClubBtnText: {
     fontSize: 9,

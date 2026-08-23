@@ -4,7 +4,12 @@ import { Globe, MapPin, ChevronRight, Building2 } from "lucide-react-native";
 import { Colors, Radius, Shadow } from "@/constants/theme";
 import { SectionLabel } from "./SharedComponents";
 
-export function InfoTab({ course, handleMap }) {
+export function InfoTab({
+  course,
+  handleMap,
+  onClaimCardLayout,
+  onOpenClaimModal,
+}) {
   return (
     <>
       <SectionLabel icon={Globe} label="COURSE DETAILS" />
@@ -140,15 +145,13 @@ export function InfoTab({ course, handleMap }) {
       {/* Claim club CTA */}
       {!course.is_claimed && (
         <View
+          onLayout={onClaimCardLayout}
           style={{
             marginTop: 6,
             borderWidth: 1,
             borderColor: Colors.border,
             borderRadius: Radius.md,
             padding: 16,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 12,
             backgroundColor: Colors.white,
             marginBottom: 24,
             ...Shadow.card,
@@ -156,39 +159,70 @@ export function InfoTab({ course, handleMap }) {
         >
           <View
             style={{
-              width: 36,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: Colors.greenLight,
-              justifyContent: "center",
+              flexDirection: "row",
               alignItems: "center",
-              flexShrink: 0,
+              gap: 12,
+              marginBottom: 14,
             }}
           >
-            <Building2 size={16} color={Colors.green} strokeWidth={1.8} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text
+            <View
               style={{
-                fontSize: 13,
-                fontWeight: "700",
-                color: Colors.textPrimary,
-                marginBottom: 2,
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: Colors.greenLight,
+                justifyContent: "center",
+                alignItems: "center",
+                flexShrink: 0,
               }}
             >
-              Is this your club?
-            </Text>
+              <Building2 size={16} color={Colors.green} strokeWidth={1.8} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: "700",
+                  color: Colors.textPrimary,
+                  marginBottom: 2,
+                }}
+              >
+                Is this your club?
+              </Text>
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: Colors.textSecondary,
+                  lineHeight: 16,
+                }}
+              >
+                Club managers can claim this profile to keep details accurate,
+                add imagery, and engage with golfers.
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            onPress={onOpenClaimModal}
+            activeOpacity={0.85}
+            style={{
+              backgroundColor: Colors.green,
+              borderRadius: Radius.md,
+              paddingVertical: 13,
+              alignItems: "center",
+            }}
+          >
             <Text
               style={{
                 fontSize: 11,
-                color: Colors.textSecondary,
-                lineHeight: 16,
+                fontWeight: "700",
+                letterSpacing: 1,
+                color: Colors.ivory,
               }}
             >
-              Club managers can claim this profile to publish news, tee-time
-              offers, and merchandise. Coming soon.
+              CLAIM THIS COURSE
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
       )}
     </>

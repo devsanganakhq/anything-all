@@ -23,6 +23,8 @@ export function CourseHero({
   courseName,
   county,
   country,
+  isClaimed = false,
+  onClaimPress,
 }) {
   return (
     <View
@@ -121,15 +123,16 @@ export function CourseHero({
             )}
           </View>
 
-          <TouchableOpacity
-            disabled
-            activeOpacity={1}
-            accessibilityState={{ disabled: true }}
-            accessibilityLabel="Claim this club"
-            style={styles.claimClubBtn}
-          >
-            <Text style={styles.claimClubBtnText}>CLAIM THIS CLUB</Text>
-          </TouchableOpacity>
+          {!isClaimed && (
+            <TouchableOpacity
+              onPress={onClaimPress}
+              activeOpacity={0.75}
+              accessibilityLabel="Claim this club"
+              style={styles.claimClubBtn}
+            >
+              <Text style={styles.claimClubBtnText}>CLAIM THIS CLUB</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </View>

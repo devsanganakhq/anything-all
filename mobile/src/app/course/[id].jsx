@@ -40,6 +40,7 @@ import { RankingsTab } from "./RankingsTab";
 import { ReviewsTab } from "./ReviewsTab";
 import { PhotosTab } from "./PhotosTab";
 import { InfoTab } from "./InfoTab";
+import { ClaimClubModal } from "./ClaimClubModal";
 import { BottomActionBar } from "./BottomActionBar";
 import {
   courseDisplayName,
@@ -100,11 +101,14 @@ export default function CourseDetailScreen() {
   const [alreadyPlayed, setAlreadyPlayed] = useState(false);
   const [following, setFollowing] = useState(false);
   const [showFullDesc, setShowFullDesc] = useState(false);
+  const [claimModalVisible, setClaimModalVisible] = useState(false);
 
   // Animated scroll value — drives parallax, sticky header, controls opacity
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef(null);
   const tabBarOffsetY = useRef(0);
+  const tabContentOffsetY = useRef(0);
+  const claimCardOffsetY = useRef(0);
 
   // ── Derived animated values ────────────────────────────────────────────
   const heroParallax = scrollY.interpolate({
@@ -199,12 +203,12 @@ export default function CourseDetailScreen() {
     if (!data?.course) return;
     try {
       await Share.share({
-        message: `${formatCourseShareLabel(data.course)}. Discover it on Heathland Links.`,
-        url: `https://heathlandlinks.com/course/${id}`,
+        message: `${formatCourseShareLabel(data.course)}. Discover it on Heathland Links.\nhttps://heathlandlinks.com/`,
+        url: "https://heathlandlinks.com/",
         title: formatCourseShareLabel(data.course),
       });
     } catch {}
-  }, [data, id]);
+  }, [data]);
 
   const handleMap = useCallback(() => {
     if (!data?.course) return;
@@ -225,6 +229,31 @@ export default function CourseDetailScreen() {
     );
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ y, animated: true });
+    });
+  }, [insets.top]);
+
+  const goToClaimClub = useCallback(() => {
+    setActiveTab("INFO");
+    const scrollToClaim = (tries = 0) => {
+      const tabY = Math.max(
+        tabBarOffsetY.current - insets.top - STICKY_HEADER_H,
+        0,
+      );
+      const claimAbsolute = claimCardOffsetY.current;
+      const claimY =
+        claimAbsolute > 0
+          ? Math.max(
+              claimAbsolute - insets.top - STICKY_HEADER_H - 12,
+              tabY,
+            )
+          : tabY;
+      scrollRef.current?.scrollTo({ y: claimY, animated: true });
+      if (claimAbsolute <= 0 && tries < 6) {
+        setTimeout(() => scrollToClaim(tries + 1), 50);
+      }
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => scrollToClaim());
     });
   }, [insets.top]);
 
@@ -385,6 +414,8 @@ export default function CourseDetailScreen() {
           courseName={displayTitle}
           county={course.county}
           country={course.country}
+          isClaimed={!!course.is_claimed}
+          onClaimPress={goToClaimClub}
         />
 
         {/* ── [1] Course identity + stats ───────────────────────────────────── */}
@@ -416,7 +447,12 @@ export default function CourseDetailScreen() {
         </View>
 
         {/* ── [3] Tab content ───────────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: Spacing.screenH, paddingTop: 22 }}>
+        <View
+          onLayout={(e) => {
+            tabContentOffsetY.current = e.nativeEvent.layout.y;
+          }}
+          style={{ paddingHorizontal: Spacing.screenH, paddingTop: 22 }}
+        >
           {activeTab === "OVERVIEW" && (
             <OverviewTab
               description={description}
@@ -462,7 +498,15 @@ export default function CourseDetailScreen() {
           )}
 
           {activeTab === "INFO" && (
-            <InfoTab course={course} handleMap={handleMap} />
+            <InfoTab
+              course={course}
+              handleMap={handleMap}
+              onClaimCardLayout={(e) => {
+                claimCardOffsetY.current =
+                  tabContentOffsetY.current + e.nativeEvent.layout.y;
+              }}
+              onOpenClaimModal={() => setClaimModalVisible(true)}
+            />
           )}
         </View>
       </Animated.ScrollView>
@@ -480,6 +524,14 @@ export default function CourseDetailScreen() {
         handleMap={handleMap}
         course={course}
       />
+
+      {!course.is_claimed && (
+        <ClaimClubModal
+          visible={claimModalVisible}
+          onClose={() => setClaimModalVisible(false)}
+          course={course}
+        />
+      )}
     </View>
   );
 }
