@@ -132,14 +132,18 @@ export default function NotificationsScreen() {
       if (n.notification_type === "friend_request" && n.from_user_id) {
         openUserProfile(n.from_user_id);
       } else if (
-        [
-          "activity_like",
-          "activity_comment",
-          "feed_like",
-          "feed_comment",
-        ].includes(n.notification_type)
+        ["feed_like", "feed_comment"].includes(n.notification_type)
       ) {
-        // Navigate to home feed (closest we can do without specific post routing)
+        if (n.feed_post_id) {
+          const openComments =
+            n.notification_type === "feed_comment" ? "?openComments=1" : "";
+          router.push(`/feed/${n.feed_post_id}${openComments}`);
+        } else {
+          router.push("/(tabs)");
+        }
+      } else if (
+        ["activity_like", "activity_comment"].includes(n.notification_type)
+      ) {
         router.push("/(tabs)");
       } else if (
         [
@@ -151,7 +155,17 @@ export default function NotificationsScreen() {
         ].includes(n.notification_type) &&
         n.community_id
       ) {
-        router.push(`/communities/${n.community_id}`);
+        const postQuery =
+          (n.notification_type === "community_post_like" ||
+            n.notification_type === "community_post_comment") &&
+          n.community_post_id
+            ? `?postId=${n.community_post_id}${
+                n.notification_type === "community_post_comment"
+                  ? "&openComments=1"
+                  : ""
+              }`
+            : "";
+        router.push(`/communities/${n.community_id}${postQuery}`);
       } else if (n.from_user_id) {
         openUserProfile(n.from_user_id);
       }

@@ -62,9 +62,16 @@ export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const openUserProfile = useOpenUserProfile();
-  const { id } = useLocalSearchParams();
+  const { id, postId: focusPostId, openComments } = useLocalSearchParams();
   const qc = useQueryClient();
   const commId = parseInt(id, 10);
+  const focusPostIdNum = parseInt(
+    Array.isArray(focusPostId) ? focusPostId[0] : focusPostId,
+    10,
+  );
+  const shouldOpenComments =
+    openComments === "1" || openComments === "true";
+  const focusedPostOnce = useRef(false);
 
   const [tab, setTab] = useState("DISCUSSION");
   const [postText, setPostText] = useState("");
@@ -97,6 +104,17 @@ export default function CommunityDetailScreen() {
     },
     enabled: tab === "DISCUSSION" || tab === "DISCUSSION",
   });
+
+  // Deep-link from community post notifications
+  useEffect(() => {
+    if (focusedPostOnce.current) return;
+    if (!Number.isFinite(focusPostIdNum) || focusPostIdNum <= 0) return;
+    const posts = postsData?.posts ?? [];
+    if (!posts.some((p) => p.id === focusPostIdNum)) return;
+    focusedPostOnce.current = true;
+    setTab("DISCUSSION");
+    if (shouldOpenComments) setExpandedPost(focusPostIdNum);
+  }, [postsData, focusPostIdNum, shouldOpenComments]);
 
   const { data: chatData } = useQuery({
     queryKey: ["community-chat", commId],
