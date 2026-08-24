@@ -4,12 +4,13 @@
  * action: "join" | "leave" | "request_access"
  *
  * - Public  community: join immediately
- * - Private community: creates a pending follow request (no separate table yet, uses follows with followee_type='community')
+ * - Private community: creates a pending join request
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
-import { createFeedPost } from "@/app/api/utils/createFeedPost";
 import { createNotification } from "@/app/api/utils/createNotification";
+import { addCommunityMember } from "@/app/api/utils/addCommunityMember";
+import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
 
 export async function POST(request) {
   const userId = await getSessionUserId();
@@ -18,6 +19,8 @@ export async function POST(request) {
     return Response.json({ error: "communityId required" }, { status: 400 });
 
   try {
+    await ensureCommunityJoinRequestsTable();
+
     const comm = await sql(
       `SELECT id, name, community_type, created_by FROM communities WHERE id=$1`,
       [communityId],
@@ -36,7 +39,6 @@ export async function POST(request) {
     if (action === "leave") {
       if (!existing.length)
         return Response.json({ error: "Not a member" }, { status: 400 });
-      // Owner cannot leave their own community
       if (community.created_by === userId)
         return Response.json(
           { error: "Owner cannot leave — transfer ownership first" },
@@ -68,31 +70,51 @@ export async function POST(request) {
         return Response.json({ success: true, action: "already_member" });
 
       if (isPrivate) {
-        // For private communities: add a follow record as a "pending request" signal
-        await sql(
-          `INSERT INTO follows (follower_id, followee_type, followee_id)
-           VALUES ($1, 'community', $2) ON CONFLICT DO NOTHING`,
-          [userId, communityId],
+        const existingReq = await sql(
+          `SELECT id, status FROM community_join_requests
+           WHERE community_id=$1 AND user_id=$2`,
+          [communityId, userId],
         );
-        await createNotification({
-          userId: community.created_by,
-          notificationType: "community_invite",
-          fromUserId: userId,
-          communityId: parseInt(communityId, 10),
-          message: `requested to join community ${community.name}`,
-        });
+
+        if (existingReq.length && existingReq[0].status === "pending") {
+          return Response.json({ success: true, action: "requested" });
+        }
+
+        const wasDeclined =
+          existingReq.length && existingReq[0].status === "declined";
+
+        await sql(
+          `INSERT INTO community_join_requests (community_id, user_id, status)
+           VALUES ($1, $2, 'pending')
+           ON CONFLICT (community_id, user_id) DO UPDATE SET
+             status = 'pending',
+             reviewed_at = NULL,
+             reviewed_by = NULL,
+             created_at = CASE
+               WHEN community_join_requests.status = 'declined' THEN NOW()
+               ELSE community_join_requests.created_at
+             END`,
+          [communityId, userId],
+        );
+
+        if (!existingReq.length || wasDeclined) {
+          await createNotification({
+            userId: community.created_by,
+            notificationType: "community_invite",
+            fromUserId: userId,
+            communityId: parseInt(communityId, 10),
+            message: `requested to join community ${community.name}`,
+          });
+        }
+
         return Response.json({ success: true, action: "requested" });
       }
 
-      // Public join
-      await sql(
-        `INSERT INTO community_members (community_id, user_id, role) VALUES ($1, $2, 'member')`,
-        [communityId, userId],
-      );
-      await sql(
-        `UPDATE communities SET member_count=member_count+1 WHERE id=$1`,
-        [communityId],
-      );
+      await addCommunityMember({
+        communityId,
+        userId,
+        communityName: community.name,
+      });
 
       await createNotification({
         userId: community.created_by,
@@ -101,30 +123,6 @@ export async function POST(request) {
         communityId: parseInt(communityId, 10),
         message: `joined community ${community.name}`,
       });
-
-      // Activity feed
-      try {
-        await sql(
-          `INSERT INTO activity_feed (user_id, activity_type, community_id) VALUES ($1,'joined_community',$2)`,
-          [userId, communityId],
-        );
-      } catch (_) {}
-
-      // Social feed post
-      try {
-        const authorRows = await sql(
-          `SELECT first_name FROM users WHERE id = $1`,
-          [userId],
-        );
-        const firstName = authorRows[0]?.first_name || "A golfer";
-        await createFeedPost({
-          userId,
-          postType: "community_discussion",
-          communityId: parseInt(communityId),
-          caption: `${firstName} joined community ${community.name}.`,
-          metadata: { community_name: community.name, event: "joined" },
-        });
-      } catch (_) {}
 
       return Response.json({ success: true, action: "joined" });
     }

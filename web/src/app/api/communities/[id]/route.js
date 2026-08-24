@@ -3,6 +3,7 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserIdOrNull } from "@/app/api/utils/getUserId";
+import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
 
 export async function GET(request, { params }) {
   const userId = (await getSessionUserIdOrNull()) ?? 0;
@@ -10,6 +11,8 @@ export async function GET(request, { params }) {
   const communityId = parseInt(id, 10);
 
   try {
+    await ensureCommunityJoinRequestsTable();
+
     const rows = await sql(
       `SELECT
           c.*,
@@ -17,7 +20,10 @@ export async function GET(request, { params }) {
           (SELECT COUNT(*)::int FROM community_posts WHERE community_id=c.id AND is_deleted=false) AS post_count,
           (SELECT role FROM community_members WHERE community_id=c.id AND user_id=$2 LIMIT 1) AS my_role,
           EXISTS(SELECT 1 FROM community_members WHERE community_id=c.id AND user_id=$2) AS is_member,
-          -- owner info
+          EXISTS(
+            SELECT 1 FROM community_join_requests
+            WHERE community_id=c.id AND user_id=$2 AND status='pending'
+          ) AS join_request_pending,
           ou.first_name||' '||ou.last_name AS owner_name,
           ou.profile_photo_url AS owner_photo
         FROM communities c
@@ -31,7 +37,6 @@ export async function GET(request, { params }) {
 
     const community = rows[0];
 
-    // Private community: only members can see full detail
     if (community.community_type === "private" && !community.is_member) {
       return Response.json({
         community: {
@@ -44,12 +49,12 @@ export async function GET(request, { params }) {
           member_count: community.member_count,
           is_member: false,
           my_role: null,
+          join_request_pending: community.join_request_pending,
         },
         locked: true,
       });
     }
 
-    // Moderators / admins
     const mods = await sql(
       `SELECT
           u.id,
@@ -65,7 +70,22 @@ export async function GET(request, { params }) {
       [communityId],
     );
 
-    return Response.json({ community, moderators: mods, locked: false });
+    let pending_count = 0;
+    if (community.my_role === "admin") {
+      const pending = await sql(
+        `SELECT COUNT(*)::int AS count FROM community_join_requests
+         WHERE community_id=$1 AND status='pending'`,
+        [communityId],
+      );
+      pending_count = pending[0]?.count ?? 0;
+    }
+
+    return Response.json({
+      community,
+      moderators: mods,
+      locked: false,
+      pending_count,
+    });
   } catch (error) {
     console.error("Community detail error:", error);
     return Response.json({ error: error.message }, { status: 500 });

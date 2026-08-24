@@ -5,11 +5,13 @@
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
+import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
 
 export async function GET(request) {
   const userId = await getSessionUserId(request);
 
   try {
+    await ensureCommunityJoinRequestsTable();
     // Ensure newer FK columns exist on older DBs
     try {
       await sql(
@@ -44,6 +46,13 @@ export async function GET(request) {
           (SELECT f.id FROM friendships f
             WHERE f.user_id = n.from_user_id AND f.friend_id = $1 AND f.status = 'pending'
             LIMIT 1) AS friendship_id,
+
+          -- Pending community join request (for accept/decline from notification)
+          (SELECT cjr.id FROM community_join_requests cjr
+            WHERE cjr.community_id = n.community_id
+              AND cjr.user_id = n.from_user_id
+              AND cjr.status = 'pending'
+            LIMIT 1) AS join_request_id,
 
           -- Relative time
           CASE

@@ -56,6 +56,16 @@ const TYPE_CONFIG = {
   },
   community_invite: { icon: Users, color: Colors.purple, label: "Community" },
   community_join: { icon: UserPlus, color: Colors.purple, label: "Joined" },
+  community_join_accepted: {
+    icon: UserCheck,
+    color: Colors.green,
+    label: "Accepted",
+  },
+  community_join_declined: {
+    icon: XCircle,
+    color: Colors.textSecondary,
+    label: "Declined",
+  },
   community_leave: { icon: UserMinus, color: Colors.purple, label: "Left" },
   community_post_like: {
     icon: Heart,
@@ -81,6 +91,12 @@ function notificationMessage(n) {
     }
     if (n.notification_type === "community_invite") {
       return `requested to join community ${name}`;
+    }
+    if (n.notification_type === "community_join_accepted") {
+      return `accepted your request to join ${name}`;
+    }
+    if (n.notification_type === "community_join_declined") {
+      return `declined your request to join ${name}`;
     }
   }
   return n.message;
@@ -137,6 +153,34 @@ export default function NotificationsScreen() {
     },
   });
 
+  const respondJoinRequestMutation = useMutation({
+    mutationFn: async ({
+      communityId,
+      requestId,
+      action,
+      notificationId,
+    }) => {
+      const r = await fetch(`/api/communities/${communityId}/join-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, action }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      if (notificationId) {
+        await fetch("/api/user/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notificationId }),
+        });
+      }
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["communities"] });
+    },
+  });
+
   const notifications = data?.notifications ?? [];
   const unread = notifications.filter((n) => !n.read_at).length;
 
@@ -166,6 +210,8 @@ export default function NotificationsScreen() {
           "community_invite",
           "community_join",
           "community_leave",
+          "community_join_accepted",
+          "community_join_declined",
           "community_post_like",
           "community_post_comment",
         ].includes(n.notification_type) &&
@@ -180,7 +226,9 @@ export default function NotificationsScreen() {
                   ? "&openComments=1"
                   : ""
               }`
-            : "";
+            : n.notification_type === "community_invite"
+              ? "?tab=REQUESTS"
+              : "";
         router.push(`/communities/${n.community_id}${postQuery}`);
       } else if (n.from_user_id) {
         openUserProfile(n.from_user_id);
@@ -359,6 +407,90 @@ export default function NotificationsScreen() {
                   </TouchableOpacity>
                 </View>
               )}
+
+            {/* Inline accept / decline for community join requests */}
+            {n.notification_type === "community_invite" &&
+              n.join_request_id &&
+              n.community_id &&
+              !n.read_at && (
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      respondJoinRequestMutation.mutate({
+                        communityId: n.community_id,
+                        requestId: n.join_request_id,
+                        action: "accept",
+                        notificationId: n.id,
+                      });
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: Colors.green,
+                      borderRadius: Radius.sm,
+                      paddingVertical: 9,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 5,
+                    }}
+                  >
+                    <CheckCircle
+                      color={Colors.ivory}
+                      size={13}
+                      strokeWidth={2}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: Colors.ivory,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      ACCEPT
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      respondJoinRequestMutation.mutate({
+                        communityId: n.community_id,
+                        requestId: n.join_request_id,
+                        action: "decline",
+                        notificationId: n.id,
+                      });
+                    }}
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      borderRadius: Radius.sm,
+                      paddingVertical: 9,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 5,
+                    }}
+                  >
+                    <XCircle
+                      color={Colors.textSecondary}
+                      size={13}
+                      strokeWidth={2}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: Colors.textSecondary,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      DECLINE
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
           </View>
 
           {/* Unread dot */}
@@ -377,7 +509,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       );
     },
-    [handlePress, respondMutation],
+    [handlePress, respondMutation, respondJoinRequestMutation],
   );
 
   return (

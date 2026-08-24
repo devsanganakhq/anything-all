@@ -106,11 +106,13 @@ export default function CommunitiesScreen() {
   const communities = data?.communities ?? [];
 
   const joinMutation = useMutation({
-    mutationFn: async (communityId) => {
+    mutationFn: async ({ communityId, communityType }) => {
+      const action =
+        communityType === "private" ? "request_access" : "join";
       const r = await fetch("/api/communities/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ communityId, action: "join" }),
+        body: JSON.stringify({ communityId, action }),
       });
       if (!r.ok) throw new Error("Failed");
       return r.json();
@@ -334,10 +336,40 @@ export default function CommunitiesScreen() {
             </View>
 
             {tab === "discover" && !c.is_member ? (
+              c.join_request_pending ? (
+                <View
+                  style={{
+                    backgroundColor: Colors.ivoryDeep,
+                    borderRadius: Radius.pill,
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
+                    minWidth: 56,
+                    minHeight: 28,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      fontWeight: "700",
+                      letterSpacing: 1,
+                      color: Colors.textMuted,
+                    }}
+                  >
+                    REQUESTED
+                  </Text>
+                </View>
+              ) : (
               <TouchableOpacity
                 onPress={(e) => {
                   e?.stopPropagation?.();
-                  joinMutation.mutate(c.id);
+                  joinMutation.mutate({
+                    communityId: c.id,
+                    communityType: c.community_type,
+                  });
                 }}
                 style={{
                   backgroundColor: Colors.green,
@@ -349,13 +381,15 @@ export default function CommunitiesScreen() {
                   alignItems: "center",
                   justifyContent: "center",
                   opacity:
-                    joinMutation.isPending && joinMutation.variables !== c.id
+                    joinMutation.isPending &&
+                    joinMutation.variables?.communityId !== c.id
                       ? 0.6
                       : 1,
                 }}
                 disabled={joinMutation.isPending}
               >
-                {joinMutation.isPending && joinMutation.variables === c.id ? (
+                {joinMutation.isPending &&
+                joinMutation.variables?.communityId === c.id ? (
                   <ActivityIndicator size="small" color={Colors.ivory} />
                 ) : (
                   <Text
@@ -370,6 +404,7 @@ export default function CommunitiesScreen() {
                   </Text>
                 )}
               </TouchableOpacity>
+              )
             ) : tab === "my" ? (
               <ChevronRight
                 color={Colors.textMuted}

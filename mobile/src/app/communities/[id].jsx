@@ -45,7 +45,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { PressableUser } from "@/components/PressableUser";
 import { useOpenUserProfile } from "@/utils/openUserProfile";
 
-const TABS = ["DISCUSSION", "CHAT", "MEMBERS", "ABOUT"];
+const BASE_TABS = ["DISCUSSION", "CHAT", "MEMBERS", "ABOUT"];
 const REACTION_TYPES = [
   { key: "like", emoji: "👍", label: "Like" },
   { key: "love", emoji: "❤️", label: "Love" },
@@ -62,7 +62,8 @@ export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const openUserProfile = useOpenUserProfile();
-  const { id, postId: focusPostId, openComments } = useLocalSearchParams();
+  const { id, postId: focusPostId, openComments, tab: tabParam } =
+    useLocalSearchParams();
   const qc = useQueryClient();
   const commId = parseInt(id, 10);
   const focusPostIdNum = parseInt(
@@ -170,6 +171,25 @@ export default function CommunityDetailScreen() {
   const isMember = community?.is_member ?? false;
   const myRole = community?.my_role ?? null;
   const isMod = ["admin", "moderator"].includes(myRole);
+  const joinRequestPending = community?.join_request_pending ?? false;
+
+  const { data: joinRequestsData, isLoading: loadingJoinRequests } = useQuery({
+    queryKey: ["community-join-requests", commId],
+    queryFn: async () => {
+      const r = await fetch(`/api/communities/${commId}/join-requests`);
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    enabled: myRole === "admin",
+  });
+
+  const pendingCount =
+    joinRequestsData?.pending_count ?? detailData?.pending_count ?? 0;
+  const joinRequests = joinRequestsData?.requests ?? [];
+  const visibleTabs =
+    myRole === "admin"
+      ? ["DISCUSSION", "CHAT", "MEMBERS", "REQUESTS", "ABOUT"]
+      : BASE_TABS;
   const myUserId = Number(
     meData?.profile?.id ?? chatData?.currentUserId ?? 0,
   ) || null;
@@ -192,6 +212,11 @@ export default function CommunityDetailScreen() {
     }
   }, [messages.length, tab]);
 
+  useEffect(() => {
+    const t = Array.isArray(tabParam) ? tabParam[0] : tabParam;
+    if (t === "REQUESTS" && myRole === "admin") setTab("REQUESTS");
+  }, [tabParam, myRole]);
+
   // ── Mutations ─────────────────────────────────────────────────────────────
   const joinMutation = useMutation({
     mutationFn: async (action) => {
@@ -203,8 +228,27 @@ export default function CommunityDetailScreen() {
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["community-detail", commId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["community-detail", commId] });
+      qc.invalidateQueries({ queryKey: ["communities"] });
+    },
+  });
+
+  const respondJoinRequestMutation = useMutation({
+    mutationFn: async ({ requestId, action }) => {
+      const r = await fetch(`/api/communities/${commId}/join-requests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestId, action }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["community-join-requests", commId] });
+      qc.invalidateQueries({ queryKey: ["community-detail", commId] });
+      qc.invalidateQueries({ queryKey: ["community-members", commId] });
+    },
   });
 
   const postMutation = useMutation({
@@ -313,6 +357,7 @@ export default function CommunityDetailScreen() {
 
   // ── Actions ───────────────────────────────────────────────────────────────
   const handleJoin = () => {
+    if (joinRequestPending) return;
     if (isMember) {
       Alert.alert("Leave Community", `Leave ${community?.name}?`, [
         { text: "Cancel", style: "cancel" },
@@ -1180,6 +1225,152 @@ export default function CommunityDetailScreen() {
     </KeyboardAvoidingView>
   );
 
+  const renderJoinRequests = () => {
+    if (loadingJoinRequests) {
+      return (
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
+          <ActivityIndicator color={Colors.green} />
+        </View>
+      );
+    }
+
+    if (!joinRequests.length) {
+      return (
+        <View
+          style={{
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: Spacing.screenH,
+          }}
+        >
+          <Users color={Colors.textMuted} size={32} strokeWidth={1.5} />
+          <Text
+            style={{
+              fontSize: 14,
+              fontWeight: "600",
+              color: Colors.textSecondary,
+              marginTop: 12,
+              textAlign: "center",
+            }}
+          >
+            No pending join requests
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={joinRequests}
+        keyExtractor={(item) => `req-${item.id}`}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: Spacing.screenH,
+          paddingTop: 14,
+          paddingBottom: insets.bottom + 100,
+        }}
+        renderItem={({ item }) => (
+          <View
+            style={{
+              backgroundColor: Colors.white,
+              borderRadius: Radius.lg,
+              padding: 14,
+              marginBottom: 10,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              ...Shadow.card,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => openUserProfile(item.user_id)}
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <UserAvatar uri={item.avatar} name={item.name} size={44} />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontWeight: "700",
+                    color: Colors.textPrimary,
+                  }}
+                >
+                  {item.name}
+                </Text>
+                {item.home_club ? (
+                  <Text
+                    style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}
+                  >
+                    {item.home_club}
+                  </Text>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <TouchableOpacity
+                onPress={() =>
+                  respondJoinRequestMutation.mutate({
+                    requestId: item.id,
+                    action: "accept",
+                  })
+                }
+                disabled={respondJoinRequestMutation.isPending}
+                style={{
+                  flex: 1,
+                  backgroundColor: Colors.green,
+                  borderRadius: Radius.sm,
+                  paddingVertical: 9,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: Colors.ivory,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  ACCEPT
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() =>
+                  respondJoinRequestMutation.mutate({
+                    requestId: item.id,
+                    action: "decline",
+                  })
+                }
+                disabled={respondJoinRequestMutation.isPending}
+                style={{
+                  flex: 1,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  borderRadius: Radius.sm,
+                  paddingVertical: 9,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: Colors.textSecondary,
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  DECLINE
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      />
+    );
+  };
+
   const renderMembers = () => {
     const admins = members.filter((m) => m.role === "admin");
     const mods = members.filter((m) => m.role === "moderator");
@@ -1847,18 +2038,21 @@ export default function CommunityDetailScreen() {
           </View>
           <TouchableOpacity
             onPress={handleJoin}
-            disabled={joinMutation.isPending}
+            disabled={joinMutation.isPending || joinRequestPending}
             style={{
               paddingHorizontal: 20,
               paddingVertical: 9,
               borderRadius: Radius.pill,
-              backgroundColor: isMember ? "transparent" : Colors.green,
+              backgroundColor:
+                isMember || joinRequestPending ? "transparent" : Colors.green,
               borderWidth: 1,
-              borderColor: isMember ? Colors.border : Colors.green,
+              borderColor:
+                isMember || joinRequestPending ? Colors.border : Colors.green,
               minWidth: 120,
               minHeight: 34,
               alignItems: "center",
               justifyContent: "center",
+              opacity: joinRequestPending ? 0.7 : 1,
             }}
           >
             {joinMutation.isPending ? (
@@ -1872,14 +2066,19 @@ export default function CommunityDetailScreen() {
                   fontSize: 10,
                   fontWeight: "700",
                   letterSpacing: 1,
-                  color: isMember ? Colors.textSecondary : Colors.ivory,
+                  color:
+                    isMember || joinRequestPending
+                      ? Colors.textSecondary
+                      : Colors.ivory,
                 }}
               >
                 {isMember
                   ? "LEAVE"
-                  : community.community_type === "private"
-                    ? "REQUEST TO JOIN"
-                    : "JOIN COMMUNITY"}
+                  : joinRequestPending
+                    ? "REQUESTED"
+                    : community.community_type === "private"
+                      ? "REQUEST TO JOIN"
+                      : "JOIN COMMUNITY"}
               </Text>
             )}
           </TouchableOpacity>
@@ -1892,7 +2091,7 @@ export default function CommunityDetailScreen() {
           style={{ flexGrow: 0 }}
           contentContainerStyle={{ paddingHorizontal: Spacing.screenH, gap: 0 }}
         >
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <TouchableOpacity
               key={t}
               onPress={() => setTab(t)}
@@ -1902,6 +2101,9 @@ export default function CommunityDetailScreen() {
                 borderBottomWidth: 2,
                 borderBottomColor: tab === t ? Colors.green : "transparent",
                 marginRight: 4,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
               }}
             >
               <Text
@@ -1914,6 +2116,29 @@ export default function CommunityDetailScreen() {
               >
                 {t}
               </Text>
+              {t === "REQUESTS" && pendingCount > 0 ? (
+                <View
+                  style={{
+                    minWidth: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    backgroundColor: Colors.error,
+                    paddingHorizontal: 4,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      fontWeight: "700",
+                      color: Colors.white,
+                    }}
+                  >
+                    {pendingCount > 99 ? "99+" : pendingCount}
+                  </Text>
+                </View>
+              ) : null}
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -2130,6 +2355,7 @@ export default function CommunityDetailScreen() {
 
         {tab === "CHAT" && renderChat()}
         {tab === "MEMBERS" && renderMembers()}
+        {tab === "REQUESTS" && renderJoinRequests()}
         {tab === "ABOUT" && renderAbout()}
       </View>
     </View>
