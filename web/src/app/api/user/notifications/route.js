@@ -6,12 +6,14 @@
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
+import { ensureCommunityInvitesTable } from "@/app/api/utils/ensureCommunityInvitesTable";
 
 export async function GET(request) {
   const userId = await getSessionUserId(request);
 
   try {
     await ensureCommunityJoinRequestsTable();
+    await ensureCommunityInvitesTable();
     // Ensure newer FK columns exist on older DBs
     try {
       await sql(
@@ -53,6 +55,14 @@ export async function GET(request) {
               AND cjr.user_id = n.from_user_id
               AND cjr.status = 'pending'
             LIMIT 1) AS join_request_id,
+
+          -- Pending community invite (for accept/decline from notification)
+          (SELECT ci.id FROM community_invites ci
+            WHERE ci.community_id = n.community_id
+              AND ci.invitee_id = $1
+              AND ci.status = 'pending'
+              AND n.notification_type = 'community_invite_received'
+            LIMIT 1) AS invite_id,
 
           -- Relative time
           CASE

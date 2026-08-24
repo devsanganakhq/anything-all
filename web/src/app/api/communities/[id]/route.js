@@ -4,6 +4,7 @@
 import sql from "@/app/api/utils/sql";
 import { getSessionUserIdOrNull } from "@/app/api/utils/getUserId";
 import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
+import { ensureCommunityInvitesTable } from "@/app/api/utils/ensureCommunityInvitesTable";
 
 export async function GET(request, { params }) {
   const userId = (await getSessionUserIdOrNull()) ?? 0;
@@ -12,6 +13,7 @@ export async function GET(request, { params }) {
 
   try {
     await ensureCommunityJoinRequestsTable();
+    await ensureCommunityInvitesTable();
 
     const rows = await sql(
       `SELECT
@@ -24,6 +26,13 @@ export async function GET(request, { params }) {
             SELECT 1 FROM community_join_requests
             WHERE community_id=c.id AND user_id=$2 AND status='pending'
           ) AS join_request_pending,
+          EXISTS(
+            SELECT 1 FROM community_invites
+            WHERE community_id=c.id AND invitee_id=$2 AND status='pending'
+          ) AS invite_pending,
+          (SELECT id FROM community_invites
+            WHERE community_id=c.id AND invitee_id=$2 AND status='pending'
+            LIMIT 1) AS pending_invite_id,
           ou.first_name||' '||ou.last_name AS owner_name,
           ou.profile_photo_url AS owner_photo
         FROM communities c
@@ -50,6 +59,8 @@ export async function GET(request, { params }) {
           is_member: false,
           my_role: null,
           join_request_pending: community.join_request_pending,
+          invite_pending: community.invite_pending,
+          pending_invite_id: community.pending_invite_id,
         },
         locked: true,
       });

@@ -55,6 +55,7 @@ export default function RootLayout() {
               />
               <Stack.Screen name="communities/index" />
               <Stack.Screen name="communities/[id]" />
+              <Stack.Screen name="communities/[id]/invite" />
               <Stack.Screen
                 name="communities/create"
                 options={{ presentation: "modal" }}

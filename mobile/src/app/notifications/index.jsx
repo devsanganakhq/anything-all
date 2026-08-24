@@ -55,6 +55,21 @@ const TYPE_CONFIG = {
     label: "Comment",
   },
   community_invite: { icon: Users, color: Colors.purple, label: "Community" },
+  community_invite_received: {
+    icon: UserPlus,
+    color: Colors.purple,
+    label: "Invite",
+  },
+  community_invite_accepted: {
+    icon: UserCheck,
+    color: Colors.green,
+    label: "Invite Accepted",
+  },
+  community_invite_declined: {
+    icon: XCircle,
+    color: Colors.textSecondary,
+    label: "Invite Declined",
+  },
   community_join: { icon: UserPlus, color: Colors.purple, label: "Joined" },
   community_join_accepted: {
     icon: UserCheck,
@@ -91,6 +106,15 @@ function notificationMessage(n) {
     }
     if (n.notification_type === "community_invite") {
       return `requested to join community ${name}`;
+    }
+    if (n.notification_type === "community_invite_received") {
+      return `invited you to join ${name}`;
+    }
+    if (n.notification_type === "community_invite_accepted") {
+      return `accepted your invite to ${name}`;
+    }
+    if (n.notification_type === "community_invite_declined") {
+      return `declined your invite to ${name}`;
     }
     if (n.notification_type === "community_join_accepted") {
       return `accepted your request to join ${name}`;
@@ -181,6 +205,40 @@ export default function NotificationsScreen() {
     },
   });
 
+  const respondInviteMutation = useMutation({
+    mutationFn: async ({
+      communityId,
+      inviteId,
+      action,
+      notificationId,
+    }) => {
+      const r = await fetch(
+        `/api/communities/${communityId}/invites/respond`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inviteId, action }),
+        },
+      );
+      if (!r.ok) throw new Error("Failed");
+      if (notificationId) {
+        await fetch("/api/user/notifications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ notificationId }),
+        });
+      }
+      return r.json();
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+      qc.invalidateQueries({ queryKey: ["communities"] });
+      if (variables.action === "accept" && variables.communityId) {
+        router.push(`/communities/${variables.communityId}`);
+      }
+    },
+  });
+
   const notifications = data?.notifications ?? [];
   const unread = notifications.filter((n) => !n.read_at).length;
 
@@ -208,6 +266,9 @@ export default function NotificationsScreen() {
       } else if (
         [
           "community_invite",
+          "community_invite_received",
+          "community_invite_accepted",
+          "community_invite_declined",
           "community_join",
           "community_leave",
           "community_join_accepted",
@@ -491,6 +552,90 @@ export default function NotificationsScreen() {
                   </TouchableOpacity>
                 </View>
               )}
+
+            {/* Inline accept / decline for community invites received */}
+            {n.notification_type === "community_invite_received" &&
+              n.invite_id &&
+              n.community_id &&
+              !n.read_at && (
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      respondInviteMutation.mutate({
+                        communityId: n.community_id,
+                        inviteId: n.invite_id,
+                        action: "accept",
+                        notificationId: n.id,
+                      });
+                    }}
+                    style={{
+                      flex: 1,
+                      backgroundColor: Colors.green,
+                      borderRadius: Radius.sm,
+                      paddingVertical: 9,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 5,
+                    }}
+                  >
+                    <CheckCircle
+                      color={Colors.ivory}
+                      size={13}
+                      strokeWidth={2}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: Colors.ivory,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      ACCEPT
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation?.();
+                      respondInviteMutation.mutate({
+                        communityId: n.community_id,
+                        inviteId: n.invite_id,
+                        action: "decline",
+                        notificationId: n.id,
+                      });
+                    }}
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      borderRadius: Radius.sm,
+                      paddingVertical: 9,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 5,
+                    }}
+                  >
+                    <XCircle
+                      color={Colors.textSecondary}
+                      size={13}
+                      strokeWidth={2}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: "700",
+                        color: Colors.textSecondary,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      DECLINE
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
           </View>
 
           {/* Unread dot */}
@@ -509,7 +654,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       );
     },
-    [handlePress, respondMutation, respondJoinRequestMutation],
+    [handlePress, respondMutation, respondJoinRequestMutation, respondInviteMutation],
   );
 
   return (

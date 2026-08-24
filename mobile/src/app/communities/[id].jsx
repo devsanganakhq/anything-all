@@ -30,6 +30,7 @@ import {
   MessageCircle,
   Camera,
   Plus,
+  UserPlus,
   Trash2,
   Flag,
   CheckCircle,
@@ -172,6 +173,8 @@ export default function CommunityDetailScreen() {
   const myRole = community?.my_role ?? null;
   const isMod = ["admin", "moderator"].includes(myRole);
   const joinRequestPending = community?.join_request_pending ?? false;
+  const invitePending = community?.invite_pending ?? false;
+  const pendingInviteId = community?.pending_invite_id ?? null;
 
   const { data: joinRequestsData, isLoading: loadingJoinRequests } = useQuery({
     queryKey: ["community-join-requests", commId],
@@ -248,6 +251,23 @@ export default function CommunityDetailScreen() {
       qc.invalidateQueries({ queryKey: ["community-join-requests", commId] });
       qc.invalidateQueries({ queryKey: ["community-detail", commId] });
       qc.invalidateQueries({ queryKey: ["community-members", commId] });
+    },
+  });
+
+  const respondInviteMutation = useMutation({
+    mutationFn: async ({ inviteId, action }) => {
+      const r = await fetch(`/api/communities/${commId}/invites/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteId, action }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["community-detail", commId] });
+      qc.invalidateQueries({ queryKey: ["communities"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 
@@ -2036,6 +2056,97 @@ export default function CommunityDetailScreen() {
               </View>
             )}
           </View>
+
+          {myRole === "admin" && community.community_type === "private" ? (
+            <TouchableOpacity
+              onPress={() => router.push(`/communities/${commId}/invite`)}
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 9,
+                borderRadius: Radius.pill,
+                backgroundColor: Colors.greenLight,
+                borderWidth: 1,
+                borderColor: Colors.greenBorder,
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <UserPlus color={Colors.green} size={12} strokeWidth={2} />
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: "700",
+                  letterSpacing: 1,
+                  color: Colors.green,
+                }}
+              >
+                INVITE
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {invitePending && !isMember && pendingInviteId ? (
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              <TouchableOpacity
+                onPress={() =>
+                  respondInviteMutation.mutate({
+                    inviteId: pendingInviteId,
+                    action: "accept",
+                  })
+                }
+                disabled={respondInviteMutation.isPending}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 9,
+                  borderRadius: Radius.pill,
+                  backgroundColor: Colors.green,
+                  minWidth: 90,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "700",
+                    letterSpacing: 1,
+                    color: Colors.ivory,
+                  }}
+                >
+                  ACCEPT
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() =>
+                  respondInviteMutation.mutate({
+                    inviteId: pendingInviteId,
+                    action: "decline",
+                  })
+                }
+                disabled={respondInviteMutation.isPending}
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 9,
+                  borderRadius: Radius.pill,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  minWidth: 90,
+                  alignItems: "center",
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "700",
+                    letterSpacing: 1,
+                    color: Colors.textSecondary,
+                  }}
+                >
+                  DECLINE
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
           <TouchableOpacity
             onPress={handleJoin}
             disabled={joinMutation.isPending || joinRequestPending}
@@ -2082,6 +2193,7 @@ export default function CommunityDetailScreen() {
               </Text>
             )}
           </TouchableOpacity>
+          )}
         </View>
 
         {/* Tab bar */}
