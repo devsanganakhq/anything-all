@@ -19,10 +19,13 @@ import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { CourseListRow } from "@/components/CourseListRow";
 import {
   CourseMarker,
+  ClusterMarker,
   MAP_PROVIDER,
   MAP_STYLE,
   MARKER,
 } from "@/components/ExploreMapShared";
+import { getClusterZoomRegion, normalizeMapRegion } from "@/utils/mapClustering";
+import { useMapClusters } from "@/utils/useMapClusters";
 import {
   MapCoursePreviewCard,
   markPlayedHref,
@@ -172,18 +175,41 @@ export default function ExploreCourseListScreen() {
   }, [data, statusById]);
 
   const mappedCourses = useMemo(() => courses.filter(hasCoords), [courses]);
-  const mapRegion = useMemo(
+  const fitRegion = useMemo(
     () => regionForCourses(mappedCourses),
     [mappedCourses],
   );
+  const [mapViewport, setMapViewport] = useState(fitRegion);
+  const { clusters, clusterIndex, courseById } = useMapClusters(
+    mappedCourses,
+    mapViewport,
+  );
+
+  useEffect(() => {
+    setMapViewport(fitRegion);
+  }, [fitRegion]);
 
   useEffect(() => {
     if (viewMode !== "map") return;
     const t = setTimeout(() => {
-      mapRef.current?.animateToRegion(mapRegion, 350);
+      mapRef.current?.animateToRegion(fitRegion, 350);
     }, 80);
     return () => clearTimeout(t);
-  }, [viewMode, mapRegion]);
+  }, [viewMode, fitRegion]);
+
+  const handleRegionChangeComplete = useCallback((region) => {
+    setMapViewport(normalizeMapRegion(region));
+  }, []);
+
+  const handleClusterPress = useCallback(
+    (feature) => {
+      setSelected(null);
+      const region = getClusterZoomRegion(clusterIndex, feature);
+      mapRef.current?.animateToRegion(region, 400);
+      setMapViewport(region);
+    },
+    [clusterIndex],
+  );
 
   const renderItem = useCallback(
     ({ item }) => (
@@ -308,19 +334,35 @@ export default function ExploreCourseListScreen() {
             ref={mapRef}
             provider={MAP_PROVIDER}
             style={{ flex: 1 }}
-            initialRegion={mapRegion}
+            initialRegion={fitRegion}
             customMapStyle={
               MAP_PROVIDER === PROVIDER_GOOGLE ? MAP_STYLE : undefined
             }
             onPress={() => setSelected(null)}
+            onRegionChangeComplete={handleRegionChangeComplete}
           >
-            {mappedCourses.map((course) => (
-              <CourseMarker
-                key={String(course.id)}
-                course={course}
-                onPress={setSelected}
-              />
-            ))}
+            {clusters.map((feature) => {
+              if (feature.properties.cluster) {
+                return (
+                  <ClusterMarker
+                    key={`cluster-${feature.id}`}
+                    feature={feature}
+                    onPress={handleClusterPress}
+                  />
+                );
+              }
+              const course =
+                courseById.get(feature.properties.courseId) ??
+                courseById.get(String(feature.properties.courseId));
+              if (!course) return null;
+              return (
+                <CourseMarker
+                  key={String(course.id)}
+                  course={course}
+                  onPress={setSelected}
+                />
+              );
+            })}
           </MapView>
 
           <View

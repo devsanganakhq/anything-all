@@ -1,9 +1,11 @@
 /**
- * Shared Explore map pieces — provider, styled map, status pins.
+ * Shared Explore map pieces — provider, styled map, status pins, clusters.
  */
 import React, { useEffect, useState } from "react";
-import { View, Platform } from "react-native";
+import { View, Text, Platform } from "react-native";
 import { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { Colors } from "@/constants/theme";
+import { getClusterStyle } from "@/utils/mapClustering";
 
 export const MAP_PROVIDER =
   process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || Platform.OS === "android"
@@ -96,6 +98,59 @@ export function CourseMarker({ course, onPress }) {
             backgroundColor: style.bg,
           }}
         />
+      </View>
+    </Marker>
+  );
+}
+
+function clusterSize(pointCount) {
+  if (pointCount >= 100) return 44;
+  if (pointCount >= 25) return 38;
+  if (pointCount >= 10) return 34;
+  return 30;
+}
+
+/**
+ * Cluster badge for grouped course pins at low zoom levels.
+ */
+export function ClusterMarker({ feature, onPress }) {
+  const coords = feature?.geometry?.coordinates;
+  if (!coords) return null;
+  const [lng, lat] = coords;
+  const pointCount = feature.properties.point_count ?? 0;
+  const style = getClusterStyle(feature.properties);
+  const size = clusterSize(pointCount);
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+
+  return (
+    <Marker
+      coordinate={{ latitude: lat, longitude: lng }}
+      onPress={() => onPress?.(feature)}
+      tracksViewChanges={false}
+      anchor={{ x: 0.5, y: 0.5 }}
+    >
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: style.bg,
+          borderWidth: 2,
+          borderColor: style.border,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text
+          style={{
+            fontSize: pointCount >= 100 ? 11 : 12,
+            fontWeight: "700",
+            color: Colors.ivory,
+          }}
+        >
+          {pointCount >= 1000 ? "999+" : pointCount}
+        </Text>
       </View>
     </Marker>
   );

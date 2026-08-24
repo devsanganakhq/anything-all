@@ -26,10 +26,13 @@ import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   CourseMarker,
+  ClusterMarker,
   MAP_PROVIDER,
   MAP_STYLE,
   MARKER,
 } from "@/components/ExploreMapShared";
+import { UK_OVERVIEW_REGION, getClusterZoomRegion, normalizeMapRegion } from "@/utils/mapClustering";
+import { useMapClusters } from "@/utils/useMapClusters";
 import {
   Search,
   MapPin,
@@ -207,6 +210,7 @@ export default function ExploreScreen() {
     MAP_FILTERS.some((f) => f.key === paramFilter) ? paramFilter : "ALL",
   );
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [mapRegion, setMapRegion] = useState(UK_OVERVIEW_REGION);
   const slideAnim = useRef(new Animated.Value(300)).current;
 
   // This tab stays mounted, so incoming params have to be applied on every
@@ -274,6 +278,10 @@ export default function ExploreScreen() {
     staleTime: 1000 * 30, // 30 s
   });
   const mapCourses = mapData?.courses ?? [];
+  const { clusters, clusterIndex, courseById } = useMapClusters(
+    mapCourses,
+    mapRegion,
+  );
 
   // ── Discover data (ranking collections) ─────────────────────────────────
   const { data: coursesData = [], isLoading: coursesLoading } = useQuery({
@@ -412,6 +420,20 @@ export default function ExploreScreen() {
       useNativeDriver: true,
     }).start(() => setSelectedCourse(null));
   }, [slideAnim]);
+
+  const handleClusterPress = useCallback(
+    (feature) => {
+      closePreview();
+      const region = getClusterZoomRegion(clusterIndex, feature);
+      mapRef.current?.animateToRegion(region, 400);
+      setMapRegion(region);
+    },
+    [clusterIndex, closePreview],
+  );
+
+  const handleRegionChangeComplete = useCallback((region) => {
+    setMapRegion(normalizeMapRegion(region));
+  }, []);
 
   const frameMapToCoords = useCallback((coords) => {
     const map = mapRef.current;
@@ -807,24 +829,35 @@ export default function ExploreScreen() {
           ref={mapRef}
           provider={MAP_PROVIDER}
           style={{ flex: 1 }}
-          initialRegion={{
-            latitude: 54.0,
-            longitude: -2.5,
-            latitudeDelta: 9.0,
-            longitudeDelta: 9.0,
-          }}
+          initialRegion={UK_OVERVIEW_REGION}
           customMapStyle={
             MAP_PROVIDER === PROVIDER_GOOGLE ? MAP_STYLE : undefined
           }
           onPress={closePreview}
+          onRegionChangeComplete={handleRegionChangeComplete}
         >
-          {mapCourses.map((course) => (
-            <CourseMarker
-              key={course.id}
-              course={course}
-              onPress={handleMarkerPress}
-            />
-          ))}
+          {clusters.map((feature) => {
+            if (feature.properties.cluster) {
+              return (
+                <ClusterMarker
+                  key={`cluster-${feature.id}`}
+                  feature={feature}
+                  onPress={handleClusterPress}
+                />
+              );
+            }
+            const course =
+              courseById.get(feature.properties.courseId) ??
+              courseById.get(String(feature.properties.courseId));
+            if (!course) return null;
+            return (
+              <CourseMarker
+                key={course.id}
+                course={course}
+                onPress={handleMarkerPress}
+              />
+            );
+          })}
         </MapView>
 
         {/* Locate button — personal maps go to your pins; All Courses stays on UK */}
@@ -852,15 +885,8 @@ export default function ExploreScreen() {
                 return;
               }
             }
-            mapRef.current?.animateToRegion(
-              {
-                latitude: 54.0,
-                longitude: -2.5,
-                latitudeDelta: 9.0,
-                longitudeDelta: 9.0,
-              },
-              600,
-            );
+            mapRef.current?.animateToRegion(UK_OVERVIEW_REGION, 600);
+            setMapRegion(UK_OVERVIEW_REGION);
           }}
           style={{
             position: "absolute",
