@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'xyz.create.CreateExpoEnvironment'
+    namespace 'com.heathlandlinks.app'
     defaultConfig {
-        applicationId 'xyz.create.CreateExpoEnvironment'
+        applicationId 'com.heathlandlinks.app'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

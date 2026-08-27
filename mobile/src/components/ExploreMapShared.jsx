@@ -51,11 +51,38 @@ export const MAP_STYLE = [
   },
 ];
 
+function courseMarkerPropsEqual(prev, next) {
+  const pc = prev.course;
+  const nc = next.course;
+  return (
+    pc?.id === nc?.id &&
+    pc?.latitude === nc?.latitude &&
+    pc?.longitude === nc?.longitude &&
+    pc?.user_played === nc?.user_played &&
+    pc?.user_wishlisted === nc?.user_wishlisted &&
+    prev.onPress === next.onPress
+  );
+}
+
+function clusterMarkerPropsEqual(prev, next) {
+  const pf = prev.feature;
+  const nf = next.feature;
+  return (
+    pf?.id === nf?.id &&
+    pf?.properties?.point_count === nf?.properties?.point_count &&
+    pf?.geometry?.coordinates?.[0] === nf?.geometry?.coordinates?.[0] &&
+    pf?.geometry?.coordinates?.[1] === nf?.geometry?.coordinates?.[1] &&
+    pf?.properties?.played === nf?.properties?.played &&
+    pf?.properties?.wishlisted === nf?.properties?.wishlisted &&
+    prev.onPress === next.onPress
+  );
+}
+
 /**
  * Status-coloured map pin used on Explore map and filtered list maps.
  * Android only snapshots custom marker views while tracksViewChanges is true.
  */
-export function CourseMarker({ course, onPress }) {
+export const CourseMarker = React.memo(function CourseMarker({ course, onPress }) {
   const style = getMarkerStyle(course);
   const [tracksViewChanges, setTracksViewChanges] = useState(true);
   const size = course?.user_played ? 14 : course?.user_wishlisted ? 13 : 10;
@@ -85,23 +112,11 @@ export function CourseMarker({ course, onPress }) {
           backgroundColor: style.bg,
           borderWidth: 2,
           borderColor: style.border,
-          justifyContent: "center",
-          alignItems: "center",
-          overflow: "hidden",
         }}
-      >
-        <View
-          style={{
-            width: Math.max(4, size - 6),
-            height: Math.max(4, size - 6),
-            borderRadius: Math.max(2, (size - 6) / 2),
-            backgroundColor: style.bg,
-          }}
-        />
-      </View>
+      />
     </Marker>
   );
-}
+}, courseMarkerPropsEqual);
 
 function clusterSize(pointCount) {
   if (pointCount >= 100) return 44;
@@ -113,13 +128,23 @@ function clusterSize(pointCount) {
 /**
  * Cluster badge for grouped course pins at low zoom levels.
  */
-export function ClusterMarker({ feature, onPress }) {
+export const ClusterMarker = React.memo(function ClusterMarker({
+  feature,
+  onPress,
+}) {
   const coords = feature?.geometry?.coordinates;
   if (!coords) return null;
   const [lng, lat] = coords;
   const pointCount = feature.properties.point_count ?? 0;
   const style = getClusterStyle(feature.properties);
   const size = clusterSize(pointCount);
+  const [tracksViewChanges, setTracksViewChanges] = useState(true);
+
+  useEffect(() => {
+    setTracksViewChanges(true);
+    const t = setTimeout(() => setTracksViewChanges(false), 400);
+    return () => clearTimeout(t);
+  }, [pointCount, lat, lng]);
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
@@ -127,7 +152,7 @@ export function ClusterMarker({ feature, onPress }) {
     <Marker
       coordinate={{ latitude: lat, longitude: lng }}
       onPress={() => onPress?.(feature)}
-      tracksViewChanges={false}
+      tracksViewChanges={tracksViewChanges}
       anchor={{ x: 0.5, y: 0.5 }}
     >
       <View
@@ -154,4 +179,4 @@ export function ClusterMarker({ feature, onPress }) {
       </View>
     </Marker>
   );
-}
+}, clusterMarkerPropsEqual);

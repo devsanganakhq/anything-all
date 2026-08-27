@@ -10,7 +10,7 @@
  *   ♥ Gold        — wishlisted (not yet played)
  *   ✓ Bright green — already played
  */
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -31,7 +31,7 @@ import {
   MAP_STYLE,
   MARKER,
 } from "@/components/ExploreMapShared";
-import { UK_OVERVIEW_REGION, getClusterZoomRegion, normalizeMapRegion } from "@/utils/mapClustering";
+import { UK_OVERVIEW_REGION, getClusterZoomRegion, quantizeMapRegion, regionsEqual } from "@/utils/mapClustering";
 import { useMapClusters } from "@/utils/useMapClusters";
 import {
   Search,
@@ -126,6 +126,55 @@ const MAP_EMPTY_COPY = {
     body: "Save courses to your wish list to plan your next round.",
   },
 };
+
+function ExploreMapLegend({ bottom }) {
+  return (
+    <View
+      style={{
+        position: "absolute",
+        bottom,
+        left: Spacing.screenH,
+        backgroundColor: "rgba(255,255,255,0.95)",
+        borderRadius: Radius.md,
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        flexDirection: "row",
+        gap: 10,
+        alignItems: "center",
+        ...Shadow.card,
+      }}
+    >
+      {[
+        { color: MARKER.unplayed.bg, label: "Unplayed" },
+        { color: MARKER.wishlisted.bg, label: "Saved" },
+        { color: MARKER.played.bg, label: "Played" },
+      ].map((item) => (
+        <View
+          key={item.label}
+          style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
+        >
+          <View
+            style={{
+              width: 9,
+              height: 9,
+              borderRadius: 5,
+              backgroundColor: item.color,
+            }}
+          />
+          <Text
+            style={{
+              fontSize: 9,
+              fontWeight: "700",
+              color: Colors.textSecondary,
+            }}
+          >
+            {item.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 // ─── Status badge used on course cards ───────────────────────────────────────
 function StatusBadge({ played, wishlisted }) {
@@ -291,6 +340,7 @@ export default function ExploreScreen() {
       if (!res.ok) throw new Error("Failed to fetch courses");
       return res.json();
     },
+    enabled: viewMode === "LIST",
   });
 
   const { data: collectionsData, isLoading: collectionsLoading } = useQuery({
@@ -300,52 +350,72 @@ export default function ExploreScreen() {
       if (!res.ok) throw new Error("Failed to fetch collections");
       return res.json();
     },
+    enabled: viewMode === "LIST",
   });
 
   const discoverLoading = collectionsLoading || coursesLoading;
 
-  // Merge static metadata with live API data
-  const collections = RANKING_COLLECTIONS.map((meta) => {
-    const live = collectionsData?.collections?.find(
-      (c) => c.id === meta.id || c.ranking_name === meta.ranking_name,
-    );
-    const verifiedCount = live?.verified_count ?? meta.verified_count;
-    const courseCount =
-      live?.course_count ??
-      verifiedCount ??
-      meta.course_count ??
-      live?.courses?.length ??
-      0;
-    return {
-      ...meta,
-      verified_count: verifiedCount,
-      missing_count: live?.missing_count ?? meta.missing_count,
-      is_complete: live?.is_complete ?? meta.is_complete,
-      is_sample_data: live?.is_sample_data ?? meta.is_sample_data,
-      course_count: courseCount,
-      courses: live?.courses ?? [],
-    };
-  });
+  const {
+    collections,
+    namedCollections,
+    topRatedCol,
+    mostPlayedCol,
+    trendingCol,
+    hiddenGemsCol,
+    destinationsCol,
+    fallbackCourses,
+    destinationList,
+  } = useMemo(() => {
+    const mergedCollections = RANKING_COLLECTIONS.map((meta) => {
+      const live = collectionsData?.collections?.find(
+        (c) => c.id === meta.id || c.ranking_name === meta.ranking_name,
+      );
+      const verifiedCount = live?.verified_count ?? meta.verified_count;
+      const courseCount =
+        live?.course_count ??
+        verifiedCount ??
+        meta.course_count ??
+        live?.courses?.length ??
+        0;
+      return {
+        ...meta,
+        verified_count: verifiedCount,
+        missing_count: live?.missing_count ?? meta.missing_count,
+        is_complete: live?.is_complete ?? meta.is_complete,
+        is_sample_data: live?.is_sample_data ?? meta.is_sample_data,
+        course_count: courseCount,
+        courses: live?.courses ?? [],
+      };
+    });
 
-  // Named external ranking collections (not community-computed lists)
-  const namedCollections = collections.filter(
-    (c) =>
-      c.ranking_source !== "HEATHLAND_LINKS_COMMUNITY" && !c.is_destinations,
-  );
-  const topRatedCol = collections.find((c) => c.id === "community-top-rated");
-  const mostPlayedCol = collections.find((c) => c.id === "most-played");
-  const trendingCol = collections.find((c) => c.id === "trending");
-  const hiddenGemsCol = collections.find((c) => c.id === "hidden-gems");
-  const destinationsCol = collections.find((c) => c.id === "golf-destinations");
-  const fallbackCourses = coursesData.slice(0, 8);
-  const destinationList =
-    destinationsCol?.courses?.length > 0
-      ? destinationsCol.courses.map((d) => ({
-          country: d.country,
-          course_count: d.course_count,
-          flag: countryFlagEmoji(d.country),
-        }))
-      : FALLBACK_DEST;
+    const named = mergedCollections.filter(
+      (c) =>
+        c.ranking_source !== "HEATHLAND_LINKS_COMMUNITY" && !c.is_destinations,
+    );
+    const destinations = mergedCollections.find(
+      (c) => c.id === "golf-destinations",
+    );
+    const destinationsMapped =
+      destinations?.courses?.length > 0
+        ? destinations.courses.map((d) => ({
+            country: d.country,
+            course_count: d.course_count,
+            flag: countryFlagEmoji(d.country),
+          }))
+        : FALLBACK_DEST;
+
+    return {
+      collections: mergedCollections,
+      namedCollections: named,
+      topRatedCol: mergedCollections.find((c) => c.id === "community-top-rated"),
+      mostPlayedCol: mergedCollections.find((c) => c.id === "most-played"),
+      trendingCol: mergedCollections.find((c) => c.id === "trending"),
+      hiddenGemsCol: mergedCollections.find((c) => c.id === "hidden-gems"),
+      destinationsCol: destinations,
+      fallbackCourses: coursesData.slice(0, 8),
+      destinationList: destinationsMapped,
+    };
+  }, [collectionsData, coursesData]);
 
   // ── Wishlist mutation (toggle) ───────────────────────────────────────────
   const wishlistMutation = useMutation({
@@ -426,13 +496,17 @@ export default function ExploreScreen() {
       closePreview();
       const region = getClusterZoomRegion(clusterIndex, feature);
       mapRef.current?.animateToRegion(region, 400);
-      setMapRegion(region);
+      setMapRegion(quantizeMapRegion(region));
     },
     [clusterIndex, closePreview],
   );
 
   const handleRegionChangeComplete = useCallback((region) => {
-    setMapRegion(normalizeMapRegion(region));
+    setMapRegion((prev) => {
+      const next = quantizeMapRegion(region);
+      if (regionsEqual(prev, next)) return prev;
+      return next;
+    });
   }, []);
 
   const frameMapToCoords = useCallback((coords) => {
@@ -495,55 +569,7 @@ export default function ExploreScreen() {
     return () => clearTimeout(t);
   }, [viewMode, mapFilter, mapCourses, paramOpen, frameMapToCoords]);
 
-  // ── Map legend ───────────────────────────────────────────────────────────
-  const MapLegend = () => (
-    <View
-      style={{
-        position: "absolute",
-        bottom: insets.bottom + TAB_BAR_CLEARANCE + (selectedCourse ? 248 : 0),
-        left: Spacing.screenH,
-        backgroundColor: "rgba(255,255,255,0.95)",
-        borderRadius: Radius.md,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        flexDirection: "row",
-        gap: 10,
-        alignItems: "center",
-        ...Shadow.card,
-      }}
-    >
-      {[
-        { color: MARKER.unplayed.bg, label: "Unplayed" },
-        { color: MARKER.wishlisted.bg, label: "Saved" },
-        { color: MARKER.played.bg, label: "Played" },
-      ].map((item) => (
-        <View
-          key={item.label}
-          style={{ flexDirection: "row", alignItems: "center", gap: 5 }}
-        >
-          <View
-            style={{
-              width: 9,
-              height: 9,
-              borderRadius: 5,
-              backgroundColor: item.color,
-            }}
-          />
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: "700",
-              color: Colors.textSecondary,
-            }}
-          >
-            {item.label}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-
-  // ── Shared header (JSX element — not a nested component, or TextInput remounts) ─
+  // Frame markers when map data arrives. Personal filters follow the user's
   const searchHeader = (
     <View
       style={{
@@ -833,6 +859,10 @@ export default function ExploreScreen() {
           customMapStyle={
             MAP_PROVIDER === PROVIDER_GOOGLE ? MAP_STYLE : undefined
           }
+          rotateEnabled={false}
+          pitchEnabled={false}
+          toolbarEnabled={false}
+          moveOnMarkerPress={false}
           onPress={closePreview}
           onRegionChangeComplete={handleRegionChangeComplete}
         >
@@ -886,7 +916,7 @@ export default function ExploreScreen() {
               }
             }
             mapRef.current?.animateToRegion(UK_OVERVIEW_REGION, 600);
-            setMapRegion(UK_OVERVIEW_REGION);
+            setMapRegion(quantizeMapRegion(UK_OVERVIEW_REGION));
           }}
           style={{
             position: "absolute",
@@ -906,7 +936,11 @@ export default function ExploreScreen() {
         </TouchableOpacity>
 
         {/* Legend */}
-        <MapLegend />
+        <ExploreMapLegend
+          bottom={
+            insets.bottom + TAB_BAR_CLEARANCE + (selectedCourse ? 248 : 0)
+          }
+        />
 
         {/* Course preview panel */}
         {selectedCourse && (

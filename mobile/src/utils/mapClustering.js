@@ -1,3 +1,4 @@
+import { Dimensions } from "react-native";
 import Supercluster from "supercluster";
 
 export const UK_OVERVIEW_REGION = {
@@ -7,9 +8,11 @@ export const UK_OVERVIEW_REGION = {
   longitudeDelta: 9.0,
 };
 
+const MAX_LEAF_MARKERS = 150;
+
 const CLUSTER_OPTIONS = {
   radius: 60,
-  maxZoom: 16,
+  maxZoom: 18,
   minPoints: 2,
   map: (props) => ({
     played: props.user_played ? 1 : 0,
@@ -75,6 +78,29 @@ export function normalizeMapRegion(region) {
   };
 }
 
+/** Round region values so tiny map gestures do not trigger full reclustering. */
+export function quantizeMapRegion(region, precision = 4) {
+  const normalized = normalizeMapRegion(region);
+  const factor = 10 ** precision;
+  return {
+    latitude: Math.round(normalized.latitude * factor) / factor,
+    longitude: Math.round(normalized.longitude * factor) / factor,
+    latitudeDelta: Math.round(normalized.latitudeDelta * factor) / factor,
+    longitudeDelta: Math.round(normalized.longitudeDelta * factor) / factor,
+  };
+}
+
+export function regionsEqual(a, b, precision = 4) {
+  const qa = quantizeMapRegion(a, precision);
+  const qb = quantizeMapRegion(b, precision);
+  return (
+    qa.latitude === qb.latitude &&
+    qa.longitude === qb.longitude &&
+    qa.latitudeDelta === qb.latitudeDelta &&
+    qa.longitudeDelta === qb.longitudeDelta
+  );
+}
+
 export function regionToBBox(region) {
   const normalized = normalizeMapRegion(region);
   return [
@@ -85,10 +111,14 @@ export function regionToBBox(region) {
   ];
 }
 
-export function regionToZoom(region) {
+export function regionToZoom(
+  region,
+  mapWidth = Dimensions.get("window").width,
+) {
   const normalized = normalizeMapRegion(region);
-  const zoom = Math.round(
-    Math.log(360 / normalized.longitudeDelta) / Math.LN2,
+  const width = Number.isFinite(mapWidth) && mapWidth > 0 ? mapWidth : 360;
+  const zoom = Math.floor(
+    Math.log((360 * width) / (256 * normalized.longitudeDelta)) / Math.LN2,
   );
   if (!Number.isFinite(zoom)) return 10;
   return Math.max(0, Math.min(20, zoom));
@@ -100,7 +130,13 @@ export function getMapClusters(index, region) {
     const bbox = regionToBBox(region);
     const zoom = regionToZoom(region);
     if (!Number.isFinite(zoom)) return [];
-    return index.getClusters(bbox, zoom);
+    const features = index.getClusters(bbox, zoom);
+    const clusters = features.filter((feature) => feature.properties.cluster);
+    const leaves = features.filter((feature) => !feature.properties.cluster);
+    if (leaves.length <= MAX_LEAF_MARKERS) {
+      return features;
+    }
+    return [...clusters, ...leaves.slice(0, MAX_LEAF_MARKERS)];
   } catch {
     return [];
   }

@@ -24,7 +24,7 @@ import {
   MAP_STYLE,
   MARKER,
 } from "@/components/ExploreMapShared";
-import { getClusterZoomRegion, normalizeMapRegion } from "@/utils/mapClustering";
+import { getClusterZoomRegion, quantizeMapRegion, regionsEqual } from "@/utils/mapClustering";
 import { useMapClusters } from "@/utils/useMapClusters";
 import {
   MapCoursePreviewCard,
@@ -198,7 +198,11 @@ export default function ExploreCourseListScreen() {
   }, [viewMode, fitRegion]);
 
   const handleRegionChangeComplete = useCallback((region) => {
-    setMapViewport(normalizeMapRegion(region));
+    setMapViewport((prev) => {
+      const next = quantizeMapRegion(region);
+      if (regionsEqual(prev, next)) return prev;
+      return next;
+    });
   }, []);
 
   const handleClusterPress = useCallback(
@@ -206,7 +210,7 @@ export default function ExploreCourseListScreen() {
       setSelected(null);
       const region = getClusterZoomRegion(clusterIndex, feature);
       mapRef.current?.animateToRegion(region, 400);
-      setMapViewport(region);
+      setMapViewport(quantizeMapRegion(region));
     },
     [clusterIndex],
   );
@@ -338,6 +342,10 @@ export default function ExploreCourseListScreen() {
             customMapStyle={
               MAP_PROVIDER === PROVIDER_GOOGLE ? MAP_STYLE : undefined
             }
+            rotateEnabled={false}
+            pitchEnabled={false}
+            toolbarEnabled={false}
+            moveOnMarkerPress={false}
             onPress={() => setSelected(null)}
             onRegionChangeComplete={handleRegionChangeComplete}
           >
