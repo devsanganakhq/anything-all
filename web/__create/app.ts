@@ -302,7 +302,13 @@ export function createApp() {
       return await handleUploadRequest(c.req.raw);
     } catch (error) {
       console.error('Upload error:', error);
-      const status = (error as { status?: number })?.status === 413 ? 413 : 500;
+      const statusCode = (error as { status?: number })?.status;
+      const status =
+        statusCode === 400 ||
+        statusCode === 413 ||
+        statusCode === 429
+          ? statusCode
+          : 500;
       return c.json(
         { error: (error as Error).message || 'Upload failed' },
         status,
