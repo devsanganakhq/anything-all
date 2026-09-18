@@ -7,6 +7,10 @@ import { timeAgo } from "./utils";
 import { ACTIVITY_LABELS } from "@/constants/courseConstants";
 import { UserAvatar } from "@/components/UserAvatar";
 import { PressableUser } from "@/components/PressableUser";
+import {
+  resolveCourseHoles,
+  resolveCoursePar,
+} from "@/utils/courseDisplayName";
 
 export function OverviewTab({
   description,
@@ -74,8 +78,8 @@ export function OverviewTab({
                 course.course_type.slice(1)
               : null,
           },
-          { label: "Holes", value: course.holes ?? 18 },
-          { label: "Par", value: course.par ?? 72 },
+          { label: "Holes", value: resolveCourseHoles(course) },
+          { label: "Par", value: resolveCoursePar(course) },
           { label: "County", value: course.county },
           { label: "Country", value: course.country },
           { label: "Club", value: course.club_name },

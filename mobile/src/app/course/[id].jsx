@@ -26,6 +26,7 @@ import {
   FALLBACK_IMAGES,
   RANKING_ACCENTS,
   RANKING_DEFAULT,
+  SHOW_RANKINGS,
   STATUS_CONFIG,
   STICKY_HEADER_H,
 } from "@/constants/courseConstants";
@@ -401,7 +402,7 @@ export default function CourseDetailScreen() {
   const activity = data.recentActivity ?? [];
   const followerCount = data.followerCount ?? 0;
   const statusConfig = STATUS_CONFIG[course.course_status] || null;
-  const hasRankings = rankings.length > 0;
+  const hasRankings = SHOW_RANKINGS && rankings.length > 0;
 
   // ── Hero image — photos cover the banner; logos sit contained ───────────
   // A. Paid official profile with official_hero_image_url
@@ -481,7 +482,7 @@ export default function CourseDetailScreen() {
             rating={rating}
             reviews={reviews}
             followerCount={followerCount}
-            listCount={rankings.length}
+            listCount={SHOW_RANKINGS ? rankings.length : 0}
             onPressReviews={goToReviews}
           />
         </View>
@@ -522,7 +523,7 @@ export default function CourseDetailScreen() {
             />
           )}
 
-          {activeTab === "RANKINGS" && (
+          {SHOW_RANKINGS && activeTab === "RANKINGS" && (
             <RankingsTab
               hasRankings={hasRankings}
               rankings={rankings}

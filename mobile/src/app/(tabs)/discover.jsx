@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
+import { formatCourseHolesPar } from "@/utils/courseDisplayName";
 
 const COURSE_IMAGES = [
   "https://images.unsplash.com/photo-1587174486073-ae5e5cff23aa?q=80&w=600&auto=format&fit=crop",
@@ -118,6 +119,16 @@ export default function DiscoverScreen() {
           </View>
         </View>
         <View style={{ marginTop: 6 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: "600",
+              color: Colors.textMuted,
+              marginBottom: 6,
+            }}
+          >
+            {formatCourseHolesPar(item, { compact: true })}
+          </Text>
           <View
             style={{
               backgroundColor: Colors.greenLight,

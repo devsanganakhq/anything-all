@@ -35,6 +35,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
+import { SHOW_RANKINGS } from "@/constants/courseConstants";
 import { HomeClubIcon, MemberClubIcon } from "@/components/ClubIcons";
 import { Alert } from "react-native";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -204,14 +205,18 @@ export default function PassportScreen() {
       color: "#C9952A",
       route: "/passport/wishlist",
     },
-    {
-      label: "Ranking Progress",
-      icon: TrendingUp,
-      count: rankingProgress.length,
-      color: Colors.purple,
-      route: null,
-      comingSoon: true,
-    },
+    ...(SHOW_RANKINGS
+      ? [
+          {
+            label: "Ranking Progress",
+            icon: TrendingUp,
+            count: rankingProgress.length,
+            color: Colors.purple,
+            route: null,
+            comingSoon: true,
+          },
+        ]
+      : []),
     {
       label: "Reviews",
       icon: MessageSquare,
@@ -458,10 +463,12 @@ export default function PassportScreen() {
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.15)" }}
             />
             <HeroStat
-              label="TOP 100 B&I"
-              value={stats.top100_bi_completed}
+              label={SHOW_RANKINGS ? "TOP 100 B&I" : "REVIEWS"}
+              value={
+                SHOW_RANKINGS ? stats.top100_bi_completed : stats.reviews_count
+              }
               large
-              gold
+              gold={SHOW_RANKINGS}
             />
           </View>
 
@@ -499,33 +506,37 @@ export default function PassportScreen() {
         )}
 
         {/* ── RANKING PROGRESS header ─────────────────────────────────────── */}
-        <SectionHeader label="RANKING PROGRESS" icon={TrendingUp} />
+        {SHOW_RANKINGS && (
+          <>
+            <SectionHeader label="RANKING PROGRESS" icon={TrendingUp} />
 
-        {/* ── Ranking cards — horizontal scroll ──────────────────────────── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={{
-            paddingLeft: Spacing.screenH,
-            paddingRight: 10,
-            paddingBottom: 6,
-            gap: 12,
-          }}
-        >
-          {rankingProgress.map((r) => (
-            <RankingProgressCard
-              key={r.id}
-              data={r}
-              onPress={() =>
-                Alert.alert(
-                  "Coming Soon",
-                  "Ranking progress detail is coming in a future update.",
-                )
-              }
-            />
-          ))}
-        </ScrollView>
+            {/* ── Ranking cards — horizontal scroll ──────────────────────────── */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{
+                paddingLeft: Spacing.screenH,
+                paddingRight: 10,
+                paddingBottom: 6,
+                gap: 12,
+              }}
+            >
+              {rankingProgress.map((r) => (
+                <RankingProgressCard
+                  key={r.id}
+                  data={r}
+                  onPress={() =>
+                    Alert.alert(
+                      "Coming Soon",
+                      "Ranking progress detail is coming in a future update.",
+                    )
+                  }
+                />
+              ))}
+            </ScrollView>
+          </>
+        )}
 
         {/* ── MAP teaser ──────────────────────────────────────────────────── */}
         <View

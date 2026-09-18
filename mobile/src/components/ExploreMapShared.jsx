@@ -119,14 +119,16 @@ export const CourseMarker = React.memo(function CourseMarker({ course, onPress }
 }, courseMarkerPropsEqual);
 
 function clusterSize(pointCount) {
-  if (pointCount >= 100) return 44;
-  if (pointCount >= 25) return 38;
-  if (pointCount >= 10) return 34;
-  return 30;
+  if (pointCount >= 100) return 48;
+  if (pointCount >= 25) return 40;
+  if (pointCount >= 10) return 36;
+  return 32;
 }
 
 /**
  * Cluster badge for grouped course pins at low zoom levels.
+ * Android marker bitmaps clip edge/border pixels unless the snapshot
+ * view is larger than the circle and marked non-collapsable.
  */
 export const ClusterMarker = React.memo(function ClusterMarker({
   feature,
@@ -138,6 +140,7 @@ export const ClusterMarker = React.memo(function ClusterMarker({
   const pointCount = feature.properties.point_count ?? 0;
   const style = getClusterStyle(feature.properties);
   const size = clusterSize(pointCount);
+  const pad = 6;
   const [tracksViewChanges, setTracksViewChanges] = useState(true);
 
   useEffect(() => {
@@ -156,26 +159,43 @@ export const ClusterMarker = React.memo(function ClusterMarker({
       anchor={{ x: 0.5, y: 0.5 }}
     >
       <View
+        collapsable={false}
         style={{
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: style.bg,
-          borderWidth: 2,
-          borderColor: style.border,
-          justifyContent: "center",
+          width: size + pad * 2,
+          height: size + pad * 2,
           alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "transparent",
         }}
       >
-        <Text
+        <View
+          collapsable={false}
           style={{
-            fontSize: pointCount >= 100 ? 11 : 12,
-            fontWeight: "700",
-            color: Colors.ivory,
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: style.bg,
+            borderWidth: 2,
+            borderColor: style.border,
+            justifyContent: "center",
+            alignItems: "center",
+            overflow: "hidden",
           }}
         >
-          {pointCount >= 1000 ? "999+" : pointCount}
-        </Text>
+          <Text
+            style={{
+              fontSize: pointCount >= 100 ? 11 : 12,
+              fontWeight: "700",
+              color: Colors.ivory,
+              textAlign: "center",
+              includeFontPadding: false,
+            }}
+            numberOfLines={1}
+            allowFontScaling={false}
+          >
+            {pointCount >= 1000 ? "999+" : pointCount}
+          </Text>
+        </View>
       </View>
     </Marker>
   );

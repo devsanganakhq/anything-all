@@ -17,6 +17,7 @@ import { CompletionBlock } from "./PostBlocks/CompletionBlock";
 import { ClubUpdateBlock } from "./PostBlocks/ClubUpdateBlock";
 import { CommunityBlock } from "./PostBlocks/CommunityBlock";
 import { GolfTripBlock } from "./PostBlocks/GolfTripBlock";
+import { SHOW_RANKINGS } from "@/constants/courseConstants";
 
 export function FeedCard({
   post,
@@ -30,6 +31,14 @@ export function FeedCard({
   const meta = POST_TYPE_META[post.post_type] || POST_TYPE_META.played_course;
   const md = post.metadata || {};
   const isClub = post.post_type === "club_update";
+
+  if (
+    !SHOW_RANKINGS &&
+    (post.post_type === "ranking_progress" ||
+      post.post_type === "ranking_complete")
+  ) {
+    return null;
+  }
 
   return (
     <View
@@ -63,10 +72,10 @@ export function FeedCard({
         <AchievementBlock post={post} md={md} />
       )}
       {post.post_type === "milestone" && <MilestoneBlock post={post} md={md} />}
-      {post.post_type === "ranking_progress" && (
+      {SHOW_RANKINGS && post.post_type === "ranking_progress" && (
         <RankingProgressBlock post={post} md={md} />
       )}
-      {(post.post_type === "ranking_complete" ||
+      {((SHOW_RANKINGS && post.post_type === "ranking_complete") ||
         post.post_type === "passport_complete") && (
         <CompletionBlock post={post} md={md} />
       )}

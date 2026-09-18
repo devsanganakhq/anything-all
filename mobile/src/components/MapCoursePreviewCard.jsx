@@ -23,9 +23,11 @@ import { CourseImagePlaceholder } from "@/components/CourseImagePlaceholder";
 import { MARKER } from "@/components/ExploreMapShared";
 import {
   courseDisplayName,
+  formatCourseHolesPar,
   formatCourseLocation,
   formatCourseShareLabel,
 } from "@/utils/courseDisplayName";
+import { SHOW_RANKINGS } from "@/constants/courseConstants";
 
 export function MapCoursePreviewCard({
   course,
@@ -148,7 +150,7 @@ export function MapCoursePreviewCard({
           <X size={14} color="#fff" strokeWidth={2.5} />
         </TouchableOpacity>
 
-        {course.rankings?.[0] ? (
+        {SHOW_RANKINGS && course.rankings?.[0] ? (
           <View
             style={{
               position: "absolute",
@@ -164,7 +166,7 @@ export function MapCoursePreviewCard({
               #{course.rankings[0].position} {course.rankings[0].ranking_name}
             </Text>
           </View>
-        ) : course.position ? (
+        ) : SHOW_RANKINGS && course.position ? (
           <View
             style={{
               position: "absolute",
@@ -230,6 +232,15 @@ export function MapCoursePreviewCard({
               </Text>
             </View>
           ) : null}
+          <Text
+            style={{
+              fontSize: 11,
+              fontWeight: "600",
+              color: Colors.textMuted,
+            }}
+          >
+            {formatCourseHolesPar(course, { compact: true })}
+          </Text>
           {course.community_rating > 0 ? (
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: 3 }}

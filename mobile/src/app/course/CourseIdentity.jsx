@@ -5,6 +5,8 @@ import { Colors, Spacing, Radius } from "@/constants/theme";
 import {
   courseDisplayName,
   formatCourseLocation,
+  resolveCourseHoles,
+  resolveCoursePar,
 } from "@/utils/courseDisplayName";
 import {
   CourseListLogo,
@@ -57,8 +59,8 @@ export function CourseIdentity({
 }) {
   const { title, subtitle } = courseDisplayName(course);
   const location = formatCourseLocation(course, { includeCounty: true });
-  const par = course.par == null || course.par === "" ? "—" : course.par;
-  const holes = course.holes == null || course.holes === "" ? "—" : course.holes;
+  const par = resolveCoursePar(course);
+  const holes = resolveCourseHoles(course);
   const onLists = listCount ?? 0;
   const website = course.website
     ? course.website.startsWith("http")

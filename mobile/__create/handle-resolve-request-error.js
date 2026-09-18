@@ -7,6 +7,13 @@ const VIRTUAL_ROOT = path.join(__dirname, '../.metro-virtual');
 const VIRTUAL_ROOT_UNRESOLVED = path.join(VIRTUAL_ROOT, 'unresolved');
 
 const handleResolveRequestError = ({ error, context, moduleName, platform }) => {
+  // Requires inside a try/catch are feature detection, not mistakes — Metro
+  // flags them isOptional and drops them when resolution fails. Substituting a
+  // throwing stub defeats that and, because the stub is written mid-resolution
+  // into an unwatched directory, Metro then fails to hash it and the whole
+  // bundle errors out.
+  if (context.dependency?.data?.isOptional) throw error;
+
   const errorMessage = `Unable to resolve module '${moduleName}' from '${context.originModulePath}'`;
   const syntheticError = new Error(errorMessage);
   syntheticError.stack = error.stack;

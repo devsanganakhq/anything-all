@@ -7,8 +7,10 @@ import { Image } from "expo-image";
 import { Colors, Radius, Shadow } from "@/constants/theme";
 import {
   courseDisplayName,
+  formatCourseHolesPar,
   formatCourseLocation,
 } from "@/utils/courseDisplayName";
+import { SHOW_RANKINGS } from "@/constants/courseConstants";
 
 const LOGO_SIZE = 52;
 
@@ -62,6 +64,7 @@ export function CourseListRow({ item, onPress, showRating = false }) {
     [item.county, item.country].filter(Boolean).join(", ") ||
     formatCourseLocation(item, { includeCounty: true });
   const logoUrl = resolveCourseLogoUrl(item);
+  const holesPar = formatCourseHolesPar(item);
 
   return (
     <TouchableOpacity
@@ -83,7 +86,7 @@ export function CourseListRow({ item, onPress, showRating = false }) {
     >
       <View>
         <CourseListLogo url={logoUrl} label={title} />
-        {item.position ? (
+        {SHOW_RANKINGS && item.position ? (
           <View
             style={{
               position: "absolute",
@@ -146,6 +149,17 @@ export function CourseListRow({ item, onPress, showRating = false }) {
             {location}
           </Text>
         ) : null}
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "600",
+            color: Colors.textMuted,
+            marginTop: 3,
+          }}
+          numberOfLines={1}
+        >
+          {holesPar}
+        </Text>
       </View>
 
       {showRating && item.community_rating > 0 ? (

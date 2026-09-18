@@ -20,7 +20,10 @@
     "production": {
       "autoIncrement": true,
       "android": {
-        "buildType": "apk"
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "distribution": "store"
       },
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "0"
@@ -34,7 +37,8 @@
         "track": "internal",
         "releaseStatus": "draft",
         "changesNotSentForReview": false
-      }
+      },
+      "ios": {}
     }
   }
 }

@@ -4,6 +4,7 @@ import { Image } from "expo-image";
 import { Trophy } from "lucide-react-native";
 import { Colors, Radius } from "@/constants/theme";
 import { countryFlag } from "@/components/Home/utils";
+import { SHOW_RANKINGS } from "@/constants/courseConstants";
 
 export function WishlistBlock({ post, onCoursePress }) {
   const flag = countryFlag(post.course_country);
@@ -48,7 +49,7 @@ export function WishlistBlock({ post, onCoursePress }) {
               .join(", ")}
           </Text>
         </View>
-        {post.top_ranking_name && (
+        {SHOW_RANKINGS && post.top_ranking_name && (
           <View
             style={{
               flexDirection: "row",

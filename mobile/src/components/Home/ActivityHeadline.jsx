@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text } from "react-native";
 import { Colors } from "@/constants/theme";
+import { SHOW_RANKINGS } from "@/constants/courseConstants";
 
 export function ActivityHeadline({ post, meta, md }) {
   const first =
@@ -21,9 +22,9 @@ export function ActivityHeadline({ post, meta, md }) {
     headline = `${first} unlocked ${md.achievement_name || "a new achievement"}.`;
   else if (post.post_type === "milestone")
     headline = `${first} ${md.headline || "reached a milestone"}`;
-  else if (post.post_type === "ranking_progress")
+  else if (SHOW_RANKINGS && post.post_type === "ranking_progress")
     headline = `${first} is making progress through ${md.list_name || "a ranking list"}.`;
-  else if (post.post_type === "ranking_complete")
+  else if (SHOW_RANKINGS && post.post_type === "ranking_complete")
     headline = `${first} completed ${md.list_name || "a ranking list"}!`;
   else if (post.post_type === "passport_complete")
     headline = `${first} completed the ${md.passport_name || "Passport Challenge"}!`;

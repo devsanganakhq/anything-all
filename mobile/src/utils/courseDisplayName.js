@@ -32,6 +32,27 @@ export function formatCourseLocation(course, { includeCounty = false } = {}) {
   return parts.filter(Boolean).join(", ");
 }
 
+/** Same defaults as course details Overview when DB values are missing. */
+export function resolveCourseHoles(course) {
+  const raw = course?.holes ?? course?.course_holes;
+  if (raw == null || raw === "") return 18;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 18;
+}
+
+export function resolveCoursePar(course) {
+  const raw = course?.par ?? course?.course_par;
+  if (raw == null || raw === "") return 72;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 72;
+}
+
+export function formatCourseHolesPar(course, { compact = false } = {}) {
+  const holes = resolveCourseHoles(course);
+  const par = resolveCoursePar(course);
+  return compact ? `${holes}H · Par ${par}` : `${holes} holes · Par ${par}`;
+}
+
 export function formatCourseShareLabel(course) {
   const { title, subtitle } = courseDisplayName(course);
   return subtitle ? `${title} — ${subtitle}` : title;

@@ -20,7 +20,7 @@ import { StatusBar } from "expo-status-bar";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import useUpload from "@/utils/useUpload";
 
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = 3;
 const TERMS_VERSION = "1.0";
 const TERMS_TEXT =
   "I confirm that I took these photos or have permission to upload them, and I grant " +

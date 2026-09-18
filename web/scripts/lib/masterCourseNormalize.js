@@ -37,6 +37,7 @@ const COUNTRY_ALIASES = {
   holland: "Netherlands",
   uae: "UAE",
   "united arab emirates": "UAE",
+  hawaii: "Hawaii",
 };
 
 const USA_STATES = {
@@ -94,24 +95,25 @@ const USA_STATES = {
 };
 
 export const COUNTRY_WORKBOOKS = [
-  { key: "australia", file: "australia enriched database (1).xlsx" },
-  { key: "canada", file: "canada enriched database (1).xlsx" },
+  { key: "australia", file: "australia enriched database v1.xlsx" },
+  { key: "canada", file: "canada enriched database v1.xlsx" },
   { key: "england", file: "england enriched database v1.xlsx" },
-  { key: "ireland", file: "republic of ireland enriched database (1).xlsx" },
-  { key: "netherlands", file: "netherlands enriched database (1).xlsx" },
-  { key: "new_zealand", file: "new zealand enriched database (1).xlsx" },
-  {
-    key: "northern_ireland",
-    file: "northern ireland enriched database (1).xlsx",
-  },
-  { key: "portugal", file: "portugal enriched database (1).xlsx" },
+  { key: "hawaii", file: "hawaii enriched database v1.xlsx" },
+  { key: "ireland", file: "ROI enriched database v1.xlsx" },
+  { key: "netherlands", file: "netherlands enriched database v1.xlsx" },
+  { key: "new_zealand", file: "NZ enriched database v1.xlsx" },
+  { key: "northern_ireland", file: "NI enriched database v1.xlsx" },
+  { key: "portugal", file: "portugal enriched database v1.xlsx" },
   { key: "scotland", file: "scotland enriched database v1.xlsx" },
-  // Filename has a known typo ("databse") and an extra space before "(1)"
-  { key: "spain", file: "spain enriched databse  (1).xlsx" },
-  { key: "turkey", file: "turkey enriched database (1).xlsx" },
-  { key: "uae", file: "UAE enriched database (1).xlsx" },
-  { key: "usa", file: "USA enriched database (1).xlsx" },
-  { key: "wales", file: "enriched wales database (1).xlsx" },
+  { key: "spain", file: "spain enriched database v1.xlsx" },
+  { key: "turkey", file: "turkey enriched database v1.xlsx" },
+  { key: "uae", file: "UAE enriched database v1.xlsx" },
+  {
+    key: "usa",
+    file: "Heathland_Links_USA_Master_Course_Database_FURTHER_ENRICHED_DEDUPED_MAP_READY_QC.xlsx",
+  },
+  // Filename has a known typo ("enirched")
+  { key: "wales", file: "wales enirched database v1.xlsx" },
 ];
 
 /** Optional dedicated rankings workbook (older GBI rebuild). */
@@ -190,6 +192,7 @@ function countryFromId(hlCourseId) {
   if (id.startsWith("ES-")) return "Spain";
   if (id.startsWith("TR-")) return "Turkey";
   if (id.startsWith("USA-")) return "USA";
+  if (id.startsWith("HI-") || id.startsWith("HAW-")) return "Hawaii";
   if (id.startsWith("CA-")) return "Canada";
   if (id.startsWith("NL-")) return "Netherlands";
   if (id.startsWith("AE-") || id.startsWith("UAE-")) return "UAE";

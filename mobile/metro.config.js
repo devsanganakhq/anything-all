@@ -37,10 +37,6 @@ const WEB_ALIASES = {
   'expo-notifications': path.resolve(__dirname, './polyfills/web/notifications.web.tsx'),
   'expo-contacts': path.resolve(__dirname, './polyfills/web/contacts.web.ts'),
   'expo-font': path.resolve(__dirname, './polyfills/web/expo-font.web.ts'),
-  'react-native-google-mobile-ads': path.resolve(
-    __dirname,
-    './polyfills/web/google-mobile-ads.web.tsx'
-  ),
   'react-native-web/dist/exports/ScrollView': path.resolve(
     __dirname,
     './polyfills/web/scrollview.web.jsx'
@@ -62,13 +58,6 @@ const DEV_ONLY_NATIVE_ALIASES = {
   'react-native-purchases': path.resolve(
     __dirname,
     './polyfills/native/react-native-purchases.native.tsx'
-  ),
-  // The ads stub must never ship in EAS builds: with it bundled, the JS layer
-  // never reaches the RNGoogleMobileAds native modules, so no ad request is
-  // ever made and banners render the placeholder forever.
-  'react-native-google-mobile-ads': path.resolve(
-    __dirname,
-    './polyfills/native/google-mobile-ads.native.tsx'
   ),
 };
 const SHARED_ALIASES = {
@@ -92,11 +81,14 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     if (moduleName.startsWith('@expo-google-fonts/') && moduleName !== '@expo-google-fonts/dev') {
       return context.resolveRequest(context, '@expo-google-fonts/dev', platform);
     }
-    // Resolve AnythingMenu to empty component in production
+    // Resolve AnythingMenu to empty component in production, and also when
+    // the LaunchDarkly mobile key is absent. The launcher overlay throws at
+    // import time without EXPO_PUBLIC_CREATE_LD_MOBILE_KEY, which is a fatal
+    // JS error and leaves the splash screen up.
     if (moduleName === './src/__create/anything-menu') {
       const isProduction = process.env.EXPO_PUBLIC_CREATE_ENV === 'PRODUCTION';
-      if (isProduction) {
-        // Create empty component for production
+      const hasLaunchDarklyKey = Boolean(process.env.EXPO_PUBLIC_CREATE_LD_MOBILE_KEY);
+      if (isProduction || !hasLaunchDarklyKey) {
         const emptyComponentPath = path.resolve(
           __dirname,
           './polyfills/shared/empty-component.tsx'

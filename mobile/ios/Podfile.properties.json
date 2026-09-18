@@ -1,0 +1,8 @@
+{
+  "expo.jsEngine": "hermes",
+  "EX_DEV_CLIENT_NETWORK_INSPECTOR": "true",
+  "newArchEnabled": "true",
+  "ios.useFrameworks": "static",
+  "ios.forceStaticLinking": "[\"react-native-maps\",\"react-native-google-maps\"]",
+  "apple.privacyManifestAggregationEnabled": "true"
+}

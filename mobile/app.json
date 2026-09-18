@@ -1,12 +1,13 @@
 {
   "expo": {
     "name": "Heathland Links",
-    "version": "1.0.0",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.heathlandlinks.app",
       "supportsTablet": true,
       "config": {
         "googleMapsApiKey": "AIzaSyASqVSa6Q98DvY5csNodKL0LCp6T6uFflM"
@@ -14,7 +15,13 @@
       "infoPlist": {
         "CFBundleDisplayName": "Heathland Links",
         "CFBundleName": "Heathland Links",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Heathland Links uses your location to show nearby golf courses on the map and improve course discovery.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Heathland Links uses your location to show nearby golf courses on the map and improve course discovery.",
+        "NSCameraUsageDescription": "Heathland Links uses the camera so you can take photos for your profile and course reviews.",
+        "NSPhotoLibraryUsageDescription": "Heathland Links uses your photo library so you can upload profile and course photos.",
+        "NSPhotoLibraryAddUsageDescription": "Heathland Links can save photos you choose to share from the app.",
+        "NSMicrophoneUsageDescription": "Heathland Links uses the microphone when recording audio or video for course content."
       }
     },
     "android": {
@@ -34,6 +41,14 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "blockedPermissions": [
+        "com.google.android.gms.permission.AD_ID",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
+        "android.permission.READ_CONTACTS",
+        "android.permission.WRITE_CONTACTS"
       ],
       "package": "com.heathlandlinks.app"
     },
@@ -58,27 +73,29 @@
         "expo-build-properties",
         {
           "ios": {
-            "useFrameworks": "static"
+            "useFrameworks": "static",
+            "forceStaticLinking": [
+              "react-native-maps",
+              "react-native-google-maps"
+            ]
           }
         }
       ],
       [
         "expo-video",
         {
-          "supportsBackgroundPlayback": true,
-          "supportsPictureInPicture": true
+          "supportsBackgroundPlayback": false,
+          "supportsPictureInPicture": false
         }
       ],
       "expo-font",
-      "expo-secure-store",
-      "expo-web-browser",
       [
-        "react-native-google-mobile-ads",
+        "expo-secure-store",
         {
-          "androidAppId": "ca-app-pub-3940256099942544~3347511713",
-          "iosAppId": "ca-app-pub-3940256099942544~1458002511"
+          "faceIDPermission": false
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "web": {
       "bundler": "metro",

@@ -34,7 +34,7 @@ const BENEFITS = [
   "Add professional imagery, course descriptions and club updates",
   "Promote visitor golf, membership opportunities, events and special offers",
   "Engage with golfers who have played—or want to play—your course",
-  "Increase visibility across our maps, rankings and discovery features",
+  "Increase visibility across our maps and discovery features",
   "Display a verified club profile to build trust with potential visitors",
   "Receive personalised analytic data regarding your profile and how it's performing",
   "Continual improvement and features added alongside the above",

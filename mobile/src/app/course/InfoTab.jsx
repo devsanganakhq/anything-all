@@ -3,6 +3,10 @@ import { View, Text, TouchableOpacity, Linking } from "react-native";
 import { Globe, MapPin, ChevronRight, Building2 } from "lucide-react-native";
 import { Colors, Radius, Shadow } from "@/constants/theme";
 import { SectionLabel } from "./SharedComponents";
+import {
+  resolveCourseHoles,
+  resolveCoursePar,
+} from "@/utils/courseDisplayName";
 
 export function InfoTab({
   course,
@@ -34,8 +38,8 @@ export function InfoTab({
                 course.course_type.slice(1)
               : null,
           },
-          { label: "Holes", value: course.holes ?? null },
-          { label: "Par", value: course.par ?? null },
+          { label: "Holes", value: resolveCourseHoles(course) },
+          { label: "Par", value: resolveCoursePar(course) },
           { label: "Address", value: course.address },
           { label: "City", value: course.city },
           { label: "County", value: course.county },

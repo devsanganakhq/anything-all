@@ -5,10 +5,17 @@ import { Star, Trophy } from "lucide-react-native";
 import { Colors, Radius } from "@/constants/theme";
 import { countryFlag } from "@/components/Home/utils";
 import { THUMB_H } from "@/components/Home/constants";
+import { formatCourseHolesPar } from "@/utils/courseDisplayName";
+import { SHOW_RANKINGS } from "@/constants/courseConstants";
 
 export function CourseBlock({ post, onCoursePress }) {
   const flag = countryFlag(post.course_country);
-  const hasRanking = post.top_ranking_name && post.top_ranking_position;
+  const hasRanking =
+    SHOW_RANKINGS && post.top_ranking_name && post.top_ranking_position;
+  const holesPar = formatCourseHolesPar(
+    { holes: post.course_holes, par: post.course_par },
+    { compact: true },
+  );
 
   return (
     <>
@@ -74,20 +81,18 @@ export function CourseBlock({ post, onCoursePress }) {
               .filter(Boolean)
               .join(", ")}
           </Text>
-          {post.course_holes && (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 2,
-                marginLeft: 8,
-              }}
-            >
-              <Text style={{ fontSize: 11, color: Colors.textMuted }}>
-                {post.course_holes}H · Par {post.course_par}
-              </Text>
-            </View>
-          )}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 2,
+              marginLeft: 8,
+            }}
+          >
+            <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+              {holesPar}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
 

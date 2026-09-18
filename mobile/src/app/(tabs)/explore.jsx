@@ -57,12 +57,14 @@ import {
   Shadow,
   TAB_BAR_CLEARANCE,
 } from "@/constants/theme";
+import { SHOW_RANKINGS } from "@/constants/courseConstants";
 import { RANKING_COLLECTIONS, ACCENT_HEX } from "@/data/rankingCollections";
 import { CourseImagePlaceholder } from "@/components/CourseImagePlaceholder";
 import { CourseListRow } from "@/components/CourseListRow";
 import { MapCoursePreviewCard, markPlayedHref } from "@/components/MapCoursePreviewCard";
 import {
   courseDisplayName,
+  formatCourseHolesPar,
   formatCourseLocation,
   formatCourseShareLabel,
 } from "@/utils/courseDisplayName";
@@ -70,6 +72,9 @@ import {
 // Keep COURSE_IMAGES as an empty fallback array so existing ref sites degrade gracefully
 // while we migrate to CourseThumbnail below
 const COURSE_IMAGES = [];
+
+/** Set to true to show Ranking Collections on Explore LIST again. */
+const SHOW_RANKING_COLLECTIONS = SHOW_RANKINGS;
 
 const FALLBACK_DEST = [
   { country: "England", course_count: 1800, flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
@@ -983,92 +988,96 @@ export default function ExploreScreen() {
           paddingBottom: insets.bottom + 100,
         }}
       >
-        {/* ── RANKING COLLECTIONS ── */}
-        <View style={{ paddingHorizontal: Spacing.screenH, marginBottom: 14 }}>
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: "700",
-              letterSpacing: 1.5,
-              color: Colors.textSecondary,
-            }}
-          >
-            RANKING COLLECTIONS
-          </Text>
-          <Text
-            style={{
-              fontSize: 15,
-              fontWeight: "300",
-              fontStyle: "italic",
-              color: Colors.textPrimary,
-              marginTop: 2,
-            }}
-          >
-            Curated lists of the finest courses
-          </Text>
-        </View>
+        {/* ── RANKING COLLECTIONS ── (hidden for now; flip SHOW_RANKING_COLLECTIONS) */}
+        {SHOW_RANKING_COLLECTIONS && (
+          <>
+            <View style={{ paddingHorizontal: Spacing.screenH, marginBottom: 14 }}>
+              <Text
+                style={{
+                  fontSize: 9,
+                  fontWeight: "700",
+                  letterSpacing: 1.5,
+                  color: Colors.textSecondary,
+                }}
+              >
+                RANKING COLLECTIONS
+              </Text>
+              <Text
+                style={{
+                  fontSize: 15,
+                  fontWeight: "300",
+                  fontStyle: "italic",
+                  color: Colors.textPrimary,
+                  marginTop: 2,
+                }}
+              >
+                Curated lists of the finest courses
+              </Text>
+            </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ flexGrow: 0 }}
-          contentContainerStyle={{
-            paddingHorizontal: Spacing.screenH,
-            gap: 10,
-            paddingBottom: 4,
-          }}
-        >
-          {discoverLoading
-            ? Array.from({ length: 4 }).map((_, i) => (
-                <RankingCollectionCardSkeleton key={`rank-skel-${i}`} />
-              ))
-            : namedCollections.map((col) => (
-                <RankingCollectionCard
-                  key={col.id}
-                  col={col}
-                  onPress={() => {
-                    router.push({
-                      pathname: "/explore/list",
-                      params: {
-                        kind: "ranking",
-                        id: col.id,
-                        title: col.display_name || col.ranking_name,
-                      },
-                    });
-                  }}
-                />
-              ))}
-        </ScrollView>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{
+                paddingHorizontal: Spacing.screenH,
+                gap: 10,
+                paddingBottom: 4,
+              }}
+            >
+              {discoverLoading
+                ? Array.from({ length: 4 }).map((_, i) => (
+                    <RankingCollectionCardSkeleton key={`rank-skel-${i}`} />
+                  ))
+                : namedCollections.map((col) => (
+                    <RankingCollectionCard
+                      key={col.id}
+                      col={col}
+                      onPress={() => {
+                        router.push({
+                          pathname: "/explore/list",
+                          params: {
+                            kind: "ranking",
+                            id: col.id,
+                            title: col.display_name || col.ranking_name,
+                          },
+                        });
+                      }}
+                    />
+                  ))}
+            </ScrollView>
 
-        {/* Disclaimer */}
-        <View
-          style={{
-            marginHorizontal: Spacing.screenH,
-            marginTop: 10,
-            flexDirection: "row",
-            alignItems: "flex-start",
-            gap: 6,
-          }}
-        >
-          <Info
-            color={Colors.textMuted}
-            size={11}
-            strokeWidth={1.8}
-            style={{ marginTop: 1 }}
-          />
-          <Text
-            style={{
-              fontSize: 10,
-              color: Colors.textMuted,
-              flex: 1,
-              lineHeight: 15,
-            }}
-          >
-            Ranking collections show verified positions from published sources.
-            Incomplete lists display only confirmed courses — missing spots are
-            awaiting verification.
-          </Text>
-        </View>
+            {/* Disclaimer */}
+            <View
+              style={{
+                marginHorizontal: Spacing.screenH,
+                marginTop: 10,
+                flexDirection: "row",
+                alignItems: "flex-start",
+                gap: 6,
+              }}
+            >
+              <Info
+                color={Colors.textMuted}
+                size={11}
+                strokeWidth={1.8}
+                style={{ marginTop: 1 }}
+              />
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: Colors.textMuted,
+                  flex: 1,
+                  lineHeight: 15,
+                }}
+              >
+                Ranking collections show verified positions from published sources.
+                Incomplete lists display only confirmed courses — missing spots are
+                awaiting verification.
+              </Text>
+            </View>
+          </>
+        )}
 
         {/* ── COMMUNITY TOP RATED ── */}
         <CourseSection
@@ -1221,9 +1230,7 @@ export default function ExploreScreen() {
             }}
           >
             Community Top Rated, Most Played, Trending and Hidden Gems lists are
-            generated from member activity on Heathland Links. Ranking
-            Collections marked with a sample badge are illustrative positions
-            only and do not represent any official external ranking.
+            generated from member activity on Heathland Links.
           </Text>
         </View>
 
@@ -1560,7 +1567,7 @@ function CourseCard({ item, imgIndex, onPress }) {
             compact
           />
         )}
-        {item.position && (
+        {item.position && SHOW_RANKINGS ? (
           <View
             style={{
               position: "absolute",
@@ -1576,7 +1583,7 @@ function CourseCard({ item, imgIndex, onPress }) {
               #{item.position}
             </Text>
           </View>
-        )}
+        ) : null}
         <StatusBadge
           played={item.user_played}
           wishlisted={item.user_wishlisted}
@@ -1615,32 +1622,15 @@ function CourseCard({ item, imgIndex, onPress }) {
               {location || item.county || item.city || item.country}
             </Text>
           </View>
-          {item.par ? (
-            <Text
-              style={{
-                fontSize: 10,
-                fontWeight: "700",
-                color: Colors.textMuted,
-              }}
-            >
-              Par {item.par}
-            </Text>
-          ) : item.community_rating > 0 ? (
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
-            >
-              <Star color={Colors.gold} size={10} fill={Colors.gold} />
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: "700",
-                  color: Colors.textPrimary,
-                }}
-              >
-                {Number(item.community_rating).toFixed(1)}
-              </Text>
-            </View>
-          ) : null}
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: "700",
+              color: Colors.textMuted,
+            }}
+          >
+            {formatCourseHolesPar(item, { compact: true })}
+          </Text>
         </View>
       </View>
     </TouchableOpacity>

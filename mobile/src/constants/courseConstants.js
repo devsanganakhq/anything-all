@@ -88,5 +88,12 @@ export const ACTIVITY_LABELS = {
   achievement_unlocked: "earned an achievement",
 };
 
+// ─── Feature flags ────────────────────────────────────────────────────────────
+/** Set to true to show rankings tab, badges, collections, and progress again. */
+export const SHOW_RANKINGS = false;
+
 // ─── Tab list ─────────────────────────────────────────────────────────────────
-export const TABS = ["OVERVIEW", "RANKINGS", "REVIEWS", "PHOTOS", "INFO"];
+export const ALL_TABS = ["OVERVIEW", "RANKINGS", "REVIEWS", "PHOTOS", "INFO"];
+export const TABS = SHOW_RANKINGS
+  ? ALL_TABS
+  : ALL_TABS.filter((t) => t !== "RANKINGS");
