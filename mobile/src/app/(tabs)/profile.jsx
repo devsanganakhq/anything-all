@@ -18,6 +18,7 @@ import {
   Bell,
   HelpCircle,
   LogOut,
+  Trash2,
   ChevronRight,
   Users,
   MapPin,
@@ -29,6 +30,7 @@ import {
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import Purchases from "react-native-purchases";
 import { useAuth } from "@/utils/auth/useAuth";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { HomeClubIcon, MemberClubIcon } from "@/components/ClubIcons";
@@ -39,6 +41,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
   const [isPublic, setIsPublic] = React.useState(true);
+  const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
 
   const {
     data: profileData,
@@ -63,6 +66,64 @@ export default function ProfileScreen() {
   const additionals = memberships
     .filter((m) => m.membership_type === "additional")
     .sort((a, b) => a.display_order - b.display_order);
+
+  const performDeleteAccount = React.useCallback(async () => {
+    setIsDeletingAccount(true);
+    try {
+      const response = await fetch("/api/user/account", { method: "DELETE" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          data.message || data.error || "Could not delete account.",
+        );
+      }
+      try {
+        await Purchases.logOut();
+      } catch {
+        // RevenueCat may not be configured in all builds
+      }
+      signOut();
+    } catch (err) {
+      Alert.alert(
+        "Delete Failed",
+        err?.message ||
+          "Unable to delete your account. Please try again or contact support.",
+      );
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  }, [signOut]);
+
+  const handleDeleteAccount = React.useCallback(() => {
+    if (isDeletingAccount) return;
+    Alert.alert(
+      "Delete Account",
+      "This permanently deletes your Heathland Links account and all associated data — passport history, wishlist, posts, photos, and community memberships. This cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Are you sure?",
+              "Your account will be permanently deleted. You will need to create a new account to use Heathland Links again.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete Account",
+                  style: "destructive",
+                  onPress: () => {
+                    performDeleteAccount();
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  }, [isDeletingAccount, performDeleteAccount]);
 
   if (isLoading) {
     return (
@@ -653,6 +714,12 @@ export default function ProfileScreen() {
                   [{ text: "OK" }],
                 )
               }
+            />
+            <MenuItem
+              icon={Trash2}
+              title={isDeletingAccount ? "Deleting Account…" : "Delete Account"}
+              titleColor={Colors.error}
+              onPress={handleDeleteAccount}
             />
             <MenuItem
               icon={LogOut}
