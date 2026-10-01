@@ -97,6 +97,7 @@ export default function ExploreCourseListScreen() {
   const heading = title || country || "Courses";
   const [viewMode, setViewMode] = useState("list");
   const [selected, setSelected] = useState(null);
+  const lastMarkerPressAt = useRef(0);
   const qc = useQueryClient();
 
   const wishlistMutation = useMutation({
@@ -207,6 +208,7 @@ export default function ExploreCourseListScreen() {
 
   const handleClusterPress = useCallback(
     (feature) => {
+      lastMarkerPressAt.current = Date.now();
       setSelected(null);
       const region = getClusterZoomRegion(clusterIndex, feature);
       mapRef.current?.animateToRegion(region, 400);
@@ -214,6 +216,16 @@ export default function ExploreCourseListScreen() {
     },
     [clusterIndex],
   );
+
+  const handleCourseMarkerPress = useCallback((course) => {
+    lastMarkerPressAt.current = Date.now();
+    setSelected(course);
+  }, []);
+
+  const handleMapPress = useCallback(() => {
+    if (Date.now() - lastMarkerPressAt.current < 400) return;
+    setSelected(null);
+  }, []);
 
   const renderItem = useCallback(
     ({ item }) => (
@@ -346,7 +358,7 @@ export default function ExploreCourseListScreen() {
             pitchEnabled={false}
             toolbarEnabled={false}
             moveOnMarkerPress={false}
-            onPress={() => setSelected(null)}
+            onPress={handleMapPress}
             onRegionChangeComplete={handleRegionChangeComplete}
           >
             {clusters.map((feature) => {
@@ -367,32 +379,11 @@ export default function ExploreCourseListScreen() {
                 <CourseMarker
                   key={String(course.id)}
                   course={course}
-                  onPress={setSelected}
+                  onPress={handleCourseMarkerPress}
                 />
               );
             })}
           </MapView>
-
-          <View
-            style={{
-              position: "absolute",
-              top: 12,
-              left: Spacing.screenH,
-              right: Spacing.screenH,
-              backgroundColor: "rgba(255,255,255,0.94)",
-              borderRadius: Radius.md,
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderWidth: 1,
-              borderColor: Colors.border,
-              ...Shadow.card,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: Colors.textSecondary }}>
-              Showing {mappedCourses.length} of {courses.length} courses with
-              map locations
-            </Text>
-          </View>
 
           {/* Legend — same colours as Explore map */}
           <View

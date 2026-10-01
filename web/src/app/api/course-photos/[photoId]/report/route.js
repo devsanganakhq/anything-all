@@ -17,12 +17,12 @@ const VALID_REASONS = [
 export async function POST(request, { params }) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const { photoId } = params;
+  const { photoId } = await params;
   const { reason, details } = await request.json().catch(() => ({}));
 
   if (!VALID_REASONS.includes(reason)) {

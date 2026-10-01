@@ -77,6 +77,7 @@ export function CoursePhotoCarousel({
 
   // Optimistic like state per photo
   const [likeState, setLikeState] = useState({}); // { [photoId]: { liked, count } }
+  const pendingLikeIds = useRef(new Set());
 
   const getLiked = (p) =>
     likeState[p.id] !== undefined ? likeState[p.id].liked : p.user_liked;
@@ -95,33 +96,60 @@ export function CoursePhotoCarousel({
     onMutate: (photoId) => {
       const photo = photos.find((p) => p.id === photoId);
       if (!photo) return;
-      const wasLiked = getLiked(photo);
-      setLikeState((s) => ({
-        ...s,
-        [photoId]: {
-          liked: !wasLiked,
-          count: (getLikeCount(photo) || 0) + (wasLiked ? -1 : 1),
-        },
-      }));
+      setLikeState((s) => {
+        const wasLiked =
+          s[photoId] !== undefined ? s[photoId].liked : !!photo.user_liked;
+        const prevCount =
+          s[photoId] !== undefined
+            ? s[photoId].count
+            : Number(photo.like_count) || 0;
+        return {
+          ...s,
+          [photoId]: {
+            liked: !wasLiked,
+            count: Math.max(0, prevCount + (wasLiked ? -1 : 1)),
+          },
+        };
+      });
     },
     onSuccess: (data, photoId) => {
       setLikeState((s) => ({
         ...s,
         [photoId]: { liked: data.liked, count: data.likeCount },
       }));
-      qc.invalidateQueries({ queryKey: ["course-photos", courseId] });
+      // Soft-update cache so a refetch doesn't flash the old liked state
+      qc.setQueryData(["course-photos", courseId], (prev) => {
+        if (!prev?.photos) return prev;
+        return {
+          ...prev,
+          photos: prev.photos.map((p) =>
+            p.id === photoId
+              ? { ...p, user_liked: data.liked, like_count: data.likeCount }
+              : p,
+          ),
+        };
+      });
     },
     onError: (_, photoId) => {
-      // Roll back optimistic state
-      const photo = photos.find((p) => p.id === photoId);
-      if (!photo) return;
       setLikeState((s) => {
         const next = { ...s };
         delete next[photoId];
         return next;
       });
     },
+    onSettled: (_data, _err, photoId) => {
+      pendingLikeIds.current.delete(photoId);
+    },
   });
+
+  const handleLike = useCallback(
+    (photoId) => {
+      if (!photoId || pendingLikeIds.current.has(photoId)) return;
+      pendingLikeIds.current.add(photoId);
+      likeMutation.mutate(photoId);
+    },
+    [likeMutation],
+  );
 
   // ── Report mutation ───────────────────────────────────────────────────────
   const reportMutation = useMutation({
@@ -264,7 +292,7 @@ export function CoursePhotoCarousel({
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => likeMutation.mutate(current.id)}
+                onPress={() => handleLike(current.id)}
                 style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
@@ -327,7 +355,7 @@ export function CoursePhotoCarousel({
         onClose={() => setGalleryOpen(false)}
         getLiked={getLiked}
         getLikeCount={getLikeCount}
-        onLike={(id) => likeMutation.mutate(id)}
+        onLike={handleLike}
         onReport={openReport}
       />
 

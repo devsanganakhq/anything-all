@@ -100,11 +100,17 @@ export const CourseMarker = React.memo(function CourseMarker({ course, onPress }
   return (
     <Marker
       coordinate={{ latitude: lat, longitude: lng }}
-      onPress={() => onPress?.(course)}
+      onPress={(e) => {
+        // iOS also fires MapView.onPress unless stopped — that races preview open/close and can crash.
+        e?.stopPropagation?.();
+        onPress?.(course);
+      }}
+      stopPropagation
       tracksViewChanges={tracksViewChanges}
       anchor={{ x: 0.5, y: 0.5 }}
     >
       <View
+        collapsable={false}
         style={{
           width: size,
           height: size,
@@ -154,7 +160,11 @@ export const ClusterMarker = React.memo(function ClusterMarker({
   return (
     <Marker
       coordinate={{ latitude: lat, longitude: lng }}
-      onPress={() => onPress?.(feature)}
+      onPress={(e) => {
+        e?.stopPropagation?.();
+        onPress?.(feature);
+      }}
+      stopPropagation
       tracksViewChanges={tracksViewChanges}
       anchor={{ x: 0.5, y: 0.5 }}
     >

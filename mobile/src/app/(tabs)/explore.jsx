@@ -266,6 +266,7 @@ export default function ExploreScreen() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [mapRegion, setMapRegion] = useState(UK_OVERVIEW_REGION);
   const slideAnim = useRef(new Animated.Value(300)).current;
+  const lastMarkerPressAt = useRef(0);
 
   // This tab stays mounted, so incoming params have to be applied on every
   // navigation. `open` is a nonce the caller changes to force a re-apply.
@@ -477,23 +478,31 @@ export default function ExploreScreen() {
   // ── Map interactions ─────────────────────────────────────────────────────
   const handleMarkerPress = useCallback(
     (course) => {
+      lastMarkerPressAt.current = Date.now();
       setSelectedCourse(course);
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 60,
-        friction: 10,
-      }).start();
+      // Defer animation so iOS map press / marker remount don't race native driver.
+      requestAnimationFrame(() => {
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 60,
+          friction: 10,
+        }).start();
+      });
     },
     [slideAnim],
   );
 
   const closePreview = useCallback(() => {
+    // iOS can still deliver MapView.onPress right after a pin tap even with stopPropagation.
+    if (Date.now() - lastMarkerPressAt.current < 400) return;
     Animated.timing(slideAnim, {
       toValue: 300,
       duration: 200,
       useNativeDriver: true,
-    }).start(() => setSelectedCourse(null));
+    }).start(({ finished }) => {
+      if (finished) setSelectedCourse(null);
+    });
   }, [slideAnim]);
 
   const handleClusterPress = useCallback(

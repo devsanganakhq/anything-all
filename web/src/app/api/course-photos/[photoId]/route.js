@@ -9,12 +9,12 @@ import { getSessionUserId } from "@/app/api/utils/getUserId";
 export async function DELETE(request, { params }) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const { photoId } = params;
+  const { photoId } = await params;
 
   try {
     const rows = await sql(
