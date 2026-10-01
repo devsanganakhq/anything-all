@@ -44,7 +44,7 @@ export async function POST(request, { params }) {
     }
 
     const existing = await sql(
-      `SELECT id FROM course_photo_likes WHERE photo_id = $1 AND user_id = $2`,
+      `SELECT photo_id FROM course_photo_likes WHERE photo_id = $1 AND user_id = $2`,
       [photoId, userId],
     );
     const currentlyLiked = existing.length > 0;
@@ -53,11 +53,11 @@ export async function POST(request, { params }) {
     if (nextLiked && !currentlyLiked) {
       await sql(
         `INSERT INTO course_photo_likes (photo_id, user_id) VALUES ($1, $2)
-         ON CONFLICT DO NOTHING`,
+         ON CONFLICT (photo_id, user_id) DO NOTHING`,
         [photoId, userId],
       );
       await sql(
-        `UPDATE course_photos SET like_count = like_count + 1 WHERE id = $1`,
+        `UPDATE course_photos SET like_count = COALESCE(like_count, 0) + 1 WHERE id = $1`,
         [photoId],
       );
     } else if (!nextLiked && currentlyLiked) {
@@ -66,7 +66,7 @@ export async function POST(request, { params }) {
         [photoId, userId],
       );
       await sql(
-        `UPDATE course_photos SET like_count = GREATEST(0, like_count - 1) WHERE id = $1`,
+        `UPDATE course_photos SET like_count = GREATEST(0, COALESCE(like_count, 0) - 1) WHERE id = $1`,
         [photoId],
       );
     }
@@ -78,10 +78,16 @@ export async function POST(request, { params }) {
 
     return Response.json({
       liked: nextLiked,
-      likeCount: updated[0]?.like_count ?? 0,
+      likeCount: Number(updated[0]?.like_count) || 0,
     });
   } catch (err) {
-    console.error("POST /api/course-photos/[photoId]/like", err);
-    return Response.json({ error: "Failed to toggle like" }, { status: 500 });
+    console.error("POST /api/course-photos/[photoId]/like", {
+      message: err?.message,
+      code: err?.code,
+    });
+    return Response.json(
+      { error: "Failed to update like", detail: err?.message },
+      { status: 500 },
+    );
   }
 }
