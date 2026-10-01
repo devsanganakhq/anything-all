@@ -112,17 +112,17 @@ export async function GET(request, { params }) {
     let likedSet = new Set();
     const allRowsForLikes = [...communityRows, ...pendingRows];
     if (userId && allRowsForLikes.length) {
-      const photoIds = allRowsForLikes.map((r) => r.id);
+      const photoIds = allRowsForLikes.map((r) => Number(r.id));
       const likedRows = await sql(
         `SELECT photo_id FROM course_photo_likes
          WHERE user_id = $1 AND photo_id = ANY($2::int[])`,
         [userId, photoIds],
       );
-      likedSet = new Set(likedRows.map((r) => r.photo_id));
+      likedSet = new Set(likedRows.map((r) => Number(r.photo_id)));
     }
 
     const shapePhoto = (r) => ({
-      id: r.id,
+      id: Number(r.id),
       image_url: r.image_url,
       thumbnail_url: r.thumbnail_url || ucThumb(r.image_url, 400),
       caption: r.caption,
@@ -130,12 +130,12 @@ export async function GET(request, { params }) {
       moderation_status: r.moderation_status,
       is_featured: r.is_featured,
       is_official: r.is_official,
-      like_count: r.like_count,
+      like_count: Number(r.like_count) || 0,
       uploaded_at: r.uploaded_at,
       attribution: r.first_name
         ? `Photo by ${r.first_name} ${r.last_name ?? ""}`.trim()
         : "Photo by member",
-      user_liked: likedSet.has(r.id),
+      user_liked: likedSet.has(Number(r.id)),
       is_pending: r.moderation_status === "pending",
     });
 

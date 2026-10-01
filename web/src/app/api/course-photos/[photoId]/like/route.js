@@ -1,7 +1,9 @@
 /**
  * POST /api/course-photos/[photoId]/like
- * Toggle like/unlike on an approved community photo.
- * One like per user per photo. like_count is maintained safely.
+ *
+ * Set or toggle like on an approved community photo.
+ * Body (optional): { liked: boolean } — when provided, sets that state
+ * instead of toggling (avoids double-request races that like then unlike).
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
@@ -15,10 +17,17 @@ export async function POST(request, { params }) {
     return Response.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const { photoId } = await params;
+  const resolved = await params;
+  const photoId = Number(resolved?.photoId);
+  if (!Number.isFinite(photoId) || photoId <= 0) {
+    return Response.json({ error: "Invalid photo id" }, { status: 400 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const wantLiked =
+    typeof body?.liked === "boolean" ? body.liked : null;
 
   try {
-    // Verify photo exists and is approved
     const photoRows = await sql(
       `SELECT id, like_count, moderation_status FROM course_photos
        WHERE id = $1 AND deleted_at IS NULL`,
@@ -34,15 +43,24 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Check existing like
     const existing = await sql(
       `SELECT id FROM course_photo_likes WHERE photo_id = $1 AND user_id = $2`,
       [photoId, userId],
     );
+    const currentlyLiked = existing.length > 0;
+    const nextLiked = wantLiked === null ? !currentlyLiked : wantLiked;
 
-    let liked;
-    if (existing.length > 0) {
-      // Unlike
+    if (nextLiked && !currentlyLiked) {
+      await sql(
+        `INSERT INTO course_photo_likes (photo_id, user_id) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [photoId, userId],
+      );
+      await sql(
+        `UPDATE course_photos SET like_count = like_count + 1 WHERE id = $1`,
+        [photoId],
+      );
+    } else if (!nextLiked && currentlyLiked) {
       await sql(
         `DELETE FROM course_photo_likes WHERE photo_id = $1 AND user_id = $2`,
         [photoId, userId],
@@ -51,18 +69,6 @@ export async function POST(request, { params }) {
         `UPDATE course_photos SET like_count = GREATEST(0, like_count - 1) WHERE id = $1`,
         [photoId],
       );
-      liked = false;
-    } else {
-      // Like
-      await sql(
-        `INSERT INTO course_photo_likes (photo_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-        [photoId, userId],
-      );
-      await sql(
-        `UPDATE course_photos SET like_count = like_count + 1 WHERE id = $1`,
-        [photoId],
-      );
-      liked = true;
     }
 
     const updated = await sql(
@@ -70,7 +76,10 @@ export async function POST(request, { params }) {
       [photoId],
     );
 
-    return Response.json({ liked, likeCount: updated[0]?.like_count ?? 0 });
+    return Response.json({
+      liked: nextLiked,
+      likeCount: updated[0]?.like_count ?? 0,
+    });
   } catch (err) {
     console.error("POST /api/course-photos/[photoId]/like", err);
     return Response.json({ error: "Failed to toggle like" }, { status: 500 });

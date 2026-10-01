@@ -75,80 +75,124 @@ export function CoursePhotoCarousel({
   const [reportModal, setReportModal] = useState(false);
   const [reportPhotoId, setReportPhotoId] = useState(null);
 
-  // Optimistic like state per photo
+  // Optimistic like state per photo (keys are numeric photo ids as strings)
   const [likeState, setLikeState] = useState({}); // { [photoId]: { liked, count } }
   const pendingLikeIds = useRef(new Set());
 
-  const getLiked = (p) =>
-    likeState[p.id] !== undefined ? likeState[p.id].liked : p.user_liked;
-  const getLikeCount = (p) =>
-    likeState[p.id] !== undefined ? likeState[p.id].count : p.like_count;
+  const photoKey = (id) => String(Number(id));
 
-  // ── Like mutation ─────────────────────────────────────────────────────────
+  const getLiked = (p) => {
+    const key = photoKey(p?.id);
+    if (!p?.id && p?.id !== 0) return false;
+    return likeState[key] !== undefined ? likeState[key].liked : !!p.user_liked;
+  };
+  const getLikeCount = (p) => {
+    const key = photoKey(p?.id);
+    if (!p?.id && p?.id !== 0) return 0;
+    return likeState[key] !== undefined
+      ? likeState[key].count
+      : Number(p.like_count) || 0;
+  };
+
+  // ── Like mutation — sends desired state (not a blind toggle) ──────────────
   const likeMutation = useMutation({
-    mutationFn: async (photoId) => {
+    mutationFn: async ({ photoId, liked }) => {
       const res = await fetch(`/api/course-photos/${photoId}/like`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ liked }),
       });
-      if (!res.ok) throw new Error("Like failed");
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.error || "Like failed");
+      }
       return res.json();
     },
-    onMutate: (photoId) => {
-      const photo = photos.find((p) => p.id === photoId);
-      if (!photo) return;
+    onMutate: ({ photoId, liked }) => {
+      const id = Number(photoId);
+      const key = photoKey(id);
+      const photo = photos.find((p) => Number(p.id) === id);
+      let wasLiked = !!photo?.user_liked;
+      let prevCount = Number(photo?.like_count) || 0;
       setLikeState((s) => {
-        const wasLiked =
-          s[photoId] !== undefined ? s[photoId].liked : !!photo.user_liked;
-        const prevCount =
-          s[photoId] !== undefined
-            ? s[photoId].count
-            : Number(photo.like_count) || 0;
+        wasLiked = s[key] !== undefined ? s[key].liked : !!photo?.user_liked;
+        prevCount =
+          s[key] !== undefined
+            ? s[key].count
+            : Number(photo?.like_count) || 0;
         return {
           ...s,
-          [photoId]: {
-            liked: !wasLiked,
-            count: Math.max(0, prevCount + (wasLiked ? -1 : 1)),
+          [key]: {
+            liked,
+            count: Math.max(
+              0,
+              prevCount + (liked === wasLiked ? 0 : liked ? 1 : -1),
+            ),
           },
         };
       });
+      return { key, wasLiked, prevCount };
     },
-    onSuccess: (data, photoId) => {
+    onSuccess: (data, { photoId }) => {
+      const id = Number(photoId);
+      const key = photoKey(id);
       setLikeState((s) => ({
         ...s,
-        [photoId]: { liked: data.liked, count: data.likeCount },
+        [key]: { liked: !!data.liked, count: Number(data.likeCount) || 0 },
       }));
-      // Soft-update cache so a refetch doesn't flash the old liked state
       qc.setQueryData(["course-photos", courseId], (prev) => {
         if (!prev?.photos) return prev;
         return {
           ...prev,
           photos: prev.photos.map((p) =>
-            p.id === photoId
-              ? { ...p, user_liked: data.liked, like_count: data.likeCount }
+            Number(p.id) === id
+              ? {
+                  ...p,
+                  user_liked: !!data.liked,
+                  like_count: Number(data.likeCount) || 0,
+                }
               : p,
           ),
         };
       });
     },
-    onError: (_, photoId) => {
-      setLikeState((s) => {
-        const next = { ...s };
-        delete next[photoId];
-        return next;
-      });
+    onError: (err, { photoId }, ctx) => {
+      const key = photoKey(photoId);
+      if (ctx) {
+        setLikeState((s) => ({
+          ...s,
+          [key]: { liked: ctx.wasLiked, count: ctx.prevCount },
+        }));
+      } else {
+        setLikeState((s) => {
+          const next = { ...s };
+          delete next[key];
+          return next;
+        });
+      }
+      Alert.alert("Couldn’t update like", err?.message || "Please try again.");
     },
-    onSettled: (_data, _err, photoId) => {
-      pendingLikeIds.current.delete(photoId);
+    onSettled: (_data, _err, vars) => {
+      pendingLikeIds.current.delete(photoKey(vars.photoId));
     },
   });
 
   const handleLike = useCallback(
     (photoId) => {
-      if (!photoId || pendingLikeIds.current.has(photoId)) return;
-      pendingLikeIds.current.add(photoId);
-      likeMutation.mutate(photoId);
+      const id = Number(photoId);
+      if (!Number.isFinite(id) || id <= 0) return;
+      const key = photoKey(id);
+      if (pendingLikeIds.current.has(key)) return;
+
+      const photo = photos.find((p) => Number(p.id) === id);
+      if (!photo) return;
+      const wasLiked =
+        likeState[key] !== undefined ? likeState[key].liked : !!photo.user_liked;
+
+      pendingLikeIds.current.add(key);
+      likeMutation.mutate({ photoId: id, liked: !wasLiked });
     },
-    [likeMutation],
+    [likeMutation, photos, likeState],
   );
 
   // ── Report mutation ───────────────────────────────────────────────────────
