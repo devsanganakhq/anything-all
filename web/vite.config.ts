@@ -27,6 +27,9 @@ export default defineConfig(({ isSsrBuild }) => ({
           }
         : undefined,
   },
+  // Vercel's file tracer misses React Router's package-exported CJS chunks
+  // when they remain external. Bundle the framework runtime into the function.
+  ...(isVercel ? { ssr: { noExternal: ["react-router", "react-router-dom"] } } : {}),
   optimizeDeps: {
     // Explicitly include fast-glob, since it gets dynamically imported and we
     // don't want that to cause a re-bundle.
@@ -53,7 +56,7 @@ export default defineConfig(({ isSsrBuild }) => ({
         runtime: "node",
       }),
     babel({
-      include: ["src/**/*.{js,jsx,ts,tsx}"], // or RegExp: /src\/.*\.[tj]sx?$/
+      include: ["src/**/*.{js,jsx,ts,tsx}"], // or RegExp: /src/.*\.[tj]sx?$/
       exclude: /node_modules/, // skip everything else
       babelConfig: {
         babelrc: false, // don’t merge other Babel files
