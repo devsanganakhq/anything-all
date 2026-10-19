@@ -1,3 +1,4 @@
+// @vitest-environment node
 // These exercise the real PostgreSQL schema and mutation SQL, not string assertions.
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
