@@ -1,3 +1,4 @@
+import { usePushNotifications } from "@/utils/usePushNotifications";
 import { useAuth } from "@/utils/auth/useAuth";
 import { AuthModal } from "@/utils/auth/useAuthModal";
 import { Stack } from "expo-router";
@@ -14,6 +15,7 @@ import { PostHogAppShell } from "@/utils/PostHogAppShell";
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
+  usePushNotifications();
   const { initiate, isReady } = useAuth();
 
   useEffect(() => {

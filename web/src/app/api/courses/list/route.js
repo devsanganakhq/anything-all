@@ -1,66 +1,42 @@
 import sql from "@/app/api/utils/sql";
-
+import { getSessionUserIdOrNull } from "@/app/api/utils/getUserId";
+import { courseScope, boundedInteger } from "@/app/api/utils/courses/scope";
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get("q") || "";
-  const country = searchParams.get("country") || "";
-  const courseType = searchParams.get("type") || "";
-  const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 200);
-
+  const limit = Math.max(1, boundedInteger(searchParams.get("limit"), 50, 200));
+  const offset = boundedInteger(searchParams.get("offset"), 0, 100000);
+  const paginated = searchParams.get("paginated") === "true";
   try {
-    const params = [];
-    const conditions = [];
-    let idx = 1;
-
-    if (q.trim().length >= 2) {
-      conditions.push(
-        `(LOWER(name) LIKE LOWER($${idx}) OR LOWER(COALESCE(club_name,'')) LIKE LOWER($${idx}) OR LOWER(COALESCE(display_name,'')) LIKE LOWER($${idx}) OR LOWER(COALESCE(city,'')) LIKE LOWER($${idx}) OR LOWER(COALESCE(county,'')) LIKE LOWER($${idx}))`,
-      );
-      params.push(`%${q.trim()}%`);
-      idx++;
-    }
-    if (country) {
-      conditions.push(`country = $${idx}`);
-      params.push(country);
-      idx++;
-    }
-    if (courseType) {
-      conditions.push(`course_type = $${idx}`);
-      params.push(courseType);
-      idx++;
-    }
-
-    params.push(limit);
-    const sort = searchParams.get("sort") || "";
-    const sortByName = sort === "name" || (Boolean(country) && !q.trim());
-    const whereClause =
-      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-    const orderClause = sortByName
-      ? `ORDER BY
-          LOWER(COALESCE(
-            NULLIF(TRIM(club_name), ''),
-            NULLIF(TRIM(name), ''),
-            NULLIF(TRIM(display_name), ''),
-            ''
-          )) ASC,
-          name ASC`
-      : `ORDER BY
-          EXISTS (
-            SELECT 1 FROM rankings r
-            WHERE r.course_id = courses.id AND r.is_active = true
-          ) DESC,
-          (latitude IS NOT NULL AND longitude IS NOT NULL) DESC,
-          community_rating DESC NULLS LAST,
-          played_count DESC,
-          name`;
-    const query = `SELECT * FROM courses ${whereClause}
-      ${orderClause}
-      LIMIT $${idx}`;
-
-    const courses = await sql(query, params);
-    return Response.json(courses);
-  } catch (error) {
-    console.error("Error fetching courses:", error);
+    const userId = await getSessionUserIdOrNull(request);
+    const { conditions, params } = courseScope(searchParams, "c");
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const idx = params.length;
+    const sortByName =
+      searchParams.get("sort") === "name" || !!searchParams.get("country");
+    const order = sortByName
+      ? `LOWER(COALESCE(NULLIF(TRIM(c.club_name),''),c.name,'')),c.name,c.id`
+      : `EXISTS(SELECT 1 FROM rankings r WHERE r.course_id=c.id AND r.is_active) DESC,c.community_rating DESC NULLS LAST,c.played_count DESC,c.name,c.id`;
+    const courses = await sql(
+      `SELECT c.*,
+   EXISTS(SELECT 1 FROM played_courses p WHERE p.course_id=c.id AND p.user_id=$${idx + 3}::int) AS user_played,
+   EXISTS(SELECT 1 FROM wishlist w WHERE w.course_id=c.id AND w.user_id=$${idx + 3}::int) AS user_wishlisted
+   FROM courses c ${where} ORDER BY ${order} LIMIT $${idx + 1} OFFSET $${idx + 2}`,
+      [...params, limit, offset, userId],
+    );
+    if (!paginated) return Response.json(courses);
+    const [{ total }] = await sql(
+      `SELECT COUNT(*)::int AS total FROM courses c ${where}`,
+      params,
+    );
+    const nextOffset = offset + courses.length;
+    return Response.json({
+      courses,
+      total,
+      nextOffset: nextOffset < total ? nextOffset : null,
+      hasMore: nextOffset < total,
+    });
+  } catch (e) {
+    console.error("Error fetching courses", e);
     return Response.json({ error: "Failed to fetch courses" }, { status: 500 });
   }
 }

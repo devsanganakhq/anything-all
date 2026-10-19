@@ -1,15 +1,17 @@
-import * as SecureStore from 'expo-secure-store';
-import { fetch as expoFetch } from 'expo/fetch';
-import { authKey, secureStoreOptions, useAuthStore } from '@/utils/auth/store';
+import * as SecureStore from "expo-secure-store";
+import { fetch as expoFetch } from "expo/fetch";
+import { authKey, secureStoreOptions, useAuthStore } from "@/utils/auth/store";
 
 const originalFetch = fetch;
 
 const getURLFromArgs = (...args: Parameters<typeof fetch>) => {
   const [urlArg] = args;
   let url: string | null;
-  if (typeof urlArg === 'string') {
+  if (typeof urlArg === "string") {
     url = urlArg;
-  } else if (typeof urlArg === 'object' && urlArg !== null) {
+  } else if (urlArg instanceof URL) {
+    url = urlArg.href;
+  } else if (typeof urlArg === "object" && urlArg !== null) {
     url = urlArg.url;
   } else {
     url = null;
@@ -18,18 +20,23 @@ const getURLFromArgs = (...args: Parameters<typeof fetch>) => {
 };
 
 const isFileURL = (url: string) => {
-  return url.startsWith('file://') || url.startsWith('data:');
+  return url.startsWith("file://") || url.startsWith("data:");
 };
 
 const isFirstPartyURL = (url: string) => {
-  return (
-    url.startsWith('/') ||
-    (process.env.EXPO_PUBLIC_BASE_URL && url.startsWith(process.env.EXPO_PUBLIC_BASE_URL))
-  );
+  if (url.startsWith("/") && !url.startsWith("//")) return true;
+  try {
+    return (
+      !!process.env.EXPO_PUBLIC_BASE_URL &&
+      new URL(url).origin === new URL(process.env.EXPO_PUBLIC_BASE_URL).origin
+    );
+  } catch {
+    return false;
+  }
 };
 
 const isSecondPartyURL = (url: string) => {
-  return url.startsWith('/_create/');
+  return url.startsWith("/_create/");
 };
 
 type Params = Parameters<typeof expoFetch>;
@@ -54,8 +61,8 @@ const fetchToWeb = async function fetchWithHeaders(...args: Params) {
 
   let finalInput = input;
   const baseURL = isSecondPartyURL(url) ? secondPartyURL : firstPartyURL;
-  if (typeof input === 'string') {
-    finalInput = input.startsWith('/') ? `${baseURL}${input}` : input;
+  if (typeof input === "string") {
+    finalInput = input.startsWith("/") ? `${baseURL}${input}` : input;
   } else {
     return expoFetch(input, init);
   }
@@ -64,10 +71,10 @@ const fetchToWeb = async function fetchWithHeaders(...args: Params) {
   const finalHeaders = new Headers(initHeaders);
 
   const headers = {
-    'x-createxyz-project-group-id': process.env.EXPO_PUBLIC_PROJECT_GROUP_ID,
+    "x-createxyz-project-group-id": process.env.EXPO_PUBLIC_PROJECT_GROUP_ID,
     host: process.env.EXPO_PUBLIC_HOST,
-    'x-forwarded-host': process.env.EXPO_PUBLIC_HOST,
-    'x-createxyz-host': process.env.EXPO_PUBLIC_HOST,
+    "x-forwarded-host": process.env.EXPO_PUBLIC_HOST,
+    "x-createxyz-host": process.env.EXPO_PUBLIC_HOST,
   };
 
   for (const [key, value] of Object.entries(headers)) {
@@ -91,7 +98,7 @@ const fetchToWeb = async function fetchWithHeaders(...args: Params) {
   }
 
   if (auth) {
-    finalHeaders.set('authorization', `Bearer ${auth.jwt}`);
+    finalHeaders.set("authorization", `Bearer ${auth.jwt}`);
   }
 
   return expoFetch(finalInput, {

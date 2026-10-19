@@ -1,3 +1,5 @@
+import { CuratedLists } from "@/components/CuratedLists";
+import { PassportFavourites } from "@/components/PassportFavourites";
 /**
  * Golf Passport — Lifetime Journey
  * A premium, visual record of every course played, ranked and reviewed.
@@ -138,7 +140,11 @@ export default function PassportScreen() {
   });
 
   const lbScope =
-    lbTab === "THIS YEAR" ? "year" : lbTab === "FRIENDS" ? "friends" : "overall";
+    lbTab === "THIS YEAR"
+      ? "year"
+      : lbTab === "FRIENDS"
+        ? "friends"
+        : "overall";
 
   const { data: leaderboardData, isLoading: lbLoading } = useQuery({
     queryKey: ["leaderboard", lbScope],
@@ -487,7 +493,10 @@ export default function PassportScreen() {
             <View
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.12)" }}
             />
-            <HeroStat label="REVIEWS" value={stats.reviews_count} />
+            <HeroStat
+              label="LISTS COMPLETED"
+              value={stats.lists_completed || 0}
+            />
             <View
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.12)" }}
             />
@@ -498,6 +507,20 @@ export default function PassportScreen() {
           </View>
         </View>
 
+        <TouchableOpacity
+          onPress={() => router.push("/passport/history")}
+          style={{
+            marginHorizontal: Spacing.screenH,
+            paddingVertical: 14,
+            marginBottom: 12,
+          }}
+        >
+          <Text style={{ color: Colors.green }}>
+            Rounds played: {stats.rounds_count || 0} · View rounds and reviews ›
+          </Text>
+        </TouchableOpacity>
+        <PassportFavourites editable />
+        <CuratedLists passport />
         {/* ── Courses by country mini-bar ──────────────────────────────────── */}
         {byCountry.length > 0 && (
           <View style={{ marginHorizontal: Spacing.screenH, marginBottom: 22 }}>
@@ -922,7 +945,7 @@ export default function PassportScreen() {
                         >
                           COURSES
                         </Text>
-                        </View>
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </View>

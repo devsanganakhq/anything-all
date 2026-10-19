@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text } from "react-native";
 import { Image } from "expo-image";
 import { Colors } from "@/constants/theme";
@@ -19,9 +19,9 @@ function isRealPhotoUrl(uri) {
 
 /** First letter of the first word in a display name */
 export function getNameInitial(name) {
-  if (!name || typeof name !== "string") return "?";
+  if (!name || typeof name !== "string") return "G";
   const first = name.trim().split(/\s+/)[0];
-  if (!first) return "?";
+  if (!first) return "G";
   // Skip generic labels
   if (/^(you|golfer|a)$/i.test(first)) {
     const parts = name.trim().split(/\s+/);
@@ -54,6 +54,7 @@ export function UserAvatar({
   textColor = Colors.ivory,
 }) {
   const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [uri]);
   const showPhoto = isRealPhotoUrl(uri) && !failed;
   const initial = getNameInitial(name);
   const fontSize = Math.max(12, Math.round(size * 0.38));

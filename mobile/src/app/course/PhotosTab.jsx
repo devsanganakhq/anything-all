@@ -12,6 +12,7 @@ import {
   Modal,
   ActivityIndicator,
   TextInput,
+  useWindowDimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { Camera, X, CheckCircle, Upload, ImageIcon } from "lucide-react-native";
@@ -23,7 +24,7 @@ import { SectionLabel, EmptySection } from "./SharedComponents";
 import useUpload from "@/utils/useUpload";
 
 const THUMB_SIZE = 110;
-const MAX_PHOTOS = 10;
+const MAX_PHOTOS = 3;
 const TERMS_VERSION = "1.0";
 const TERMS_TEXT =
   "I confirm that I took these photos or have permission to upload them, " +
@@ -32,6 +33,9 @@ const TERMS_TEXT =
 
 export function PhotosTab({ courseId, alreadyPlayed, course }) {
   const qc = useQueryClient();
+  const { width } = useWindowDimensions();
+  const thumbSize = (width - 2 * Spacing.screenH - 8) / 3;
+  const [galleryRequest, setGalleryRequest] = useState(null);
   const [uploadSheet, setUploadSheet] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState([]);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -109,9 +113,13 @@ export function PhotosTab({ courseId, alreadyPlayed, course }) {
       setUploadError(null);
       const uploaded = [];
       for (const p of selectedPhotos) {
-        const r = await upload({ reactNativeAsset: { uri: p.uri } });
-        if (r.error) throw new Error(r.error);
-        uploaded.push({ imageUrl: r.url, caption: p.caption || null });
+        if (!p.uploadedUrl) {
+          const r = await upload({ reactNativeAsset: { uri: p.uri } });
+          if (r.error || !r.url)
+            throw new Error(r.error || "Photo upload failed");
+          p.uploadedUrl = r.url;
+        }
+        uploaded.push({ imageUrl: p.uploadedUrl, caption: p.caption || null });
       }
       const res = await fetch("/api/course-photos/upload", {
         method: "POST",
@@ -151,6 +159,7 @@ export function PhotosTab({ courseId, alreadyPlayed, course }) {
       <View style={{ marginHorizontal: -Spacing.screenH, marginBottom: 22 }}>
         <CoursePhotoCarousel
           photos={photos}
+          galleryRequest={galleryRequest}
           height={280}
           courseId={courseId}
           course={course}
@@ -188,11 +197,13 @@ export function PhotosTab({ courseId, alreadyPlayed, course }) {
             }}
           >
             {photos.map((p, i) => (
-              <View
+              <TouchableOpacity
                 key={p.id ?? i}
+                accessibilityLabel="View course photo"
+                onPress={() => setGalleryRequest({ index: i, key: Date.now() })}
                 style={{
-                  width: THUMB_SIZE,
-                  height: THUMB_SIZE,
+                  width: thumbSize,
+                  height: thumbSize,
                   borderRadius: Radius.sm,
                   overflow: "hidden",
                   backgroundColor: Colors.ivoryDeep,
@@ -227,7 +238,7 @@ export function PhotosTab({ courseId, alreadyPlayed, course }) {
                     </Text>
                   </View>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </>
@@ -386,8 +397,8 @@ export function PhotosTab({ courseId, alreadyPlayed, course }) {
                 >
                   {course?.name}
                 </Text>
-                . Up to {MAX_PHOTOS} photos. They appear on the course page
-                as soon as you upload.
+                . Up to {MAX_PHOTOS} photos. They appear on the course page as
+                soon as you upload.
               </Text>
 
               <View

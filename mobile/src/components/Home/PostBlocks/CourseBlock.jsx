@@ -1,3 +1,4 @@
+import { RatingStars } from "@/components/RatingStars";
 import React from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
@@ -108,15 +109,7 @@ export function CourseBlock({ post, onCoursePress }) {
             paddingBottom: 4,
           }}
         >
-          {[1, 2, 3, 4, 5].map((s) => (
-            <Star
-              key={s}
-              size={15}
-              color="#C9952A"
-              fill={s <= Math.round(post.rating) ? "#C9952A" : "transparent"}
-              strokeWidth={1.5}
-            />
-          ))}
+          <RatingStars rating={post.rating} />
           <Text
             style={{
               fontSize: 13,

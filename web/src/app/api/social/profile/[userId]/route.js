@@ -2,6 +2,7 @@
  * GET /api/social/profile/:userId
  * Public golfer profile. Respects privacy. Never exposes email.
  */
+import { activities } from "@/app/api/utils/activity/http";
 import sql from "@/app/api/utils/sql";
 import { getSessionUserIdOrNull } from "@/app/api/utils/getUserId";
 
@@ -23,7 +24,7 @@ export async function GET(request, { params }) {
     const rows = await sql(
       `SELECT
           u.id,
-          u.first_name || ' ' || u.last_name  AS name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer')  AS name,
           u.profile_photo_url                  AS avatar,
           u.location,
           u.home_club_name                     AS home_club,
@@ -31,14 +32,14 @@ export async function GET(request, { params }) {
           u.bio,
           u.privacy_settings,
 
-          CASE WHEN (u.privacy_settings->>'stats_visible')::boolean
+          CASE WHEN (u.id=$1 OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND ((f.user_id=$1 AND f.friend_id=u.id) OR (f.friend_id=$1 AND f.user_id=u.id))) OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true))
             THEN u.handicap ELSE NULL END AS handicap,
 
-          CASE WHEN (u.privacy_settings->>'stats_visible')::boolean
+          CASE WHEN (u.id=$1 OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND ((f.user_id=$1 AND f.friend_id=u.id) OR (f.friend_id=$1 AND f.user_id=u.id))) OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true))
             THEN (SELECT COUNT(*)::int FROM played_courses WHERE user_id=u.id)
             ELSE NULL END AS courses_played,
 
-          CASE WHEN (u.privacy_settings->>'stats_visible')::boolean
+          CASE WHEN (u.id=$1 OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND ((f.user_id=$1 AND f.friend_id=u.id) OR (f.friend_id=$1 AND f.user_id=u.id))) OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true))
             THEN (SELECT COUNT(DISTINCT c.country)::int
                   FROM played_courses pc JOIN courses c ON pc.course_id=c.id WHERE pc.user_id=u.id)
             ELSE NULL END AS countries_played,
@@ -64,7 +65,7 @@ export async function GET(request, { params }) {
             UNION SELECT user_id FROM friendships WHERE friend_id=u.id AND status='accepted'
           )) AS mutual_friends_count
 
-        FROM users u WHERE u.id=$2`,
+        FROM users u WHERE u.id=$2 AND COALESCE(u.is_suspended,false)=false`,
       [viewerId, targetId],
     );
 
@@ -111,7 +112,7 @@ export async function GET(request, { params }) {
     const mutualFriends = isSelf
       ? []
       : await sql(
-          `SELECT u2.id, u2.first_name||' '||u2.last_name AS name, u2.profile_photo_url AS avatar
+          `SELECT u2.id, COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u2.first_name, u2.last_name)), ''), 'Golfer') AS name, u2.profile_photo_url AS avatar
         FROM (
           SELECT friend_id AS mid FROM friendships WHERE user_id=$1 AND status='accepted'
           UNION SELECT user_id AS mid FROM friendships WHERE friend_id=$1 AND status='accepted'
@@ -155,6 +156,7 @@ export async function GET(request, { params }) {
       recentCourses,
       mutualFriends,
       clubMemberships,
+      favourites: await activities.favourites(viewerId, targetId),
     });
   } catch (error) {
     console.error("Profile error:", error);

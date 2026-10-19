@@ -89,20 +89,22 @@ export function BottomActionBar({
             flexDirection: "row",
             justifyContent: "center",
             gap: 7,
-            opacity: alreadyPlayed ? 0.75 : 1,
+            opacity: 1,
           }}
           activeOpacity={0.8}
         >
           <CheckCircle color={Colors.ivory} size={16} strokeWidth={2} />
           <Text
             style={{
+              flexShrink: 1,
+              textAlign: "center",
               fontSize: 10,
               fontWeight: "700",
               letterSpacing: 1.2,
               color: Colors.ivory,
             }}
           >
-            {alreadyPlayed ? "ROUND RECORDED" : "MARK AS PLAYED"}
+            {alreadyPlayed ? "RECORD ANOTHER ROUND" : "RECORD ROUND"}
           </Text>
         </TouchableOpacity>
 
@@ -132,13 +134,15 @@ export function BottomActionBar({
           />
           <Text
             style={{
+              flexShrink: 1,
+              textAlign: "center",
               fontSize: 10,
               fontWeight: "700",
               letterSpacing: 1.2,
               color: wishlisted ? Colors.ivory : Colors.purple,
             }}
           >
-            {wishlisted ? "SAVED" : "SAVE"}
+            {wishlisted ? "SAVED" : "ADD TO WISHLIST"}
           </Text>
         </TouchableOpacity>
       </View>

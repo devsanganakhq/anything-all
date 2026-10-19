@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 /**
  * Passport — Played Courses
  * Full list of every course the signed-in user has marked as played.
@@ -35,6 +36,7 @@ const COURSE_TYPE_COLOR = {
 };
 
 export default function PlayedCoursesScreen() {
+  const { userId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -48,9 +50,11 @@ export default function PlayedCoursesScreen() {
     refetch,
     isRefetching,
   } = useInfiniteQuery({
-    queryKey: ["passport-played"],
+    queryKey: ["passport-played", userId],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await fetch(`/api/user/played-courses?page=${pageParam}`);
+      const res = await fetch(
+        `/api/user/played-courses?page=${pageParam}${userId ? `&userId=${userId}` : ""}`,
+      );
       if (!res.ok) throw new Error("Failed to fetch played courses");
       return res.json();
     },
@@ -96,7 +100,9 @@ export default function PlayedCoursesScreen() {
         <View style={{ flex: 1 }}>
           {(() => {
             const { title, subtitle } = courseDisplayName(item);
-            const location = formatCourseLocation(item, { includeCounty: true });
+            const location = formatCourseLocation(item, {
+              includeCounty: true,
+            });
             return (
               <>
                 <Text
@@ -129,7 +135,11 @@ export default function PlayedCoursesScreen() {
                     marginTop: 3,
                   }}
                 >
-                  <MapPin color={Colors.textMuted} size={11} strokeWidth={1.8} />
+                  <MapPin
+                    color={Colors.textMuted}
+                    size={11}
+                    strokeWidth={1.8}
+                  />
                   <Text
                     style={{ fontSize: 11, color: Colors.textSecondary }}
                     numberOfLines={1}

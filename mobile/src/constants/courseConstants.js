@@ -93,7 +93,14 @@ export const ACTIVITY_LABELS = {
 export const SHOW_RANKINGS = false;
 
 // ─── Tab list ─────────────────────────────────────────────────────────────────
-export const ALL_TABS = ["OVERVIEW", "RANKINGS", "REVIEWS", "PHOTOS", "INFO"];
+export const ALL_TABS = [
+  "OVERVIEW",
+  "RANKINGS",
+  "REVIEWS",
+  "ROUNDS",
+  "PHOTOS",
+  "INFO",
+];
 export const TABS = SHOW_RANKINGS
   ? ALL_TABS
   : ALL_TABS.filter((t) => t !== "RANKINGS");

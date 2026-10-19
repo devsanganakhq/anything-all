@@ -15,6 +15,9 @@
       "distribution": "internal",
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "0"
+      },
+      "android": {
+        "buildType": "apk"
       }
     },
     "production": {
@@ -27,6 +30,24 @@
       },
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "0"
+      }
+    },
+    "testflight": {
+      "extends": "production",
+      "ios": {
+        "distribution": "store"
+      }
+    },
+    "client-preview": {
+      "extends": "preview",
+      "env": {
+        "HEATHLAND_CLIENT_PROJECT": "1"
+      }
+    },
+    "client-testflight": {
+      "extends": "testflight",
+      "env": {
+        "HEATHLAND_CLIENT_PROJECT": "1"
       }
     }
   },

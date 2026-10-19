@@ -1,3 +1,6 @@
+import { photoUrls } from "@/app/api/utils/activity/validation";
+import { notifyCommunity } from "@/app/api/utils/createNotification";
+import { communityAccess } from "@/app/api/utils/communityAccess";
 /**
  * GET  /api/communities/:id/chat?limit=30&before=<id>  — paginated chat (newest first)
  * POST /api/communities/:id/chat                       — send message
@@ -13,7 +16,7 @@ import {
 } from "@/app/api/utils/getUserId";
 
 export async function GET(request, { params }) {
-  const userId = (await getSessionUserIdOrNull()) ?? 0;
+  const userId = (await getSessionUserIdOrNull(request)) ?? 0;
   const { id } = params;
   const communityId = parseInt(id, 10);
   const { searchParams } = new URL(request.url);
@@ -22,13 +25,15 @@ export async function GET(request, { params }) {
   const since = searchParams.get("since"); // poll: load newer messages after this id
 
   try {
+    if (!(await communityAccess(communityId, userId, { memberOnly: true })))
+      return Response.json({ error: "Membership required" }, { status: 403 });
     let messages;
 
     if (since) {
       messages = await sql(
         `SELECT
-            m.id, m.community_id, m.user_id, m.message_text, m.image_url, m.is_deleted, m.created_at,
-            u.first_name||' '||u.last_name AS sender_name,
+            m.id, m.community_id, m.user_id, m.message_text, m.image_url, m.image_urls, m.is_deleted, m.created_at,
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer') AS sender_name,
             u.profile_photo_url AS sender_avatar,
             u.home_club_name    AS sender_club
           FROM community_chat_messages m
@@ -41,8 +46,8 @@ export async function GET(request, { params }) {
     } else if (before) {
       messages = await sql(
         `SELECT
-            m.id, m.community_id, m.user_id, m.message_text, m.image_url, m.is_deleted, m.created_at,
-            u.first_name||' '||u.last_name AS sender_name,
+            m.id, m.community_id, m.user_id, m.message_text, m.image_url, m.image_urls, m.is_deleted, m.created_at,
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer') AS sender_name,
             u.profile_photo_url AS sender_avatar,
             u.home_club_name    AS sender_club
           FROM community_chat_messages m
@@ -55,8 +60,8 @@ export async function GET(request, { params }) {
     } else {
       messages = await sql(
         `SELECT
-            m.id, m.community_id, m.user_id, m.message_text, m.image_url, m.is_deleted, m.created_at,
-            u.first_name||' '||u.last_name AS sender_name,
+            m.id, m.community_id, m.user_id, m.message_text, m.image_url, m.image_urls, m.is_deleted, m.created_at,
+            COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer') AS sender_name,
             u.profile_photo_url AS sender_avatar,
             u.home_club_name    AS sender_club
           FROM community_chat_messages m
@@ -80,16 +85,25 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   const { id } = params;
   const communityId = parseInt(id, 10);
-  const { text, imageUrl } = await request.json();
+  const body = await request.json();
+  const { text, imageUrl } = body;
+  let images;
+  try {
+    images = photoUrls(body.imageUrls ?? (imageUrl ? [imageUrl] : []));
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 400 });
+  }
+  if (text != null && (typeof text !== "string" || text.length > 10000))
+    return Response.json({ error: "Invalid message" }, { status: 400 });
 
-  if (!text?.trim() && !imageUrl)
+  if (!text?.trim() && !images.length)
     return Response.json(
       { error: "text or imageUrl required" },
       { status: 400 },
@@ -107,13 +121,25 @@ export async function POST(request, { params }) {
       );
 
     const result = await sql(
-      `INSERT INTO community_chat_messages (community_id, user_id, message_text, image_url)
-       VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
-      [communityId, userId, text?.trim() || null, imageUrl || null],
+      `INSERT INTO community_chat_messages (community_id, user_id, message_text, image_url,image_urls)
+       VALUES ($1, $2, $3, $4,$5::jsonb) RETURNING id, created_at`,
+      [
+        communityId,
+        userId,
+        text?.trim() || null,
+        images[0] || null,
+        JSON.stringify(images),
+      ],
     );
 
+    await notifyCommunity({
+      communityId,
+      fromUserId: userId,
+      message: "New community message",
+      eventKey: `community-message:${result[0].id}`,
+    });
     const author = await sql(
-      `SELECT first_name||' '||last_name AS sender_name, profile_photo_url AS sender_avatar, home_club_name AS sender_club FROM users WHERE id=$1`,
+      `SELECT COALESCE(NULLIF(TRIM(CONCAT_WS(' ', first_name, last_name)), ''), 'Golfer') AS sender_name, profile_photo_url AS sender_avatar, home_club_name AS sender_club FROM users WHERE id=$1`,
       [userId],
     );
 
@@ -123,6 +149,8 @@ export async function POST(request, { params }) {
         ...result[0],
         user_id: userId,
         message_text: text,
+        image_url: images[0] || null,
+        image_urls: images,
         ...author[0],
       },
     });
@@ -134,7 +162,7 @@ export async function POST(request, { params }) {
 export async function DELETE(request, { params }) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -156,8 +184,8 @@ export async function DELETE(request, { params }) {
       myRole.length && ["admin", "moderator"].includes(myRole[0].role);
 
     const msg = await sql(
-      `SELECT user_id FROM community_chat_messages WHERE id=$1`,
-      [messageId],
+      `SELECT user_id FROM community_chat_messages WHERE id=$1 AND community_id=$2`,
+      [messageId, communityId],
     );
     if (!msg.length)
       return Response.json({ error: "Message not found" }, { status: 404 });

@@ -1,3 +1,5 @@
+import { CuratedLists } from "@/components/CuratedLists";
+import { PassportFavourites } from "@/components/PassportFavourites";
 /**
  * Public golfer profile
  * Route: /social/:userId
@@ -828,6 +830,28 @@ export default function GolferProfileScreen() {
         )}
 
         {/* ── Recent courses ───────────────────────────────────────────────── */}
+        <PassportFavourites userId={targetId} />
+        <CuratedLists passport userId={targetId} />
+        <View style={{ marginHorizontal: Spacing.screenH, marginBottom: 20 }}>
+          {[
+            ["played", "Played courses"],
+            ["wishlist", "Wish list"],
+            ["history", "Rounds and reviews"],
+          ].map(([path, label]) => (
+            <TouchableOpacity
+              key={path}
+              onPress={() =>
+                router.push({
+                  pathname: `/passport/${path}`,
+                  params: { userId: targetId },
+                })
+              }
+              style={{ paddingVertical: 12 }}
+            >
+              <Text style={{ color: Colors.green }}>{label} ›</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         {recentCourses.length > 0 && (
           <Section label="RECENTLY PLAYED">
             <View style={{ gap: 8, paddingHorizontal: Spacing.screenH }}>

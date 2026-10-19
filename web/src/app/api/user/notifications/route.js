@@ -34,11 +34,12 @@ export async function GET(request) {
           n.feed_post_id,
           n.community_post_id,
           n.message,
+          n.target_path,
           n.read_at,
           n.created_at,
 
           -- From user (safe — no email)
-          u.first_name || ' ' || u.last_name  AS from_user_name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer')  AS from_user_name,
           u.profile_photo_url                  AS from_user_photo,
 
           -- Community name (if any)

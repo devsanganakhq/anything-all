@@ -1,3 +1,4 @@
+import { RatingStars } from "@/components/RatingStars";
 import React from "react";
 import { View, Text, Linking, TouchableOpacity } from "react-native";
 import { Star, MapPin, Users, Globe } from "lucide-react-native";
@@ -13,9 +14,11 @@ import {
   resolveCourseLogoUrl,
 } from "@/components/CourseListRow";
 
-export function StatStrip({ label, value, noBorder }) {
+export function StatStrip({ label, value, noBorder, onPress }) {
   return (
-    <View
+    <TouchableOpacity
+      disabled={!onPress}
+      onPress={onPress}
       style={{
         flex: 1,
         alignItems: "center",
@@ -45,7 +48,7 @@ export function StatStrip({ label, value, noBorder }) {
       >
         {label}
       </Text>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -56,6 +59,8 @@ export function CourseIdentity({
   followerCount,
   listCount,
   onPressReviews,
+  onPressLists,
+  reviewCount,
 }) {
   const { title, subtitle } = courseDisplayName(course);
   const location = formatCourseLocation(course, { includeCounty: true });
@@ -94,16 +99,10 @@ export function CourseIdentity({
             style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
           >
             {rating > 0 && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                {[1, 2, 3, 4, 5].map((s) => (
-                  <Star
-                    key={s}
-                    size={13}
-                    color={Colors.gold}
-                    fill={s <= Math.round(rating) ? Colors.gold : "transparent"}
-                    strokeWidth={1.5}
-                  />
-                ))}
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
+              >
+                <RatingStars rating={rating} size={13} />
                 <Text
                   style={{
                     fontSize: 13,
@@ -117,7 +116,8 @@ export function CourseIdentity({
               </View>
             )}
             <Text style={{ fontSize: 12, color: Colors.textSecondary }}>
-              ({reviews.length} {reviews.length === 1 ? "review" : "reviews"})
+              ({reviewCount ?? reviews.length}{" "}
+              {(reviewCount ?? reviews.length) === 1 ? "review" : "reviews"})
             </Text>
           </TouchableOpacity>
         )}
@@ -206,8 +206,8 @@ export function CourseIdentity({
           marginBottom: 20,
         }}
       >
-        <StatStrip label="PLAYED" value={course.played_count ?? 0} noBorder />
-        <StatStrip label="ON LISTS" value={onLists} />
+        <StatStrip label="ROUNDS" value={course.played_count ?? 0} noBorder />
+        <StatStrip label="ON LISTS" value={onLists} onPress={onPressLists} />
         <StatStrip label="PAR" value={par} />
         <StatStrip label="HOLES" value={holes} />
       </View>
@@ -227,7 +227,12 @@ export function CourseIdentity({
         >
           <Globe size={16} color={Colors.green} strokeWidth={1.8} />
           <Text
-            style={{ flex: 1, fontSize: 13, fontWeight: "600", color: Colors.green }}
+            style={{
+              flex: 1,
+              fontSize: 13,
+              fontWeight: "600",
+              color: Colors.green,
+            }}
             numberOfLines={1}
           >
             Visit website

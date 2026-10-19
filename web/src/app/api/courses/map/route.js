@@ -19,6 +19,7 @@
  *   ?mvpOnly=true  — only courses with mvp_data_status = 'ready'
  */
 import sql from "@/app/api/utils/sql";
+import { courseScope, boundedInteger } from "@/app/api/utils/courses/scope";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 
 // Generate Uploadcare thumbnail URL
@@ -33,7 +34,11 @@ function ucThumb(url, size = 400) {
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const filter = searchParams.get("filter") || "ALL";
-  const country = searchParams.get("country") || "";
+  const limit = Math.max(
+    1,
+    boundedInteger(searchParams.get("limit"), 2000, 2000),
+  );
+  const offset = boundedInteger(searchParams.get("offset"), 0, 100000);
   const ranking = searchParams.get("ranking") || "";
   const mvpOnly = searchParams.get("mvpOnly") === "true";
 
@@ -55,16 +60,18 @@ export async function GET(request) {
       "c.latitude  IS NOT NULL",
       "c.longitude IS NOT NULL",
       "NOT (c.latitude = 0 AND c.longitude = 0)",
-      "c.course_status <> 'permanently_closed'",
+      "COALESCE(c.course_status, 'active') <> 'permanently_closed'",
+      "c.latitude BETWEEN -90 AND 90",
+      "c.longitude BETWEEN -180 AND 180",
     ];
     // Cast as int so Neon can type a null guest userId ($1::int IS NOT NULL)
     const params = [userId]; // $1 = userId (null for guests)
     let idx = 2;
 
-    if (country) {
-      conditions.push(`c.country = $${idx++}`);
-      params.push(country);
-    }
+    const scope = courseScope(searchParams, "c", idx);
+    conditions.push(...scope.conditions);
+    params.push(...scope.params);
+    idx += scope.params.length;
     if (ranking) {
       conditions.push(`EXISTS (
         SELECT 1 FROM rankings r2
@@ -100,6 +107,10 @@ export async function GET(request) {
 
     const where = `WHERE ${conditions.join(" AND ")}`;
 
+    const [{ total }] = await sql(
+      `SELECT COUNT(*)::int AS total,$1::int AS viewer_id FROM courses c ${joinClause} ${where}`,
+      params,
+    );
     const rows = await sql(
       `SELECT
           -- identity
@@ -168,13 +179,9 @@ export async function GET(request) {
         FROM   courses c
         ${joinClause}
         ${where}
-        ORDER BY
-          (SELECT MIN(r.position) FROM rankings r
-            WHERE r.course_id = c.id AND r.is_active = true) NULLS LAST,
-          c.community_rating DESC NULLS LAST,
-          c.played_count     DESC NULLS LAST
-        LIMIT  2000`,
-      params,
+        ORDER BY c.id
+        LIMIT $${idx} OFFSET $${idx + 1}`,
+      [...params, limit, offset],
     );
 
     // ── Resolve media priority client-side fields ──────────────────────────
@@ -226,7 +233,13 @@ export async function GET(request) {
       };
     });
 
-    return Response.json({ courses, total: courses.length });
+    const nextOffset = offset + courses.length;
+    return Response.json({
+      courses,
+      total,
+      hasMore: nextOffset < total,
+      nextOffset: nextOffset < total ? nextOffset : null,
+    });
   } catch (error) {
     console.error("Courses map error:", error);
     return Response.json({ error: error.message }, { status: 500 });

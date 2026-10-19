@@ -1,8 +1,15 @@
+import { activities } from "@/app/api/utils/activity/http";
+import { getSessionUserId } from "@/app/api/utils/getUserId";
 import sql from "@/app/api/utils/sql";
 import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function POST(request) {
-  const userId = 1; // Mock user ID
+  let userId;
+  try {
+    userId = await getSessionUserId(request);
+  } catch {
+    return Response.json({ error: "Sign in required" }, { status: 401 });
+  }
   const body = await request.json();
   const { activityId } = body;
 
@@ -11,6 +18,17 @@ export async function POST(request) {
   }
 
   try {
+    const owner = await sql("SELECT user_id FROM activity_feed WHERE id=$1", [
+      activityId,
+    ]);
+    if (
+      !owner.length ||
+      !(await activities.canViewPassport(userId, owner[0].user_id))
+    )
+      return Response.json(
+        { error: "Activity not available" },
+        { status: 404 },
+      );
     // Check if already liked
     const existing = await sql`
       SELECT id FROM activity_likes 

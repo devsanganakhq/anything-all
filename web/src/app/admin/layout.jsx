@@ -190,6 +190,7 @@ export default function AdminLayout({ children }) {
           {[
             { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
             { href: "/admin/users", label: "Users", icon: Users },
+            { href: "/admin/lists", label: "Curated Lists", icon: BookOpen },
             {
               href: "/admin/course-photos",
               label: "Course Photos",

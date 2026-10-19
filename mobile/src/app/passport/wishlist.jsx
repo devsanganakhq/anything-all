@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from "expo-router";
 /**
  * Passport — Wish List
  * All courses the signed-in user has saved to their wishlist.
@@ -26,6 +27,7 @@ import {
 } from "@/utils/courseDisplayName";
 
 export default function WishlistScreen() {
+  const { userId } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
@@ -40,9 +42,11 @@ export default function WishlistScreen() {
     refetch,
     isRefetching,
   } = useInfiniteQuery({
-    queryKey: ["passport-wishlist"],
+    queryKey: ["passport-wishlist", userId],
     queryFn: async ({ pageParam = 1 }) => {
-      const res = await fetch(`/api/user/wishlist?page=${pageParam}`);
+      const res = await fetch(
+        `/api/user/wishlist?page=${pageParam}${userId ? `&userId=${userId}` : ""}`,
+      );
       if (!res.ok) throw new Error("Failed to fetch wishlist");
       return res.json();
     },
@@ -65,7 +69,7 @@ export default function WishlistScreen() {
       return res.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["passport-wishlist"] });
+      qc.invalidateQueries({ queryKey: ["passport-wishlist", userId] });
       qc.invalidateQueries({ queryKey: ["passport-stats"] });
     },
   });
@@ -110,7 +114,9 @@ export default function WishlistScreen() {
         <View style={{ flex: 1 }}>
           {(() => {
             const { title, subtitle } = courseDisplayName(item);
-            const location = formatCourseLocation(item, { includeCounty: true });
+            const location = formatCourseLocation(item, {
+              includeCounty: true,
+            });
             return (
               <>
                 <Text
@@ -143,7 +149,11 @@ export default function WishlistScreen() {
                     marginTop: 3,
                   }}
                 >
-                  <MapPin color={Colors.textMuted} size={11} strokeWidth={1.8} />
+                  <MapPin
+                    color={Colors.textMuted}
+                    size={11}
+                    strokeWidth={1.8}
+                  />
                   <Text
                     style={{ fontSize: 11, color: Colors.textSecondary }}
                     numberOfLines={1}
@@ -204,6 +214,7 @@ export default function WishlistScreen() {
 
         {/* Remove button */}
         <TouchableOpacity
+          disabled={!!userId}
           onPress={() => removeMutation.mutate(item.course_id)}
           style={{
             width: 34,

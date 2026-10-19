@@ -7,7 +7,7 @@ import sql from "@/app/api/utils/sql";
 import { getSessionUserIdOrNull } from "@/app/api/utils/getUserId";
 
 export async function GET(request, { params }) {
-  const userId = (await getSessionUserIdOrNull()) ?? 0;
+  const userId = (await getSessionUserIdOrNull(request)) ?? 0;
   const { id } = params;
   const communityId = parseInt(id, 10);
 
@@ -34,7 +34,7 @@ export async function GET(request, { params }) {
     const members = await sql(
       `SELECT
           u.id,
-          u.first_name||' '||u.last_name AS name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer') AS name,
           u.profile_photo_url            AS avatar,
           u.location,
           u.home_club_name               AS home_club,

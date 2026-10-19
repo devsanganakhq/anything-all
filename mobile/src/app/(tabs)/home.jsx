@@ -1,3 +1,4 @@
+import { shareLink } from "@/utils/shareLinks";
 /**
  * Home — Heathland Links Activity Feed
  *
@@ -266,8 +267,8 @@ export default function HomeScreen() {
     try {
       const coursePart = post.course_name ? ` at ${post.course_name}` : "";
       await Share.share({
-        message: `${post.author_name} on Heathland Links${coursePart}`,
-        url: `https://heathlandlinks.com/feed/${post.id}`,
+        message: `${post.author_name} on Heathland Links${coursePart}\n${shareLink("feed", post.id)}`,
+        url: shareLink("feed", post.id),
       });
     } catch {}
   }, []);
