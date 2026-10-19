@@ -1,8 +1,17 @@
+import { passportOwner } from "@/app/api/utils/activity/http";
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 
 export async function GET(request) {
-  const userId = await getSessionUserId(request);
+  let userId;
+  try {
+    userId = (await passportOwner(request)).owner;
+  } catch (e) {
+    return Response.json(
+      { error: "Passport not available" },
+      { status: e.status || 500 },
+    );
+  }
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
   const limit = 20;

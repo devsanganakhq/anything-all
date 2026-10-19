@@ -7,7 +7,7 @@ import { getSessionUserIdOrNull } from "@/app/api/utils/getUserId";
 import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
 
 export async function GET(request) {
-  const userId = (await getSessionUserIdOrNull()) ?? 0;
+  const userId = (await getSessionUserIdOrNull(request)) ?? 0;
   const { searchParams } = new URL(request.url);
   const filter = searchParams.get("filter") || "all";
   const q = (searchParams.get("q") || "").trim();

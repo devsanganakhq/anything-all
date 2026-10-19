@@ -61,53 +61,44 @@ export async function GET(request, { params }) {
       LIMIT 18
     `;
 
-    const reviews = await sql`
-      SELECT r.*, u.first_name, u.last_name, u.profile_photo_url,
-             COALESCE((
-               SELECT json_agg(
-                 json_build_object(
-                   'id', cp.id,
-                   'image_url', cp.image_url,
-                   'thumbnail_url', COALESCE(cp.thumbnail_url, cp.image_url),
-                   'caption', cp.caption
-                 )
-                 ORDER BY cp.uploaded_at
-               )
-               FROM course_photos cp
-               WHERE cp.deleted_at IS NULL
-                 AND cp.moderation_status = 'approved'
-                 AND (
-                   cp.review_id = r.id
-                   OR (
-                     cp.review_id IS NULL
-                     AND cp.course_id = r.course_id
-                     AND cp.user_id = r.user_id
-                   )
-                 )
-             ), '[]'::json) AS photos
-      FROM   played_courses r
-      JOIN   users u ON r.user_id = u.id
-      WHERE  r.course_id = ${id}
-        AND  (
-          (r.review_text IS NOT NULL AND TRIM(r.review_text) <> '')
-          OR EXISTS (
-            SELECT 1 FROM course_photos cp
-            WHERE cp.deleted_at IS NULL
-              AND cp.moderation_status = 'approved'
-              AND (
-                cp.review_id = r.id
-                OR (
-                  cp.review_id IS NULL
-                  AND cp.course_id = r.course_id
-                  AND cp.user_id = r.user_id
-                )
-              )
-          )
-        )
-      ORDER  BY r.created_at DESC
-      LIMIT  20
-    `;
+    const reviews = await sql(
+      `SELECT r.*,u.first_name,u.last_name,u.profile_photo_url,
+      COALESCE((SELECT json_agg(json_build_object('id',cp.id,'image_url',cp.image_url,'thumbnail_url',COALESCE(cp.thumbnail_url,cp.image_url),'caption',cp.caption) ORDER BY cp.uploaded_at,cp.id)
+        FROM course_photos cp WHERE cp.course_review_id=r.id AND cp.deleted_at IS NULL AND cp.moderation_status='approved'),'[]') AS photos
+      FROM course_reviews r JOIN users u ON u.id=r.user_id WHERE r.course_id=$1 AND r.deleted_at IS NULL
+      AND COALESCE(u.is_suspended,false)=false AND NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked'
+       AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id)))
+      AND (r.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+       OR EXISTS(SELECT 1 FROM friendships WHERE status='accepted' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id))))
+      ORDER BY r.created_at DESC,r.id DESC LIMIT 100`,
+      [id, userId],
+    );
+    const curatedLists = await sql(
+      `SELECT l.id,l.title FROM curated_lists l JOIN curated_list_courses lc ON lc.list_id=l.id WHERE lc.course_id=$1 AND l.is_published ORDER BY l.display_order,l.id`,
+      [id],
+    );
 
+    const rounds = await sql(
+      `SELECT r.*,u.first_name,u.last_name,u.profile_photo_url FROM course_rounds r JOIN users u ON u.id=r.user_id
+      WHERE r.course_id=$1 AND COALESCE(u.is_suspended,false)=false
+      AND NOT EXISTS(SELECT 1 FROM friendships b WHERE b.status='blocked' AND ((b.user_id=$2 AND b.friend_id=r.user_id) OR (b.friend_id=$2 AND b.user_id=r.user_id)))
+      AND (r.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true) OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND ((f.user_id=$2 AND f.friend_id=r.user_id) OR (f.friend_id=$2 AND f.user_id=r.user_id))))
+      ORDER BY r.date_played DESC,r.id DESC LIMIT 100`,
+      [id, userId],
+    );
+    const categoryAverages = await sql(
+      `SELECT category.key,AVG(category.value::numeric) AS average
+      FROM course_reviews r CROSS JOIN LATERAL jsonb_each_text(r.scores) category
+      WHERE r.course_id=$1 AND r.deleted_at IS NULL AND r.scores IS NOT NULL GROUP BY category.key`,
+      [id],
+    );
+    const [reviewStats] = await sql(
+      `SELECT COUNT(*)::int AS total,
+      COUNT(*) FILTER(WHERE ROUND(rating)=1)::int AS one,COUNT(*) FILTER(WHERE ROUND(rating)=2)::int AS two,
+      COUNT(*) FILTER(WHERE ROUND(rating)=3)::int AS three,COUNT(*) FILTER(WHERE ROUND(rating)=4)::int AS four,
+      COUNT(*) FILTER(WHERE ROUND(rating)=5)::int AS five FROM course_reviews WHERE course_id=$1 AND deleted_at IS NULL`,
+      [id],
+    );
     // Recent activity feed entries for this course
     const recentActivity = await sql`
       SELECT af.id, af.activity_type, af.created_at,
@@ -148,8 +139,12 @@ export async function GET(request, { params }) {
     return Response.json({
       course: course[0],
       rankings,
+      curatedLists,
       photos,
       reviews,
+      rounds,
+      categoryAverages,
+      reviewStats,
       recentActivity,
       followerCount: followerCountRow[0]?.count ?? 0,
       userStatus,

@@ -1,3 +1,7 @@
+import {
+  PhotoAttachments,
+  AttachedPhotos,
+} from "@/components/PhotoAttachments";
 /**
  * Community detail screen
  * Tabs: DISCUSSION | CHAT | MEMBERS | ABOUT
@@ -63,22 +67,29 @@ export default function CommunityDetailScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const openUserProfile = useOpenUserProfile();
-  const { id, postId: focusPostId, openComments, tab: tabParam } =
-    useLocalSearchParams();
+  const {
+    id,
+    postId: focusPostId,
+    openComments,
+    tab: tabParam,
+  } = useLocalSearchParams();
   const qc = useQueryClient();
   const commId = parseInt(id, 10);
   const focusPostIdNum = parseInt(
     Array.isArray(focusPostId) ? focusPostId[0] : focusPostId,
     10,
   );
-  const shouldOpenComments =
-    openComments === "1" || openComments === "true";
+  const shouldOpenComments = openComments === "1" || openComments === "true";
   const focusedPostOnce = useRef(false);
 
   const [tab, setTab] = useState("DISCUSSION");
   const [postText, setPostText] = useState("");
   const [postTitle, setPostTitle] = useState("");
   const [postType, setPostType] = useState("discussion");
+  const [chatPhotos, setChatPhotos] = useState([]),
+    [commentPhotos, setCommentPhotos] = useState([]),
+    [postPhotos, setPostPhotos] = useState([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [chatText, setChatText] = useState("");
   const [composerOpen, setComposerOpen] = useState(false);
   const [expandedPost, setExpandedPost] = useState(null); // postId with comments open
@@ -193,11 +204,9 @@ export default function CommunityDetailScreen() {
     myRole === "admin"
       ? ["DISCUSSION", "CHAT", "MEMBERS", "REQUESTS", "ABOUT"]
       : BASE_TABS;
-  const myUserId = Number(
-    meData?.profile?.id ?? chatData?.currentUserId ?? 0,
-  ) || null;
-  const isMine = (userId) =>
-    myUserId != null && Number(userId) === myUserId;
+  const myUserId =
+    Number(meData?.profile?.id ?? chatData?.currentUserId ?? 0) || null;
+  const isMine = (userId) => myUserId != null && Number(userId) === myUserId;
 
   // Track last message id for polling
   useEffect(() => {
@@ -217,6 +226,7 @@ export default function CommunityDetailScreen() {
 
   useEffect(() => {
     const t = Array.isArray(tabParam) ? tabParam[0] : tabParam;
+    if (["CHAT", "DISCUSSION", "ABOUT", "MEMBERS"].includes(t)) setTab(t);
     if (t === "REQUESTS" && myRole === "admin") setTab("REQUESTS");
   }, [tabParam, myRole]);
 
@@ -280,6 +290,7 @@ export default function CommunityDetailScreen() {
           title: postTitle.trim() || null,
           body: postText.trim(),
           postType,
+          photoUrls: postPhotos,
         }),
       });
       if (!r.ok) throw new Error("Failed");
@@ -287,6 +298,7 @@ export default function CommunityDetailScreen() {
     },
     onSuccess: () => {
       setPostText("");
+      setPostPhotos([]);
       setPostTitle("");
       setComposerOpen(false);
       qc.invalidateQueries({ queryKey: ["community-posts", commId] });
@@ -314,13 +326,14 @@ export default function CommunityDetailScreen() {
       const r = await fetch(`/api/communities/${commId}/comments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ postId, text }),
+        body: JSON.stringify({ postId, text, imageUrls: commentPhotos }),
       });
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
     onSuccess: () => {
       setCommentText("");
+      setCommentPhotos([]);
       qc.invalidateQueries({
         queryKey: ["community-comments", commId, expandedPost],
       });
@@ -333,13 +346,14 @@ export default function CommunityDetailScreen() {
       const r = await fetch(`/api/communities/${commId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, imageUrls: chatPhotos }),
       });
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
     onSuccess: () => {
       setChatText("");
+      setChatPhotos([]);
       qc.invalidateQueries({ queryKey: ["community-chat", commId] });
     },
   });
@@ -716,11 +730,7 @@ export default function CommunityDetailScreen() {
                   marginBottom: 4,
                 }}
               >
-                <Image
-                  source={{ uri: post.photo_urls[0] }}
-                  style={{ width: "100%", height: 180 }}
-                  contentFit="cover"
-                />
+                <AttachedPhotos photos={post.photo_urls} />
               </View>
             )}
 
@@ -987,6 +997,7 @@ export default function CommunityDetailScreen() {
                     >
                       {c.comment_text}
                     </Text>
+                    <AttachedPhotos photos={c.image_urls || []} />
                     <Text
                       style={{
                         fontSize: 10,
@@ -999,6 +1010,14 @@ export default function CommunityDetailScreen() {
                   </View>
                 </View>
               ))}
+              {isMember && (
+                <PhotoAttachments
+                  photos={commentPhotos}
+                  onChange={setCommentPhotos}
+                  onBusy={setPhotoBusy}
+                  disabled={commentMutation.isPending}
+                />
+              )}
               {/* Comment input */}
               {isMember && (
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
@@ -1021,13 +1040,17 @@ export default function CommunityDetailScreen() {
                   />
                   <TouchableOpacity
                     onPress={() =>
-                      commentText.trim() &&
+                      (commentText.trim() || commentPhotos.length) &&
                       commentMutation.mutate({
                         postId: post.id,
                         text: commentText,
                       })
                     }
-                    disabled={!commentText.trim()}
+                    disabled={
+                      photoBusy ||
+                      commentMutation.isPending ||
+                      (!commentText.trim() && !commentPhotos.length)
+                    }
                     style={{
                       width: 36,
                       height: 36,
@@ -1134,6 +1157,15 @@ export default function CommunityDetailScreen() {
                   >
                     {msg.message_text}
                   </Text>
+                  <AttachedPhotos
+                    photos={
+                      msg.image_urls?.length
+                        ? msg.image_urls
+                        : msg.image_url
+                          ? [msg.image_url]
+                          : []
+                    }
+                  />
                 </View>
                 <Text
                   style={{
@@ -1185,6 +1217,14 @@ export default function CommunityDetailScreen() {
           </View>
         )}
       </ScrollView>
+      {isMember && (
+        <PhotoAttachments
+          photos={chatPhotos}
+          onChange={setChatPhotos}
+          onBusy={setPhotoBusy}
+          disabled={sendChatMutation.isPending}
+        />
+      )}
       {/* Chat input */}
       {isMember && (
         <View
@@ -1220,9 +1260,14 @@ export default function CommunityDetailScreen() {
           />
           <TouchableOpacity
             onPress={() =>
-              chatText.trim() && sendChatMutation.mutate(chatText.trim())
+              (chatText.trim() || chatPhotos.length) &&
+              sendChatMutation.mutate(chatText.trim())
             }
-            disabled={!chatText.trim()}
+            disabled={
+              photoBusy ||
+              sendChatMutation.isPending ||
+              (!chatText.trim() && !chatPhotos.length)
+            }
             style={{
               width: 42,
               height: 42,
@@ -1321,7 +1366,11 @@ export default function CommunityDetailScreen() {
                 </Text>
                 {item.home_club ? (
                   <Text
-                    style={{ fontSize: 11, color: Colors.textMuted, marginTop: 2 }}
+                    style={{
+                      fontSize: 11,
+                      color: Colors.textMuted,
+                      marginTop: 2,
+                    }}
                   >
                     {item.home_club}
                   </Text>
@@ -2057,6 +2106,34 @@ export default function CommunityDetailScreen() {
             )}
           </View>
 
+          {isMember && (
+            <TouchableOpacity
+              onPress={async () => {
+                try {
+                  const response = await fetch(
+                    `/api/communities/${commId}/mute`,
+                    {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ muted: !community.muted }),
+                    },
+                  );
+                  if (!response.ok)
+                    throw Error("Unable to update notifications");
+                  qc.invalidateQueries({
+                    queryKey: ["community-detail", commId],
+                  });
+                } catch (e) {
+                  Alert.alert("Unable to update", e.message);
+                }
+              }}
+              style={{ padding: 10 }}
+            >
+              <Text style={{ color: Colors.green }}>
+                {community.muted ? "Unmute" : "Mute"}
+              </Text>
+            </TouchableOpacity>
+          )}
           {myRole === "admin" && community.community_type === "private" ? (
             <TouchableOpacity
               onPress={() => router.push(`/communities/${commId}/invite`)}
@@ -2147,52 +2224,52 @@ export default function CommunityDetailScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-          <TouchableOpacity
-            onPress={handleJoin}
-            disabled={joinMutation.isPending || joinRequestPending}
-            style={{
-              paddingHorizontal: 20,
-              paddingVertical: 9,
-              borderRadius: Radius.pill,
-              backgroundColor:
-                isMember || joinRequestPending ? "transparent" : Colors.green,
-              borderWidth: 1,
-              borderColor:
-                isMember || joinRequestPending ? Colors.border : Colors.green,
-              minWidth: 120,
-              minHeight: 34,
-              alignItems: "center",
-              justifyContent: "center",
-              opacity: joinRequestPending ? 0.7 : 1,
-            }}
-          >
-            {joinMutation.isPending ? (
-              <ActivityIndicator
-                size="small"
-                color={isMember ? Colors.green : Colors.ivory}
-              />
-            ) : (
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontWeight: "700",
-                  letterSpacing: 1,
-                  color:
-                    isMember || joinRequestPending
-                      ? Colors.textSecondary
-                      : Colors.ivory,
-                }}
-              >
-                {isMember
-                  ? "LEAVE"
-                  : joinRequestPending
-                    ? "REQUESTED"
-                    : community.community_type === "private"
-                      ? "REQUEST TO JOIN"
-                      : "JOIN COMMUNITY"}
-              </Text>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              onPress={handleJoin}
+              disabled={joinMutation.isPending || joinRequestPending}
+              style={{
+                paddingHorizontal: 20,
+                paddingVertical: 9,
+                borderRadius: Radius.pill,
+                backgroundColor:
+                  isMember || joinRequestPending ? "transparent" : Colors.green,
+                borderWidth: 1,
+                borderColor:
+                  isMember || joinRequestPending ? Colors.border : Colors.green,
+                minWidth: 120,
+                minHeight: 34,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: joinRequestPending ? 0.7 : 1,
+              }}
+            >
+              {joinMutation.isPending ? (
+                <ActivityIndicator
+                  size="small"
+                  color={isMember ? Colors.green : Colors.ivory}
+                />
+              ) : (
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: "700",
+                    letterSpacing: 1,
+                    color:
+                      isMember || joinRequestPending
+                        ? Colors.textSecondary
+                        : Colors.ivory,
+                  }}
+                >
+                  {isMember
+                    ? "LEAVE"
+                    : joinRequestPending
+                      ? "REQUESTED"
+                      : community.community_type === "private"
+                        ? "REQUEST TO JOIN"
+                        : "JOIN COMMUNITY"}
+                </Text>
+              )}
+            </TouchableOpacity>
           )}
         </View>
 
@@ -2369,6 +2446,12 @@ export default function CommunityDetailScreen() {
                       onChangeText={setPostText}
                       multiline
                     />
+                    <PhotoAttachments
+                      photos={postPhotos}
+                      onChange={setPostPhotos}
+                      onBusy={setPhotoBusy}
+                      disabled={postMutation.isPending}
+                    />
                     <View
                       style={{ flexDirection: "row", gap: 8, marginTop: 10 }}
                     >
@@ -2394,8 +2477,15 @@ export default function CommunityDetailScreen() {
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={() => postText.trim() && postMutation.mutate()}
-                        disabled={!postText.trim()}
+                        onPress={() =>
+                          (postText.trim() || postPhotos.length) &&
+                          postMutation.mutate()
+                        }
+                        disabled={
+                          photoBusy ||
+                          postMutation.isPending ||
+                          (!postText.trim() && !postPhotos.length)
+                        }
                         style={{
                           flex: 2,
                           paddingVertical: 11,

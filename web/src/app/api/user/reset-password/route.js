@@ -115,15 +115,26 @@ export async function POST(request) {
     // ── Hash the new password (argon2id, same as the auth system) ─────────
     const newHash = await hash(password);
 
-    // ── Atomically update the password and invalidate the token ───────────
-    // Update password first, then mark token used
-    await sql(`UPDATE auth_accounts SET password = $1 WHERE id = $2`, [
-      newHash,
-      accountId,
-    ]);
-    await sql(`UPDATE password_reset_tokens SET used = true WHERE id = $1`, [
-      tokenId,
-    ]);
+    // One statement consumes the token and changes the password. Concurrent
+    // submissions cannot reuse a consumed token or leave a half-applied reset.
+    const changed = await sql(
+      `WITH consumed AS (
+      UPDATE password_reset_tokens SET used=true
+      WHERE id=$1 AND used=false AND expires_at>NOW() RETURNING email
+    ), changed AS (
+      UPDATE auth_accounts SET password=$2 WHERE id=$3
+        AND EXISTS(SELECT 1 FROM consumed) RETURNING id
+    ) SELECT id FROM changed`,
+      [tokenId, newHash, accountId],
+    );
+    if (!changed.length)
+      return Response.json(
+        {
+          error:
+            "This reset link is invalid or has expired. Please request a new one.",
+        },
+        { status: 400 },
+      );
 
     return Response.json({ success: true });
   } catch (err) {

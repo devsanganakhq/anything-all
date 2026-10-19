@@ -29,7 +29,7 @@ import {
 } from "lucide-react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Purchases from "react-native-purchases";
 import { useAuth } from "@/utils/auth/useAuth";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
@@ -40,7 +40,37 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();
-  const [isPublic, setIsPublic] = React.useState(true);
+  const queryClient = useQueryClient();
+  const privacyMutation = useMutation({
+    mutationFn: async (isPublic) => {
+      const response = await fetch("/api/user/privacy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          privacySettings: { profile_visible: isPublic },
+        }),
+      });
+      if (!response.ok)
+        throw new Error("Could not save privacy settings. Please try again.");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["user-profile"], (old) =>
+        old
+          ? {
+              ...old,
+              profile: {
+                ...old.profile,
+                privacy_settings: data.settings.privacy_settings,
+              },
+            }
+          : old,
+      );
+      queryClient.invalidateQueries({ queryKey: ["social-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["feed"] });
+    },
+    onError: (error) => Alert.alert("Privacy settings", error.message),
+  });
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
 
   const {
@@ -647,8 +677,9 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <Switch
-            value={isPublic}
-            onValueChange={setIsPublic}
+            value={profile?.privacy_settings?.profile_visible ?? true}
+            disabled={privacyMutation.isPending || !profile}
+            onValueChange={(value) => privacyMutation.mutate(value)}
             trackColor={{ false: Colors.border, true: Colors.green }}
             thumbColor={Colors.ivory}
           />

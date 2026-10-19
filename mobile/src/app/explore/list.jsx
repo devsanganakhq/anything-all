@@ -2,13 +2,20 @@
  * Explore — full course list for a ranking collection, community list, or country.
  * Map mode reuses the Explore map pins + map style.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -24,12 +31,17 @@ import {
   MAP_STYLE,
   MARKER,
 } from "@/components/ExploreMapShared";
-import { getClusterZoomRegion, quantizeMapRegion, regionsEqual } from "@/utils/mapClustering";
+import {
+  getClusterZoomRegion,
+  quantizeMapRegion,
+  regionsEqual,
+} from "@/utils/mapClustering";
 import { useMapClusters } from "@/utils/useMapClusters";
 import {
   MapCoursePreviewCard,
   markPlayedHref,
 } from "@/components/MapCoursePreviewCard";
+import { fetchCoursePages } from "@/utils/coursePages";
 import { courseDisplayName } from "@/utils/courseDisplayName";
 
 function sortCoursesByName(rows) {
@@ -44,6 +56,10 @@ function hasCoords(course) {
   const lat = Number(course?.latitude);
   const lng = Number(course?.longitude);
   return (
+    course?.latitude != null &&
+    course?.longitude != null &&
+    Math.abs(lat) <= 90 &&
+    Math.abs(lng) <= 180 &&
     Number.isFinite(lat) &&
     Number.isFinite(lng) &&
     !(lat === 0 && lng === 0)
@@ -97,6 +113,12 @@ export default function ExploreCourseListScreen() {
   const heading = title || country || "Courses";
   const [viewMode, setViewMode] = useState("list");
   const [selected, setSelected] = useState(null);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setQuery(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
   const lastMarkerPressAt = useRef(0);
   const qc = useQueryClient();
 
@@ -124,15 +146,14 @@ export default function ExploreCourseListScreen() {
   });
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["explore-list", kind, id, country],
-    queryFn: async () => {
+    queryKey: ["explore-list", kind, id, country, query],
+    queryFn: async ({ signal }) => {
       if (kind === "country") {
-        const res = await fetch(
-          `/api/courses/list?country=${encodeURIComponent(country || "")}&limit=200&sort=name`,
+        const result = await fetchCoursePages(
+          `/api/courses/list?country=${encodeURIComponent(country || "")}&q=${encodeURIComponent(query)}&limit=200&sort=name&paginated=true`,
+          signal,
         );
-        if (!res.ok) throw new Error("Failed to load courses");
-        const rows = await res.json();
-        return sortCoursesByName(Array.isArray(rows) ? rows : []);
+        return sortCoursesByName(result.courses);
       }
       const res = await fetch(
         `/api/rankings/collections?id=${encodeURIComponent(id || "")}&preview=200`,
@@ -146,11 +167,8 @@ export default function ExploreCourseListScreen() {
   // Merge played / wishlist status from the main map feed so pins match Explore.
   const { data: mapStatusData } = useQuery({
     queryKey: ["courses-map", "ALL"],
-    queryFn: async () => {
-      const res = await fetch("/api/courses/map?filter=ALL");
-      if (!res.ok) return { courses: [] };
-      return res.json();
-    },
+    queryFn: ({ signal }) =>
+      fetchCoursePages("/api/courses/map?filter=ALL", signal),
     staleTime: 60_000,
   });
 
@@ -168,12 +186,20 @@ export default function ExploreCourseListScreen() {
   }, [mapStatusData]);
 
   const courses = useMemo(() => {
-    const rows = data ?? [];
+    const all = data ?? [];
+    const rows =
+      kind === "country" || !query
+        ? all
+        : all.filter((c) =>
+            [c.name, c.club_name, c.display_name, c.city, c.county].some((v) =>
+              v?.toLowerCase().includes(query.toLowerCase()),
+            ),
+          );
     return rows.map((c) => {
       const status = statusById.get(String(c.id));
       return status ? { ...c, ...status } : c;
     });
-  }, [data, statusById]);
+  }, [data, statusById, kind, query]);
 
   const mappedCourses = useMemo(() => courses.filter(hasCoords), [courses]);
   const fitRegion = useMemo(
@@ -217,10 +243,13 @@ export default function ExploreCourseListScreen() {
     [clusterIndex],
   );
 
-  const handleCourseMarkerPress = useCallback((course) => {
-    lastMarkerPressAt.current = Date.now();
-    setSelected(course);
-  }, []);
+  const handleCourseMarkerPress = useCallback(
+    (course) => {
+      lastMarkerPressAt.current = Date.now();
+      router.push(`/course/${course.id}`);
+    },
+    [router],
+  );
 
   const handleMapPress = useCallback(() => {
     if (Date.now() - lastMarkerPressAt.current < 400) return;
@@ -331,8 +360,42 @@ export default function ExploreCourseListScreen() {
         )}
       </View>
 
+      <View
+        style={{
+          paddingHorizontal: Spacing.screenH,
+          paddingVertical: 10,
+          backgroundColor: Colors.white,
+        }}
+      >
+        <TextInput
+          accessibilityLabel="Search within this destination"
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search courses in this list…"
+          placeholderTextColor={Colors.textSecondary}
+          style={{
+            padding: 12,
+            borderWidth: 1,
+            borderColor: Colors.border,
+            borderRadius: Radius.sm,
+            color: Colors.textPrimary,
+          }}
+        />
+        {!isLoading && !isError ? (
+          <Text
+            style={{ color: Colors.textSecondary, fontSize: 12, marginTop: 8 }}
+          >
+            {courses.length} courses · {mappedCourses.length} shown on map
+            {courses.length > mappedCourses.length
+              ? ` · ${courses.length - mappedCourses.length} without map locations`
+              : ""}
+          </Text>
+        ) : null}
+      </View>
       {isLoading ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <ActivityIndicator color={Colors.green} />
         </View>
       ) : isError ? (

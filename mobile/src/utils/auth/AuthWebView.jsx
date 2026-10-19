@@ -69,7 +69,15 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
       return;
     }
     const handleMessage = (event) => {
-      if (event.origin !== process.env.EXPO_PUBLIC_PROXY_BASE_URL) {
+      if (
+        ![baseURL, proxyURL].filter(Boolean).some((value) => {
+          try {
+            return event.origin === new URL(value).origin;
+          } catch {
+            return false;
+          }
+        })
+      ) {
         return;
       }
       if (event.data.type === "AUTH_SUCCESS") {
@@ -109,16 +117,16 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
       thirdPartyCookiesEnabled={false}
       source={{
         uri: currentURI,
-      }}
-      headers={{
-        "x-createxyz-project-group-id":
-          process.env.EXPO_PUBLIC_PROJECT_GROUP_ID,
-        host: process.env.EXPO_PUBLIC_HOST,
-        "x-forwarded-host": process.env.EXPO_PUBLIC_HOST,
-        "x-createxyz-host": process.env.EXPO_PUBLIC_HOST,
+        headers: {
+          "x-createxyz-project-group-id":
+            process.env.EXPO_PUBLIC_PROJECT_GROUP_ID || "",
+          "x-createxyz-host": process.env.EXPO_PUBLIC_HOST || "",
+        },
       }}
       onMessage={(event) => {
         try {
+          const origin = new URL(event.nativeEvent.url).origin;
+          if (origin !== new URL(baseURL).origin) return;
           const data = JSON.parse(event.nativeEvent.data);
           if (data?.type === "AUTH_SUCCESS") {
             applyAuthSuccess(data);
@@ -164,15 +172,21 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
           return true;
         }
 
-        if (url.includes("/account/forgot-password")) {
-          return false;
-        }
-
         if (url === currentURI) return true;
 
         const hasParams = url.includes("?");
         const separator = hasParams ? "&" : "?";
-        const newURL = url.replaceAll(proxyURL, baseURL);
+        let parsed;
+        try {
+          parsed = new URL(url);
+        } catch {
+          return false;
+        }
+        const trusted = [baseURL, proxyURL]
+          .filter(Boolean)
+          .some((value) => parsed.origin === new URL(value).origin);
+        if (!trusted) return false;
+        const newURL = proxyURL ? url.replace(proxyURL, baseURL) : url;
 
         if (
           newURL.endsWith(tokenCallbackPath) ||
@@ -183,10 +197,7 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
         }
 
         // Keep callbackUrl attached when navigating between account pages
-        if (
-          newURL.includes("/account/") &&
-          !newURL.includes("callbackUrl=")
-        ) {
+        if (newURL.includes("/account/") && !newURL.includes("callbackUrl=")) {
           setURI(
             `${newURL}${separator}callbackUrl=${encodeURIComponent(nativeCallbackPath)}`,
           );

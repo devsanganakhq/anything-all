@@ -36,7 +36,7 @@ export async function GET(request, { params }) {
           cjr.id,
           cjr.user_id,
           cjr.created_at AS requested_at,
-          u.first_name || ' ' || u.last_name AS name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer') AS name,
           u.profile_photo_url AS avatar,
           u.home_club_name AS home_club,
           u.location

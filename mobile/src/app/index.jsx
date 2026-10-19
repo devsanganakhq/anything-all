@@ -7,8 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import { useAuth } from "@/utils/auth/useAuth";
 
 // ── Official Welcome Screen artwork — do NOT regenerate or replace ──
-const ARTWORK_URI =
-  "https://dtvoeevhaseb5.cloudfront.net/user-uploads/e30ce1d7-f3f9-466d-8641-919de79212af.png";
+const ARTWORK = require("../../assets/images/welcome-original.png");
 
 export default function WelcomeScreen() {
   const router = useRouter();
@@ -34,7 +33,7 @@ export default function WelcomeScreen() {
 
       {/* Production artwork — fills screen edge-to-edge, nothing cropped */}
       <Image
-        source={{ uri: ARTWORK_URI }}
+        source={ARTWORK}
         style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
         contentFit="cover"
         transition={200}

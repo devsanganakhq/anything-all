@@ -6,6 +6,7 @@
  * instead of toggling (avoids double-request races that like then unlike).
  */
 import sql from "@/app/api/utils/sql";
+import { createNotification } from "@/app/api/utils/createNotification";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 
 export async function POST(request, { params }) {
@@ -24,12 +25,11 @@ export async function POST(request, { params }) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const wantLiked =
-    typeof body?.liked === "boolean" ? body.liked : null;
+  const wantLiked = typeof body?.liked === "boolean" ? body.liked : null;
 
   try {
     const photoRows = await sql(
-      `SELECT id, like_count, moderation_status FROM course_photos
+      `SELECT id, user_id, course_id, like_count, moderation_status FROM course_photos
        WHERE id = $1 AND deleted_at IS NULL`,
       [photoId],
     );
@@ -50,25 +50,30 @@ export async function POST(request, { params }) {
     const currentlyLiked = existing.length > 0;
     const nextLiked = wantLiked === null ? !currentlyLiked : wantLiked;
 
-    if (nextLiked && !currentlyLiked) {
-      await sql(
-        `INSERT INTO course_photo_likes (photo_id, user_id) VALUES ($1, $2)
-         ON CONFLICT (photo_id, user_id) DO NOTHING`,
+    const result = await sql.transaction([
+      sql("SELECT id FROM course_photos WHERE id=$1 FOR UPDATE", [photoId]),
+      sql(
+        nextLiked
+          ? `INSERT INTO course_photo_likes(photo_id,user_id) VALUES($1,$2) ON CONFLICT(photo_id,user_id) DO NOTHING RETURNING photo_id`
+          : `DELETE FROM course_photo_likes WHERE photo_id=$1 AND user_id=$2 RETURNING photo_id`,
         [photoId, userId],
-      );
-      await sql(
-        `UPDATE course_photos SET like_count = COALESCE(like_count, 0) + 1 WHERE id = $1`,
+      ),
+      sql(
+        "UPDATE course_photos SET like_count=(SELECT COUNT(*) FROM course_photo_likes WHERE photo_id=$1) WHERE id=$1",
         [photoId],
-      );
-    } else if (!nextLiked && currentlyLiked) {
-      await sql(
-        `DELETE FROM course_photo_likes WHERE photo_id = $1 AND user_id = $2`,
-        [photoId, userId],
-      );
-      await sql(
-        `UPDATE course_photos SET like_count = GREATEST(0, COALESCE(like_count, 0) - 1) WHERE id = $1`,
-        [photoId],
-      );
+      ),
+    ]);
+    const changed = result[1];
+    if (changed.length) {
+      if (nextLiked)
+        await createNotification({
+          userId: photoRows[0].user_id,
+          fromUserId: userId,
+          notificationType: "photo_like",
+          message: "liked your course photo",
+          targetPath: `/course/${photoRows[0].course_id}`,
+          eventKey: `photo-like:${photoId}:${userId}`,
+        });
     }
 
     const updated = await sql(
@@ -85,9 +90,6 @@ export async function POST(request, { params }) {
       message: err?.message,
       code: err?.code,
     });
-    return Response.json(
-      { error: "Failed to update like", detail: err?.message },
-      { status: 500 },
-    );
+    return Response.json({ error: "Failed to update like" }, { status: 500 });
   }
 }

@@ -1,3 +1,6 @@
+import { photoUrls as validatePhotos } from "@/app/api/utils/activity/validation";
+import { notifyCommunity } from "@/app/api/utils/createNotification";
+import { communityAccess } from "@/app/api/utils/communityAccess";
 /**
  * GET  /api/communities/:id/posts  — paginated posts, pinned first
  * POST /api/communities/:id/posts  — create a post
@@ -9,11 +12,16 @@ import {
 } from "@/app/api/utils/getUserId";
 
 export async function GET(request, { params }) {
-  const userId = (await getSessionUserIdOrNull()) ?? 0;
+  const userId = (await getSessionUserIdOrNull(request)) ?? 0;
   const { id } = params;
   const communityId = parseInt(id, 10);
 
   try {
+    if (!(await communityAccess(communityId, userId)))
+      return Response.json(
+        { error: "Community not available" },
+        { status: 403 },
+      );
     const posts = await sql(
       `SELECT
           cp.id,
@@ -26,7 +34,7 @@ export async function GET(request, { params }) {
           cp.is_pinned,
           cp.created_at,
 
-          u.first_name||' '||u.last_name AS author_name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer') AS author_name,
           u.profile_photo_url            AS author_photo,
           u.home_club_name               AS author_club,
 
@@ -68,7 +76,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -83,6 +91,13 @@ export async function POST(request, { params }) {
     courseId,
   } = await request.json();
 
+  try {
+    validatePhotos(photoUrls);
+  } catch (e) {
+    return Response.json({ error: e.message }, { status: 400 });
+  }
+  if (body != null && (typeof body !== "string" || body.length > 20000))
+    return Response.json({ error: "Invalid post body" }, { status: 400 });
   if (!body?.trim() && photoUrls.length === 0) {
     return Response.json(
       { error: "Post body or photo required" },
@@ -122,6 +137,13 @@ export async function POST(request, { params }) {
       communityId,
     ]);
 
+    await notifyCommunity({
+      communityId,
+      fromUserId: userId,
+      message: "New community post",
+      eventKey: `community-post:${result[0].id}`,
+      type: "community_post",
+    });
     return Response.json({ success: true, postId: result[0].id });
   } catch (error) {
     console.error("Posts POST error:", error);

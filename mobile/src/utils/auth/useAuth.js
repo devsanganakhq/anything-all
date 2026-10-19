@@ -1,12 +1,17 @@
-import { router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
-import { useCallback, useEffect, useMemo } from 'react';
-import { create } from 'zustand';
-import { Modal, View } from 'react-native';
-import { useAuthModal, useAuthStore, authKey, secureStoreOptions } from './store';
-import { resetAppCache } from '@/utils/queryClient';
-import { identifyUser, resetUser } from '@/utils/posthog';
-
+import { detachPushToken } from "@/utils/usePushNotifications";
+import { router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
+import { useCallback, useEffect, useMemo } from "react";
+import { create } from "zustand";
+import { Modal, View } from "react-native";
+import {
+  useAuthModal,
+  useAuthStore,
+  authKey,
+  secureStoreOptions,
+} from "./store";
+import { resetAppCache } from "@/utils/queryClient";
+import { identifyUser, resetUser } from "@/utils/posthog";
 
 /**
  * This hook provides authentication functionality.
@@ -47,13 +52,14 @@ export const useAuth = () => {
   useEffect(() => {}, []);
 
   const signIn = useCallback(() => {
-    open({ mode: 'signin' });
+    open({ mode: "signin" });
   }, [open]);
   const signUp = useCallback(() => {
-    open({ mode: 'signup' });
+    open({ mode: "signup" });
   }, [open]);
 
-  const signOut = useCallback(() => {
+  const signOut = useCallback(async () => {
+    await detachPushToken();
     fetch("/api/auth/signout", { method: "POST" }).catch(() => {});
     setAuth(null);
     resetUser();

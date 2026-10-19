@@ -45,13 +45,16 @@ export async function GET(request) {
               AND r.ranking_name = 'Top 100 Britain & Ireland'
               AND r.is_active = true
               AND r.verification_status = ANY($2))                                                         AS top100_bi_completed,
-          (SELECT COUNT(DISTINCT c.country)::int
+          (SELECT COUNT(DISTINCT CASE WHEN c.country IN ('USA','United States','United States of America') THEN 'USA' ELSE c.country END)::int
             FROM played_courses pc JOIN courses c ON c.id = pc.course_id
             WHERE pc.user_id = $1 AND c.country IS NOT NULL)                                               AS countries_played,
           (SELECT COUNT(DISTINCT c.county)::int
             FROM played_courses pc JOIN courses c ON c.id = pc.course_id
             WHERE pc.user_id = $1 AND c.county IS NOT NULL)                                                AS counties_played,
-          (SELECT COUNT(*)::int  FROM played_courses              WHERE user_id = $1 AND review_text IS NOT NULL AND review_text <> '') AS reviews_count,
+          (SELECT COUNT(*)::int FROM course_reviews WHERE user_id=$1 AND deleted_at IS NULL) AS reviews_count,
+          (SELECT COUNT(*)::int FROM course_rounds WHERE user_id=$1) AS rounds_count,
+          (SELECT COUNT(*)::int FROM curated_lists l WHERE is_published AND EXISTS(SELECT 1 FROM curated_list_courses WHERE list_id=l.id AND counts_for_completion)
+           AND NOT EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=l.id AND lc.counts_for_completion AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=lc.course_id))) AS lists_completed,
           (SELECT COUNT(*)::int  FROM user_achievements           WHERE user_id = $1)                       AS achievements_unlocked`,
       [USER_ID, VERIFIED_STATUSES],
     );

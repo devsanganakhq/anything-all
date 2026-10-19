@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -13,13 +13,19 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X, Star, Camera, ImageIcon, CheckCircle } from "lucide-react-native";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import * as ImagePickerLib from "expo-image-picker";
 import { Image } from "expo-image";
 import { StatusBar } from "expo-status-bar";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import useUpload from "@/utils/useUpload";
 
+import Slider from "@react-native-community/slider";
+import {
+  COURSE_CATEGORIES,
+  LIST_CATEGORIES,
+  FEE_BANDS,
+} from "@/utils/reviewCriteria";
 const MAX_PHOTOS = 3;
 const TERMS_VERSION = "1.0";
 const TERMS_TEXT =
@@ -28,7 +34,43 @@ const TERMS_TEXT =
   "services under the platform terms.";
 
 export default function MarkPlayedScreen() {
-  const { courseId, courseName } = useLocalSearchParams();
+  const {
+    courseId,
+    courseName,
+    mode: initialMode,
+    activityId,
+    listId,
+  } = useLocalSearchParams();
+  const [mode, setMode] = useState(
+    initialMode === "review" || listId ? "review" : "round",
+  );
+  const isList = !!listId;
+  const isEdit = !!activityId;
+  const categories = isList ? LIST_CATEGORIES : COURSE_CATEGORIES;
+  const [scores, setScores] = useState(
+    Object.fromEntries(categories.map((c) => [c.key, 5])),
+  );
+  const [feeBand, setFeeBand] = useState("");
+  const requestId = useRef(
+    `activity-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  const endpoint = isList
+    ? `/api/lists/${listId}/reviews`
+    : `/api/activity/${mode === "review" ? "reviews" : "rounds"}${isEdit ? `/${activityId}` : ""}`;
+  const {
+    data: existing,
+    isLoading: loadingExisting,
+    isError: existingError,
+  } = useQuery({
+    queryKey: ["activity-edit", mode, activityId],
+    enabled: isEdit,
+    queryFn: async () => {
+      const r = await fetch(endpoint);
+      const data = await r.json();
+      if (!r.ok) throw Error(data.error || "Unable to load activity");
+      return data.review || data.round || data;
+    },
+  });
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -44,6 +86,22 @@ export default function MarkPlayedScreen() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [photoError, setPhotoError] = useState(null);
   const [upload, { loading: uploading }] = useUpload();
+
+  useEffect(() => {
+    if (!existing) return;
+    setRating(Number(existing.rating) || 0);
+    setReviewText(existing.review_text ?? existing.comments ?? "");
+    setDatePlayed(String(existing.date_played).slice(0, 10));
+    if (existing.scores) setScores(existing.scores);
+    setFeeBand(existing.fee_band || "");
+    setSelectedPhotos(
+      (existing.photos || []).map((url) => ({
+        uri: typeof url === "string" ? url : url.image_url,
+        remote: true,
+      })),
+    );
+    setTermsAccepted(true);
+  }, [existing]);
 
   const pickPhotos = useCallback(async () => {
     const { status } =
@@ -79,39 +137,42 @@ export default function MarkPlayedScreen() {
     mutationFn: async () => {
       setPhotoError(null);
 
-      // 1. Create the played_courses record
-      const response = await fetch("/api/activity/mark-played", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, rating, reviewText, datePlayed }),
-      });
-      if (!response.ok) throw new Error("Failed to record activity");
-      const { reviewId } = await response.json();
-
-      // 2. Upload photos if any (and terms accepted)
-      if (selectedPhotos.length > 0 && termsAccepted) {
-        const uploaded = [];
-        for (const p of selectedPhotos) {
+      if (isEdit && !existing)
+        throw Error("Wait for the saved activity to load");
+      const photos = [];
+      for (const p of selectedPhotos) {
+        if (p.remote) {
+          photos.push(p.uri);
+          continue;
+        }
+        if (!p.uploadedUrl) {
           const r = await upload({ reactNativeAsset: { uri: p.uri } });
-          if (r.error) throw new Error(`Photo upload failed: ${r.error}`);
-          uploaded.push({ imageUrl: r.url, caption: p.caption || null });
+          if (r.error || !r.url) throw Error(r.error || "Photo upload failed");
+          p.uploadedUrl = r.url;
         }
-        const photoRes = await fetch("/api/course-photos/upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            courseId,
-            photos: uploaded,
-            reviewId: reviewId || null,
-            termsAccepted: true,
-            termsVersion: TERMS_VERSION,
-          }),
-        });
-        if (!photoRes.ok) {
-          const err = await photoRes.json().catch(() => ({}));
-          throw new Error(err.error || "Photo submission failed");
-        }
+        photos.push(p.uploadedUrl);
       }
+      const response = await fetch(endpoint, {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId,
+          datePlayed,
+          reviewText,
+          photos,
+          termsAccepted,
+          scores:
+            mode === "review" && !(isEdit && existing?.scores == null)
+              ? scores
+              : undefined,
+          rating,
+          feeBand,
+          requestId: requestId.current,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw Error(result.error || "Unable to save activity");
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["course", courseId] });
@@ -122,14 +183,17 @@ export default function MarkPlayedScreen() {
       queryClient.invalidateQueries({ queryKey: ["feed"] });
       queryClient.invalidateQueries({ queryKey: ["user-profile"] });
 
-      const photoMsg =
-        selectedPhotos.length > 0 && termsAccepted
-          ? "\n\nYour photos are now live on the course page."
-          : "";
+      queryClient.invalidateQueries({ queryKey: ["activity-history"] });
+      queryClient.invalidateQueries({ queryKey: ["curated-lists"] });
+      queryClient.invalidateQueries({ queryKey: ["curated-list"] });
       Alert.alert(
-        "Round Recorded",
-        `${courseName} added to your Golf Passport.${photoMsg}`,
-        [{ text: "Great", onPress: () => router.back() }],
+        isEdit
+          ? "Changes saved"
+          : mode === "review"
+            ? "Review saved"
+            : "Round recorded",
+        `${courseName || "Your activity"} has been saved.`,
+        [{ text: "Done", onPress: () => router.back() }],
       );
     },
     onError: (err) => {
@@ -164,7 +228,11 @@ export default function MarkPlayedScreen() {
               color: Colors.textSecondary,
             }}
           >
-            MARK AS PLAYED
+            {isEdit
+              ? "EDIT ACTIVITY"
+              : isList
+                ? "REVIEW LIST"
+                : "RECORD ACTIVITY"}
           </Text>
           <TouchableOpacity onPress={() => router.back()}>
             <X color={Colors.textSecondary} size={20} strokeWidth={1.8} />
@@ -197,61 +265,179 @@ export default function MarkPlayedScreen() {
               marginBottom: 30,
             }}
           >
-            How was your round? Add a rating and review to your Passport.
+            {isList
+              ? "Review the experience of completing this list."
+              : "Record a round or share a course review in your Passport."}
           </Text>
 
-          {/* Star Rating */}
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: "700",
-              letterSpacing: 1.5,
-              color: Colors.textSecondary,
-              marginBottom: 14,
-            }}
-          >
-            YOUR RATING
-          </Text>
-          <View style={{ flexDirection: "row", gap: 12, marginBottom: 30 }}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => setRating(star)}>
-                <Star
-                  size={30}
-                  color={star <= rating ? Colors.gold : Colors.border}
-                  fill={star <= rating ? Colors.gold : "transparent"}
-                  strokeWidth={1.5}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Date Played */}
-          <Text
-            style={{
-              fontSize: 9,
-              fontWeight: "700",
-              letterSpacing: 1.5,
-              color: Colors.textSecondary,
-              marginBottom: 10,
-            }}
-          >
-            DATE PLAYED
-          </Text>
-          <TextInput
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: Colors.border,
-              paddingVertical: 12,
-              fontSize: 15,
-              color: Colors.textPrimary,
-              marginBottom: 28,
-            }}
-            value={datePlayed}
-            onChangeText={setDatePlayed}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={Colors.textMuted}
-          />
-
+          {!isEdit && !isList && (
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 24 }}>
+              {["round", "review"].map((value) => (
+                <TouchableOpacity
+                  key={value}
+                  onPress={() => setMode(value)}
+                  style={{
+                    flex: 1,
+                    padding: 14,
+                    borderRadius: Radius.sm,
+                    backgroundColor:
+                      mode === value ? Colors.green : Colors.white,
+                  }}
+                >
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      color: mode === value ? Colors.ivory : Colors.green,
+                    }}
+                  >
+                    {value === "round" ? "Record a round" : "Leave a review"}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {isEdit && loadingExisting && (
+            <ActivityIndicator color={Colors.green} />
+          )}
+          {existingError && (
+            <Text style={{ color: Colors.error }}>
+              Unable to load this activity. Please reopen it.
+            </Text>
+          )}
+          {mode === "review" && !(isEdit && existing?.scores == null) && (
+            <>
+              {categories.map((category) => (
+                <View key={category.key} style={{ marginBottom: 22 }}>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "600",
+                      color: Colors.textPrimary,
+                    }}
+                  >
+                    {category.title}
+                  </Text>
+                  {!!category.caption && (
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        lineHeight: 18,
+                        color: Colors.textSecondary,
+                        marginTop: 5,
+                      }}
+                    >
+                      {category.caption}
+                    </Text>
+                  )}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <Slider
+                      style={{ flex: 1, height: 44 }}
+                      minimumValue={1}
+                      maximumValue={10}
+                      step={1}
+                      value={scores[category.key]}
+                      onValueChange={(v) =>
+                        setScores((p) => ({ ...p, [category.key]: v }))
+                      }
+                      minimumTrackTintColor={Colors.green}
+                      thumbTintColor={Colors.green}
+                      accessibilityLabel={category.title}
+                      accessibilityValue={{
+                        min: 1,
+                        max: 10,
+                        now: scores[category.key],
+                      }}
+                    />
+                    <Text style={{ color: Colors.green, width: 38 }}>
+                      {scores[category.key]}/10
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              <Text style={{ color: Colors.green, marginBottom: 20 }}>
+                Overall score:{" "}
+                {(
+                  Object.values(scores).reduce((a, b) => a + b, 0) / 10
+                ).toFixed(1)}{" "}
+                / 5
+              </Text>
+              {!isList && (
+                <View style={{ marginBottom: 24 }}>
+                  <Text style={{ color: Colors.textPrimary, marginBottom: 12 }}>
+                    Full advertised green fee
+                  </Text>
+                  <View
+                    style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+                  >
+                    {FEE_BANDS.map((band) => (
+                      <TouchableOpacity
+                        key={band}
+                        onPress={() => setFeeBand(band)}
+                        style={{
+                          padding: 12,
+                          borderRadius: Radius.sm,
+                          backgroundColor:
+                            feeBand === band ? Colors.green : Colors.white,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color:
+                              feeBand === band
+                                ? Colors.ivory
+                                : Colors.textPrimary,
+                          }}
+                        >
+                          {band}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+          {isEdit && existing?.scores == null && mode === "review" && (
+            <Text style={{ color: Colors.textSecondary, marginBottom: 20 }}>
+              Original rating: {rating}/5
+            </Text>
+          )}
+          {!isList && (
+            <>
+              {/* Date Played */}
+              <Text
+                style={{
+                  fontSize: 9,
+                  fontWeight: "700",
+                  letterSpacing: 1.5,
+                  color: Colors.textSecondary,
+                  marginBottom: 10,
+                }}
+              >
+                DATE PLAYED
+              </Text>
+              <TextInput
+                style={{
+                  borderBottomWidth: 1,
+                  borderBottomColor: Colors.border,
+                  paddingVertical: 12,
+                  fontSize: 15,
+                  color: Colors.textPrimary,
+                  marginBottom: 28,
+                }}
+                value={datePlayed}
+                onChangeText={setDatePlayed}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Colors.textMuted}
+              />
+            </>
+          )}
           {/* Review */}
           <Text
             style={{
@@ -262,7 +448,7 @@ export default function MarkPlayedScreen() {
               marginBottom: 10,
             }}
           >
-            PERSONAL REVIEW
+            {mode === "round" ? "ROUND COMMENTS" : "PERSONAL REVIEW"}
           </Text>
           <TextInput
             style={{
@@ -307,7 +493,9 @@ export default function MarkPlayedScreen() {
             }}
           >
             Share your photos from this round. Up to {MAX_PHOTOS} photos.
-            They appear on the course page as soon as you save.
+            {isList
+              ? "They appear with your list review."
+              : "They appear on the course page as soon as you save."}
           </Text>
 
           {/* Photo previews + picker */}
@@ -349,7 +537,7 @@ export default function MarkPlayedScreen() {
                 </TouchableOpacity>
               </View>
             ))}
-            {selectedPhotos.length < MAX_PHOTOS && (
+            {!isEdit && selectedPhotos.length < MAX_PHOTOS && (
               <TouchableOpacity
                 onPress={pickPhotos}
                 style={{
@@ -381,7 +569,7 @@ export default function MarkPlayedScreen() {
           </View>
 
           {/* Terms consent — only shown if photos are selected */}
-          {selectedPhotos.length > 0 && (
+          {!isEdit && selectedPhotos.length > 0 && (
             <TouchableOpacity
               onPress={() => setTermsAccepted((v) => !v)}
               style={{
@@ -481,6 +669,38 @@ export default function MarkPlayedScreen() {
             </View>
           )}
 
+          {isEdit && mode === "review" && (
+            <TouchableOpacity
+              onPress={() =>
+                Alert.alert(
+                  "Delete review?",
+                  "This removes the review from rankings. Your recorded rounds remain.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                      text: "Delete",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          const r = await fetch(endpoint, { method: "DELETE" });
+                          if (!r.ok) throw Error("Unable to delete review");
+                          await queryClient.invalidateQueries();
+                          router.back();
+                        } catch (e) {
+                          Alert.alert("Unable to delete", e.message);
+                        }
+                      },
+                    },
+                  ],
+                )
+              }
+              style={{ padding: 14, marginBottom: 15 }}
+            >
+              <Text style={{ color: Colors.error, textAlign: "center" }}>
+                Delete review
+              </Text>
+            </TouchableOpacity>
+          )}
           {/* Submit */}
           <TouchableOpacity
             style={{
@@ -493,7 +713,7 @@ export default function MarkPlayedScreen() {
               gap: 8,
               opacity: mutation.isPending || uploading ? 0.6 : 1,
             }}
-            disabled={mutation.isPending || uploading}
+            disabled={mutation.isPending || uploading || (isEdit && !existing)}
             onPress={() => {
               if (selectedPhotos.length > 0 && !termsAccepted) {
                 Alert.alert(
@@ -516,7 +736,13 @@ export default function MarkPlayedScreen() {
                 color: Colors.ivory,
               }}
             >
-              {mutation.isPending || uploading ? "SAVING…" : "CONFIRM ROUND"}
+              {mutation.isPending || uploading
+                ? "SAVING…"
+                : isEdit
+                  ? "SAVE CHANGES"
+                  : mode === "review"
+                    ? "SAVE REVIEW"
+                    : "CONFIRM ROUND"}
             </Text>
           </TouchableOpacity>
         </ScrollView>

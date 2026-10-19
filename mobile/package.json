@@ -7,7 +7,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "ios:release": "./scripts/build-ios-release.sh",
-    "android:release": "./scripts/build-android-release.sh"
+    "android:release": "./scripts/build-android-release.sh",
+    "check:release": "node scripts/check-release.mjs",
+    "eas-build-pre-install": "node scripts/check-release.mjs"
   },
   "dependencies": {
     "@anythingai/app": "0.1.98",

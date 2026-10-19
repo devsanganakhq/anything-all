@@ -22,7 +22,8 @@
         "NSPhotoLibraryUsageDescription": "Heathland Links uses your photo library so you can upload profile and course photos.",
         "NSPhotoLibraryAddUsageDescription": "Heathland Links can save photos you choose to share from the app.",
         "NSMicrophoneUsageDescription": "Heathland Links uses the microphone when recording audio or video for course content."
-      }
+      },
+      "associatedDomains": ["applinks:anything-all.vercel.app"]
     },
     "android": {
       "adaptiveIcon": {
@@ -50,7 +51,31 @@
         "android.permission.READ_CONTACTS",
         "android.permission.WRITE_CONTACTS"
       ],
-      "package": "com.heathlandlinks.app"
+      "package": "com.heathlandlinks.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "anything-all.vercel.app",
+              "pathPrefix": "/course/"
+            },
+            {
+              "scheme": "https",
+              "host": "anything-all.vercel.app",
+              "pathPrefix": "/feed/"
+            },
+            {
+              "scheme": "https",
+              "host": "anything-all.vercel.app",
+              "pathPrefix": "/lists/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "plugins": [
       [
@@ -95,7 +120,14 @@
           "faceIDPermission": false
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#091811"
+        }
+      ]
     ],
     "web": {
       "bundler": "metro",
@@ -114,6 +146,7 @@
       }
     },
     "owner": "syedaliwork789s-team",
-    "slug": "anything"
+    "slug": "anything",
+    "scheme": "heathlandlinks"
   }
 }

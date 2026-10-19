@@ -1,3 +1,5 @@
+import { RatingStars } from "@/components/RatingStars";
+import { COURSE_CATEGORIES } from "@/utils/reviewCriteria";
 import React, { useState } from "react";
 import {
   View,
@@ -8,6 +10,7 @@ import {
   Pressable,
 } from "react-native";
 import { Star, CalendarDays, PenLine, X } from "lucide-react-native";
+import { useRouter } from "expo-router";
 import { Image } from "expo-image";
 import { Colors, Radius, Shadow } from "@/constants/theme";
 import { SectionLabel, EmptySection } from "./SharedComponents";
@@ -17,7 +20,8 @@ import { PressableUser } from "@/components/PressableUser";
 
 function photosForReview(rev) {
   const raw = rev?.photos;
-  if (Array.isArray(raw)) return raw.filter((p) => p?.image_url || p?.thumbnail_url);
+  if (Array.isArray(raw))
+    return raw.filter((p) => p?.image_url || p?.thumbnail_url);
   if (typeof raw === "string") {
     try {
       const parsed = JSON.parse(raw);
@@ -36,7 +40,11 @@ export function ReviewsTab({
   rating,
   alreadyPlayed,
   handleMarkPlayed,
+  courseId,
+  courseName,
+  categoryAverages = [],
 }) {
+  const router = useRouter();
   const [lightbox, setLightbox] = useState(null);
   return (
     <>
@@ -146,6 +154,30 @@ export function ReviewsTab({
         </View>
       )}
 
+      {categoryAverages.length > 0 && (
+        <View
+          style={{
+            padding: 16,
+            backgroundColor: Colors.white,
+            borderRadius: Radius.md,
+            marginBottom: 20,
+          }}
+        >
+          {COURSE_CATEGORIES.map((category) => {
+            const row = categoryAverages.find((a) => a.key === category.key);
+            return row ? (
+              <View key={category.key} style={{ marginBottom: 14 }}>
+                <Text style={{ color: Colors.textPrimary, fontSize: 13 }}>
+                  {category.title}
+                </Text>
+                <Text style={{ color: Colors.green, marginTop: 5 }}>
+                  {Number(row.average).toFixed(1)} / 10
+                </Text>
+              </View>
+            ) : null;
+          })}
+        </View>
+      )}
       <SectionLabel icon={Star} label="MEMBER REVIEWS" />
 
       {reviews.length > 0 ? (
@@ -153,136 +185,137 @@ export function ReviewsTab({
           {reviews.map((rev) => {
             const photos = photosForReview(rev);
             return (
-            <View
-              key={rev.id}
-              style={{
-                backgroundColor: Colors.white,
-                borderRadius: Radius.lg,
-                padding: 15,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                ...Shadow.card,
-              }}
-            >
               <View
+                key={rev.id}
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  marginBottom: 10,
+                  backgroundColor: Colors.white,
+                  borderRadius: Radius.lg,
+                  padding: 15,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  ...Shadow.card,
                 }}
               >
-                <PressableUser
-                  userId={rev.user_id}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 10,
-                    flex: 1,
-                  }}
-                >
-                  <UserAvatar
-                    uri={rev.profile_photo_url}
-                    name={`${rev.first_name || ""} ${rev.last_name || ""}`.trim()}
-                    size={38}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "700",
-                        color: Colors.textPrimary,
-                      }}
-                    >
-                      {rev.first_name} {rev.last_name}
-                    </Text>
-                  <View style={{ flexDirection: "row", gap: 2, marginTop: 2 }}>
-                    {[...Array(rev.rating || 0)].map((_, i) => (
-                      <Star
-                        key={i}
-                        size={10}
-                        color={Colors.gold}
-                        fill={Colors.gold}
-                      />
-                    ))}
-                    </View>
-                  </View>
-                </PressableUser>
-                <Text style={{ fontSize: 10, color: Colors.textMuted }}>
-                  {formatDate(rev.created_at)}
-                </Text>
-              </View>
-              {rev.date_played && (
                 <View
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    gap: 5,
-                    marginBottom: 8,
+                    gap: 10,
+                    marginBottom: 10,
                   }}
                 >
-                  <CalendarDays
-                    size={11}
-                    color={Colors.textMuted}
-                    strokeWidth={1.8}
-                  />
-                  <Text
+                  <PressableUser
+                    userId={rev.user_id}
                     style={{
-                      fontSize: 11,
-                      color: Colors.textSecondary,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                      flex: 1,
                     }}
                   >
-                    Played {formatDate(rev.date_played)}
+                    <UserAvatar
+                      uri={rev.profile_photo_url}
+                      name={`${rev.first_name || ""} ${rev.last_name || ""}`.trim()}
+                      size={38}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "700",
+                          color: Colors.textPrimary,
+                        }}
+                      >
+                        {`${rev.first_name || ""} ${rev.last_name || ""}`.trim() ||
+                          "Golfer"}
+                      </Text>
+                      <View
+                        style={{ flexDirection: "row", gap: 2, marginTop: 2 }}
+                      >
+                        <RatingStars rating={rev.rating} size={11} />
+                        <Text
+                          style={{ fontSize: 11, color: Colors.textSecondary }}
+                        >
+                          {Number(rev.rating).toFixed(1)}/5
+                        </Text>
+                      </View>
+                    </View>
+                  </PressableUser>
+                  <Text style={{ fontSize: 10, color: Colors.textMuted }}>
+                    {formatDate(rev.created_at)}
                   </Text>
                 </View>
-              )}
-              {rev.review_text ? (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: Colors.textSecondary,
-                    lineHeight: 20,
-                  }}
-                >
-                  {rev.review_text}
-                </Text>
-              ) : null}
-              {photos.length > 0 ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={{ flexGrow: 0, marginTop: rev.review_text ? 12 : 4 }}
-                  contentContainerStyle={{ gap: 8 }}
-                >
-                  {photos.map((photo) => {
-                    const uri = photo.thumbnail_url || photo.image_url;
-                    return (
-                      <TouchableOpacity
-                        key={photo.id || uri}
-                        onPress={() =>
-                          setLightbox({
-                            uri: photo.image_url || uri,
-                            caption: photo.caption,
-                          })
-                        }
-                        activeOpacity={0.85}
-                      >
-                        <Image
-                          source={{ uri }}
-                          style={{
-                            width: 88,
-                            height: 88,
-                            borderRadius: Radius.sm,
-                            backgroundColor: Colors.ivoryDeep,
-                          }}
-                          contentFit="cover"
-                        />
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              ) : null}
-            </View>
+                {rev.date_played && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 5,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <CalendarDays
+                      size={11}
+                      color={Colors.textMuted}
+                      strokeWidth={1.8}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: Colors.textSecondary,
+                      }}
+                    >
+                      Played {formatDate(rev.date_played)}
+                    </Text>
+                  </View>
+                )}
+                {rev.review_text ? (
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: Colors.textSecondary,
+                      lineHeight: 20,
+                    }}
+                  >
+                    {rev.review_text}
+                  </Text>
+                ) : null}
+                {photos.length > 0 ? (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ flexGrow: 0, marginTop: rev.review_text ? 12 : 4 }}
+                    contentContainerStyle={{ gap: 8 }}
+                  >
+                    {photos.map((photo) => {
+                      const uri = photo.thumbnail_url || photo.image_url;
+                      return (
+                        <TouchableOpacity
+                          key={photo.id || uri}
+                          onPress={() =>
+                            setLightbox({
+                              uri: photo.image_url || uri,
+                              caption: photo.caption,
+                            })
+                          }
+                          activeOpacity={0.85}
+                        >
+                          <Image
+                            source={{ uri }}
+                            style={{
+                              width: 88,
+                              height: 88,
+                              borderRadius: Radius.sm,
+                              backgroundColor: Colors.ivoryDeep,
+                            }}
+                            contentFit="cover"
+                          />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                ) : null}
+              </View>
             );
           })}
         </View>
@@ -295,9 +328,14 @@ export function ReviewsTab({
       )}
 
       {/* CTA to add own review */}
-      {!alreadyPlayed && (
+      {true && (
         <TouchableOpacity
-          onPress={handleMarkPlayed}
+          onPress={() =>
+            router.push({
+              pathname: "/activity/mark-played",
+              params: { courseId, courseName, mode: "review" },
+            })
+          }
           style={{
             flexDirection: "row",
             alignItems: "center",
@@ -318,7 +356,7 @@ export function ReviewsTab({
               color: Colors.ivory,
             }}
           >
-            MARK AS PLAYED & LEAVE A REVIEW
+            LEAVE A REVIEW
           </Text>
         </TouchableOpacity>
       )}

@@ -1,24 +1,24 @@
-import { SplashScreen } from 'expo-router/build/exports';
-import * as Updates from 'expo-updates';
-import React, { type ReactNode, useCallback, useEffect } from 'react';
-import { Platform, View } from 'react-native';
-import { serializeError } from 'serialize-error';
-import { Button, SharedErrorBoundary } from './SharedErrorBoundary';
-import { reportErrorToRemote } from './report-error-to-remote';
-import { getTestFlightLogger } from './testflight-logger';
+import { SplashScreen } from "expo-router/build/exports";
+import * as Updates from "expo-updates";
+import React, { type ReactNode, useCallback, useEffect } from "react";
+import { Platform, View } from "react-native";
+import { serializeError } from "serialize-error";
+import { Button, SharedErrorBoundary } from "./SharedErrorBoundary";
+import { reportErrorToRemote } from "./report-error-to-remote";
+import { getTestFlightLogger } from "./testflight-logger";
 
-type ErrorBoundaryState = { hasError: boolean; error: unknown | null; sentLogs: boolean };
-
-const DeviceErrorBoundary = ({
-  sentLogs,
-}: {
+type ErrorBoundaryState = {
+  hasError: boolean;
+  error: unknown | null;
   sentLogs: boolean;
-}) => {
+};
+
+const DeviceErrorBoundary = ({ sentLogs }: { sentLogs: boolean }) => {
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
   const handleReload = useCallback(async () => {
-    if (Platform.OS === 'web') {
+    if (Platform.OS === "web") {
       window.location.reload();
       return;
     }
@@ -32,11 +32,11 @@ const DeviceErrorBoundary = ({
       isOpen
       description={
         sentLogs
-          ? 'It looks like an error occurred while trying to use your app. This error has been reported to the AI agent and should be visible to the AI soon. If it is not present please see anything.com/docs for help'
-          : 'It looks like an error occurred while trying to use your app. Please see anything.com/docs for help'
+          ? "It looks like an error occurred while trying to use your app. This error has been reported to the AI agent and should be visible to the AI soon. If it is not present please see anything.com/docs for help"
+          : "It looks like an error occurred while trying to use your app. Please see anything.com/docs for help"
       }
     >
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={{ flexDirection: "row", gap: 8 }}>
         <Button color="primary" onPress={handleReload}>
           Restart app
         </Button>
@@ -61,7 +61,9 @@ export class DeviceErrorBoundaryWrapper extends React.Component<
     const logger = getTestFlightLogger();
     if (logger) {
       const serialized = serializeError(error);
-      logger.logError(`[ERROR_BOUNDARY] ${serialized.message ?? JSON.stringify(serialized)}`);
+      logger.logError(
+        `[ERROR_BOUNDARY] ${serialized && typeof serialized === "object" && "message" in serialized ? serialized.message : JSON.stringify(serialized)}`,
+      );
     }
     reportErrorToRemote({ error })
       .then(({ success, error: fetchError }) => {

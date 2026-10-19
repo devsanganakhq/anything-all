@@ -13,7 +13,7 @@ function postColorToParent(color: string) {
     if (typeof window !== "undefined" && "parent" in window) {
       window.parent.postMessage(
         { type: "sandbox:mobile:statusbarcolor", color, timestamp: Date.now() },
-        "*"
+        "*",
       );
     }
   } catch {
@@ -23,13 +23,12 @@ function postColorToParent(color: string) {
 
 function styleToBarColor(
   style: StatusBarStyle | "auto" | "inverted" = "auto",
-  colorScheme = Appearance.getColorScheme()
+  colorScheme = Appearance.getColorScheme(),
 ) {
   const actual = colorScheme ?? "light";
   let resolved:
-    | Exclude<StatusBarStyle, "auto" | "inverted">
-    | "light"
-    | "dark" = style as any;
+    Exclude<StatusBarStyle, "auto" | "inverted"> | "light" | "dark" =
+    style as any;
 
   if (style === "auto") resolved = actual === "light" ? "dark" : "light";
   else if (style === "inverted")
@@ -46,8 +45,8 @@ export const StatusBar = React.forwardRef<any, StatusBarProps>(
       postColorToParent(styleToBarColor(style, colorScheme));
     }, [style, colorScheme]);
 
-    return <ExpoStatusBar ref={ref} style={style} {...props} />;
-  }
+    return <ExpoStatusBar style={style} {...props} />;
+  },
 );
 
 export const setStatusBarStyle = (style: StatusBarStyle, animated?: boolean) =>
@@ -55,12 +54,12 @@ export const setStatusBarStyle = (style: StatusBarStyle, animated?: boolean) =>
 
 export const setStatusBarHidden = (
   hidden: boolean,
-  animation?: StatusBarAnimation
+  animation?: StatusBarAnimation,
 ) => ExpoSB.setStatusBarHidden(hidden, animation);
 
 export const setStatusBarBackgroundColor = (
   backgroundColor: string,
-  animated?: boolean
+  animated?: boolean,
 ) => ExpoSB.setStatusBarBackgroundColor(backgroundColor as any, animated);
 
 export const setStatusBarNetworkActivityIndicatorVisible = (visible: boolean) =>

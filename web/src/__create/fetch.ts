@@ -1,29 +1,38 @@
 const originalFetch = fetch;
-const isBackend = () => typeof window === 'undefined';
+const isBackend = () => typeof window === "undefined";
 
 const safeStringify = (value: unknown) =>
   JSON.stringify(value, (_k, v) => {
-    if (v instanceof Date) return { __t: 'Date', v: v.toISOString() };
+    if (v instanceof Date) return { __t: "Date", v: v.toISOString() };
     if (v instanceof Error)
-      return { __t: 'Error', v: { name: v.name, message: v.message, stack: v.stack } };
+      return {
+        __t: "Error",
+        v: { name: v.name, message: v.message, stack: v.stack },
+      };
     return v;
   });
 
 const postToParent = (level: string, text: string, extra: unknown) => {
   try {
     if (isBackend() || !window.parent || window.parent === window) {
-      ('level' in console ? console[level] : console.log)(text, extra);
+      const logger =
+        level === "warn"
+          ? console.warn
+          : level === "error"
+            ? console.error
+            : console.log;
+      logger(text, extra);
       return;
     }
     window.parent.postMessage(
       {
-        type: 'sandbox:web:console-write',
+        type: "sandbox:web:console-write",
         __viteConsole: true,
         level,
         text,
         args: [safeStringify(extra)],
       },
-      '*'
+      "*",
     );
   } catch {
     /* noop */
@@ -32,13 +41,13 @@ const postToParent = (level: string, text: string, extra: unknown) => {
 
 const getUrlFromArgs = (...args: Parameters<typeof originalFetch>): string => {
   const [input] = args;
-  if (typeof input === 'string') return input;
+  if (typeof input === "string") return input;
   if (input instanceof Request) return input.url;
   return `${input.protocol}//${input.host}${input.pathname}`;
 };
 
 const isFirstPartyURL = (url: string) => {
-  return url.startsWith('/integrations') || url.startsWith('/_create');
+  return url.startsWith("/integrations") || url.startsWith("/_create");
 };
 
 const isSecondPartyUrl = (url: string) => {
@@ -47,27 +56,27 @@ const isSecondPartyUrl = (url: string) => {
       url.startsWith(process.env.NEXT_PUBLIC_CREATE_API_BASE_URL)) ||
     (process.env.NEXT_PUBLIC_CREATE_BASE_URL &&
       url.startsWith(process.env.NEXT_PUBLIC_CREATE_BASE_URL)) ||
-    url.startsWith('https://www.create.xyz') ||
-    url.startsWith('https://api.create.xyz/') ||
-    url.startsWith('https://www.createanything.com') ||
-    url.startsWith('https://api.createanything.com')
+    url.startsWith("https://www.create.xyz") ||
+    url.startsWith("https://api.create.xyz/") ||
+    url.startsWith("https://www.createanything.com") ||
+    url.startsWith("https://api.createanything.com")
   );
 };
 
 export const fetchWithHeaders = async (
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit,
 ): Promise<Response> => {
   const url = getUrlFromArgs(input, init);
 
   const additionalHeaders = {
-    'x-createxyz-project-group-id': process.env.NEXT_PUBLIC_PROJECT_GROUP_ID,
+    "x-createxyz-project-group-id": process.env.NEXT_PUBLIC_PROJECT_GROUP_ID,
   };
 
   const isExternalFetch = !isFirstPartyURL(url) && !isSecondPartyUrl(url);
   // we should not add headers to requests that don't go to our own server
   // or if it's an API request
-  if (isExternalFetch || url.startsWith('/api')) {
+  if (isExternalFetch || url.startsWith("/api")) {
     return originalFetch(input, init);
   }
 
@@ -88,7 +97,7 @@ export const fetchWithHeaders = async (
       integrity: input.integrity,
       keepalive: input.keepalive,
       signal: input.signal,
-      ...(hasBody ? { duplex: 'half' } : {}),
+      ...(hasBody ? { duplex: "half" } : {}),
       ...init,
     };
   } else {
@@ -103,26 +112,26 @@ export const fetchWithHeaders = async (
 
   const prefix = !isSecondPartyUrl(url)
     ? isBackend()
-      ? (process.env.NEXT_PUBLIC_CREATE_BASE_URL ?? 'https://www.create.xyz')
-      : ''
-    : '';
+      ? (process.env.NEXT_PUBLIC_CREATE_BASE_URL ?? "https://www.create.xyz")
+      : ""
+    : "";
 
   try {
     const result = await originalFetch(`${prefix}${url}`, finalInit);
     if (!result.ok) {
       postToParent(
-        'error',
-        `Failed to load resource: the server responded with a status of ${result.status} (${result.statusText ?? ''})`,
+        "error",
+        `Failed to load resource: the server responded with a status of ${result.status} (${result.statusText ?? ""})`,
         {
           url,
           status: result.status,
           statusText: result.statusText,
-        }
+        },
       );
     }
     return result;
   } catch (error) {
-    postToParent('error', 'Fetch error', {
+    postToParent("error", "Fetch error", {
       url,
       error:
         error instanceof Error

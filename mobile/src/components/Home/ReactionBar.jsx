@@ -31,9 +31,6 @@ export function ReactionBar({
     onReact();
   };
 
-  const reactionEmoji =
-    reacted === "love" ? "🔥" : reacted === "celebrate" ? "🎉" : null;
-
   return (
     <View
       style={{
@@ -49,7 +46,6 @@ export function ReactionBar({
       {/* Like */}
       <TouchableOpacity
         onPress={handleReact}
-        onLongPress={onLongReact}
         delayLongPress={380}
         style={{
           flexDirection: "row",
@@ -60,16 +56,12 @@ export function ReactionBar({
         }}
       >
         <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-          {reactionEmoji ? (
-            <Text style={{ fontSize: 18 }}>{reactionEmoji}</Text>
-          ) : (
-            <Heart
-              size={20}
-              color={reacted === "like" ? "#E53935" : Colors.textSecondary}
-              fill={reacted === "like" ? "#E53935" : "transparent"}
-              strokeWidth={1.8}
-            />
-          )}
+          <Heart
+            size={20}
+            color={reacted ? "#E53935" : Colors.textSecondary}
+            fill={reacted ? "#E53935" : "transparent"}
+            strokeWidth={1.8}
+          />
         </Animated.View>
         {total > 0 && (
           <Text
@@ -126,11 +118,6 @@ export function ReactionBar({
       </TouchableOpacity>
 
       <View style={{ flex: 1 }} />
-      <Text
-        style={{ fontSize: 9, color: Colors.textMuted, letterSpacing: 0.3 }}
-      >
-        Hold ❤ for reactions
-      </Text>
     </View>
   );
 }

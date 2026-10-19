@@ -1,3 +1,4 @@
+import { feedVisibility } from "@/app/api/utils/feedVisibility";
 /**
  * GET /api/feed
  *
@@ -64,13 +65,9 @@ export async function GET(request) {
         UNION SELECT ${userId}
       `;
     } else {
-      // all
-      authorSubquery = `
-        SELECT friend_id AS author_id FROM friendships WHERE user_id = ${userId} AND status = 'accepted'
-        UNION SELECT user_id AS author_id FROM friendships WHERE friend_id = ${userId} AND status = 'accepted'
-        UNION SELECT followee_id AS author_id FROM follows WHERE follower_id = ${userId} AND followee_type = 'user'
-        UNION SELECT ${userId}
-      `;
+      // Public chronological discovery is independent of the friendship graph.
+      authorSubquery = `SELECT id AS author_id FROM users
+        WHERE COALESCE((privacy_settings->>'profile_visible')::boolean, true) = true OR id=${userId} OR id IN(SELECT friend_id FROM friendships WHERE user_id=${userId} AND status='accepted' UNION SELECT user_id FROM friendships WHERE friend_id=${userId} AND status='accepted')`;
     }
 
     // ── Main query ─────────────────────────────────────────────────────────
@@ -80,7 +77,7 @@ export async function GET(request) {
           fp.club_name, fp.caption, fp.metadata, fp.is_private, fp.created_at,
 
           -- Author
-          u.first_name || ' ' || u.last_name  AS author_name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer')  AS author_name,
           u.first_name                         AS author_first_name,
           u.profile_photo_url                  AS author_avatar,
           u.location                           AS author_location,
@@ -88,7 +85,7 @@ export async function GET(request) {
                THEN u.home_club_name ELSE NULL END AS author_home_club,
 
           -- Course
-          c.name             AS course_name,
+          CASE WHEN NULLIF(TRIM(c.club_name), '') IS NOT NULL AND LOWER(TRIM(c.club_name)) <> LOWER(TRIM(c.name)) THEN c.club_name || ', ' || c.name ELSE c.name END AS course_name,
           c.city             AS course_city,
           c.county           AS course_county,
           c.country          AS course_country,
@@ -104,7 +101,9 @@ export async function GET(request) {
           cm.name AS community_name,
 
           -- Review data from played_courses
-          pc.rating, pc.review_text, pc.date_played,
+          CASE WHEN fp.metadata ? 'round_id' THEN NULL WHEN fp.metadata ? 'course_review_id' THEN cr.rating ELSE pc.rating END AS rating,
+          CASE WHEN fp.metadata ? 'round_id' THEN rd.comments WHEN fp.metadata ? 'course_review_id' THEN cr.review_text ELSE pc.review_text END AS review_text,
+          COALESCE(rd.date_played,cr.date_played,pc.date_played) AS date_played,
 
           -- Reactions
           (SELECT COUNT(*)::int FROM feed_reactions WHERE post_id = fp.id)                             AS reaction_count,
@@ -123,12 +122,13 @@ export async function GET(request) {
                FROM course_photos cp
               WHERE cp.user_id = fp.author_id
                 AND cp.course_id = fp.course_id
-                AND cp.moderation_status = 'approved'
+                AND cp.moderation_status = 'approved' AND cp.deleted_at IS NULL
                 AND fp.post_type IN ('review', 'played_course', 'photos')
                 AND (
-                  ((fp.metadata->>'review_id') IS NOT NULL
-                    AND cp.review_id = (fp.metadata->>'review_id')::int)
-                  OR (fp.metadata->>'review_id') IS NULL
+                  (fp.metadata ? 'course_review_id' AND cp.course_review_id=(fp.metadata->>'course_review_id')::int)
+                  OR (fp.metadata ? 'round_id' AND cp.round_id=(fp.metadata->>'round_id')::int)
+                  OR (NOT(fp.metadata ? 'course_review_id' OR fp.metadata ? 'round_id') AND
+                     ((fp.metadata ? 'review_id' AND cp.review_id=(fp.metadata->>'review_id')::int) OR (NOT(fp.metadata ? 'review_id') AND fp.post_type='photos')))
                 )
               ORDER BY cp.uploaded_at DESC
               LIMIT 1)
@@ -138,12 +138,13 @@ export async function GET(request) {
             (SELECT COUNT(*)::int FROM course_photos cp
               WHERE cp.user_id = fp.author_id
                 AND cp.course_id = fp.course_id
-                AND cp.moderation_status = 'approved'
+                AND cp.moderation_status = 'approved' AND cp.deleted_at IS NULL
                 AND fp.post_type IN ('review', 'played_course', 'photos')
                 AND (
-                  ((fp.metadata->>'review_id') IS NOT NULL
-                    AND cp.review_id = (fp.metadata->>'review_id')::int)
-                  OR (fp.metadata->>'review_id') IS NULL
+                  (fp.metadata ? 'course_review_id' AND cp.course_review_id=(fp.metadata->>'course_review_id')::int)
+                  OR (fp.metadata ? 'round_id' AND cp.round_id=(fp.metadata->>'round_id')::int)
+                  OR (NOT(fp.metadata ? 'course_review_id' OR fp.metadata ? 'round_id') AND
+                     ((fp.metadata ? 'review_id' AND cp.review_id=(fp.metadata->>'review_id')::int) OR (NOT(fp.metadata ? 'review_id') AND fp.post_type='photos')))
                 )),
             0
           ) AS photo_count,
@@ -159,12 +160,13 @@ export async function GET(request) {
                      FROM course_photos cp
                     WHERE cp.user_id = fp.author_id
                       AND cp.course_id = fp.course_id
-                      AND cp.moderation_status = 'approved'
+                      AND cp.moderation_status = 'approved' AND cp.deleted_at IS NULL
                       AND fp.post_type IN ('review', 'played_course', 'photos')
                       AND (
-                        ((fp.metadata->>'review_id') IS NOT NULL
-                          AND cp.review_id = (fp.metadata->>'review_id')::int)
-                        OR (fp.metadata->>'review_id') IS NULL
+                        (fp.metadata ? 'course_review_id' AND cp.course_review_id=(fp.metadata->>'course_review_id')::int)
+                  OR (fp.metadata ? 'round_id' AND cp.round_id=(fp.metadata->>'round_id')::int)
+                  OR (NOT(fp.metadata ? 'course_review_id' OR fp.metadata ? 'round_id') AND
+                     ((fp.metadata ? 'review_id' AND cp.review_id=(fp.metadata->>'review_id')::int) OR (NOT(fp.metadata ? 'review_id') AND fp.post_type='photos')))
                       )
                     ORDER BY cp.uploaded_at DESC
                     LIMIT 5) x)
@@ -190,15 +192,21 @@ export async function GET(request) {
           ORDER BY date_played DESC NULLS LAST, created_at DESC
           LIMIT 1
         ) pc ON true
+        LEFT JOIN course_reviews cr ON cr.id=(fp.metadata->>'course_review_id')::int AND cr.deleted_at IS NULL
+        LEFT JOIN course_rounds rd ON rd.id=(fp.metadata->>'round_id')::int
 
         WHERE fp.author_id IN (${authorSubquery})
-          AND fp.is_private   = false
+          AND ${feedVisibility}
           AND fp.is_sponsored = false
+          AND NOT EXISTS (SELECT 1 FROM friendships blocked
+            WHERE blocked.status = 'blocked'
+              AND ((blocked.user_id = $1 AND blocked.friend_id = fp.author_id)
+                OR (blocked.friend_id = $1 AND blocked.user_id = fp.author_id)))
           AND fp.id NOT IN (SELECT post_id FROM feed_hidden_posts WHERE user_id = $1)
-          AND COALESCE((u.privacy_settings->>'activity_visible')::boolean, true) = true
+
           ${extraWhere}
 
-        ORDER BY fp.created_at DESC
+        ORDER BY fp.created_at DESC, fp.id DESC
         LIMIT $2 OFFSET $3`,
       [userId, limit, offset],
     );
@@ -208,8 +216,12 @@ export async function GET(request) {
         FROM feed_posts fp JOIN users u ON fp.author_id = u.id
         WHERE fp.author_id IN (${authorSubquery})
           AND fp.is_private = false AND fp.is_sponsored = false
+          AND NOT EXISTS (SELECT 1 FROM friendships blocked
+            WHERE blocked.status = 'blocked'
+              AND ((blocked.user_id = $1 AND blocked.friend_id = fp.author_id)
+                OR (blocked.friend_id = $1 AND blocked.user_id = fp.author_id)))
           AND fp.id NOT IN (SELECT post_id FROM feed_hidden_posts WHERE user_id = $1)
-          AND COALESCE((u.privacy_settings->>'activity_visible')::boolean, true) = true
+
           ${extraWhere}`,
       [userId],
     );
@@ -242,9 +254,9 @@ export async function GET(request) {
         metadata: meta,
         photo_urls: photoUrls.filter(Boolean),
         rating: p.rating
-          ? parseInt(p.rating)
+          ? Number(p.rating)
           : meta.rating
-            ? parseInt(meta.rating)
+            ? Number(meta.rating)
             : null,
         review_text: p.review_text || meta.review_text || null,
         top_ranking_position: p.top_ranking_position

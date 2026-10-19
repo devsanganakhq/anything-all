@@ -1,3 +1,5 @@
+import { shareLink } from "@/utils/shareLinks";
+import { RoundsTab } from "./RoundsTab";
 /**
  * Course Details — Heathland Links
  *
@@ -85,7 +87,10 @@ function uniqueRankingsByName(rows = []) {
     const name = row?.ranking_name;
     if (!name) continue;
     const prev = byName.get(name);
-    if (!prev || (Number(row.ranking_year) || 0) > (Number(prev.ranking_year) || 0)) {
+    if (
+      !prev ||
+      (Number(row.ranking_year) || 0) > (Number(prev.ranking_year) || 0)
+    ) {
       byName.set(name, row);
     }
   }
@@ -229,8 +234,8 @@ export default function CourseDetailScreen() {
     if (!data?.course) return;
     try {
       await Share.share({
-        message: `${formatCourseShareLabel(data.course)}. Discover it on Heathland Links.\nhttps://heathlandlinks.com/`,
-        url: "https://heathlandlinks.com/",
+        message: `${formatCourseShareLabel(data.course)}. Discover it on Heathland Links.\n${shareLink("course", id)}`,
+        url: shareLink("course", id),
         title: formatCourseShareLabel(data.course),
       });
       const { title } = courseDisplayName(data.course);
@@ -254,10 +259,7 @@ export default function CourseDetailScreen() {
 
   const goToReviews = useCallback(() => {
     setActiveTab("REVIEWS");
-    const y = Math.max(
-      tabBarOffsetY.current - insets.top - STICKY_HEADER_H,
-      0,
-    );
+    const y = Math.max(tabBarOffsetY.current - insets.top - STICKY_HEADER_H, 0);
     requestAnimationFrame(() => {
       scrollRef.current?.scrollTo({ y, animated: true });
     });
@@ -279,10 +281,7 @@ export default function CourseDetailScreen() {
       const claimAbsolute = claimCardOffsetY.current;
       const claimY =
         claimAbsolute > 0
-          ? Math.max(
-              claimAbsolute - insets.top - STICKY_HEADER_H - 12,
-              tabY,
-            )
+          ? Math.max(claimAbsolute - insets.top - STICKY_HEADER_H - 12, tabY)
           : tabY;
       scrollRef.current?.scrollTo({ y: claimY, animated: true });
       if (claimAbsolute <= 0 && tries < 6) {
@@ -309,14 +308,6 @@ export default function CourseDetailScreen() {
   }, [data?.course, id]);
 
   const handleMarkPlayed = useCallback(() => {
-    if (alreadyPlayed) {
-      Alert.alert(
-        "Round Recorded",
-        "You've already recorded a round here. Head to your Passport to update your review.",
-        [{ text: "OK" }],
-      );
-      return;
-    }
     const { title } = courseDisplayName(data?.course);
     capture(AnalyticsEvents.MARK_PLAYED_STARTED, {
       course_id: id,
@@ -324,7 +315,10 @@ export default function CourseDetailScreen() {
     });
     router.push({
       pathname: "/activity/mark-played",
-      params: { courseId: id, courseName: formatCourseShareLabel(data?.course) },
+      params: {
+        courseId: id,
+        courseName: formatCourseShareLabel(data?.course),
+      },
     });
   }, [alreadyPlayed, id, data, router]);
 
@@ -482,7 +476,14 @@ export default function CourseDetailScreen() {
             rating={rating}
             reviews={reviews}
             followerCount={followerCount}
-            listCount={SHOW_RANKINGS ? rankings.length : 0}
+            reviewCount={data.reviewStats?.total}
+            listCount={
+              (data.curatedLists?.length || 0) +
+              (SHOW_RANKINGS ? rankings.length : 0)
+            }
+            onPressLists={() =>
+              router.push({ pathname: "/course-lists/[id]", params: { id } })
+            }
             onPressReviews={goToReviews}
           />
         </View>
@@ -534,13 +535,23 @@ export default function CourseDetailScreen() {
 
           {activeTab === "REVIEWS" && (
             <ReviewsTab
+              courseId={id}
+              courseName={formatCourseShareLabel(course)}
               reviews={reviews}
+              categoryAverages={data.categoryAverages}
               rating={rating}
               alreadyPlayed={alreadyPlayed}
               handleMarkPlayed={handleMarkPlayed}
             />
           )}
 
+          {activeTab === "ROUNDS" && (
+            <RoundsTab
+              rounds={data.rounds}
+              courseId={id}
+              courseName={formatCourseShareLabel(course)}
+            />
+          )}
           {activeTab === "PHOTOS" && (
             <PhotosTab
               courseId={id}
