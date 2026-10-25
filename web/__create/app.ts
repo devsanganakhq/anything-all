@@ -276,11 +276,13 @@ export function createApp() {
               image: { label: "Image", type: "text", required: false },
             },
             authorize: async (credentials) => {
-              const { email, password, name, image } = credentials;
+              const { password, name, image } = credentials;
+              const email = typeof credentials.email === "string" ? credentials.email.trim().toLowerCase() : "";
               if (!email || !password) return null;
               if (typeof email !== "string" || typeof password !== "string") {
                 return null;
               }
+              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || password.length < 8 || password.length > 1024) return null;
 
               const user = await adapter.getUserByEmail(email);
               if (!user) {
