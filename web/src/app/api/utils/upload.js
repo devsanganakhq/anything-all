@@ -4,6 +4,7 @@
  */
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
+import { getSessionUserId } from "@/app/api/utils/getUserId";
 
 const MAX_ATTEMPTS = 3;
 const RETRYABLE = new Set([408, 429, 500, 502, 503, 504]);
@@ -176,6 +177,13 @@ async function uploadToAnything(opts) {
  * Handle an incoming Request (multipart, JSON, or raw bytes) and upload.
  */
 async function handleUploadRequest(request) {
+  try {
+    await getSessionUserId(request);
+  } catch (error) {
+    const authError = new Error("Authentication required");
+    authError.status = error.code === "ACCOUNT_SUSPENDED" ? 403 : 401;
+    throw authError;
+  }
   const contentType = request.headers.get("content-type") || "";
 
   if (contentType.includes("multipart/form-data")) {
