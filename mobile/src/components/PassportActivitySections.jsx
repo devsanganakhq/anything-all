@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
 import { courseDisplayName, formatCourseLocation } from "@/utils/courseDisplayName";
 
-function ActivitySection({ kind, label, userId }) {
+export function PassportActivitySection({ kind, label, userId, renderHeader }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const history = kind === "rounds" || kind === "reviews";
@@ -23,10 +23,10 @@ function ActivitySection({ kind, label, userId }) {
   });
   const rows = query.data?.pages.flatMap(page => history ? page[kind] || [] : page.courses || []) || [];
   return (
-    <View style={{ marginBottom: 16 }}>
-      <TouchableOpacity onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ paddingVertical: 12 }}>
+    <View style={{ marginBottom: renderHeader ? 0 : 16 }}>
+      {renderHeader ? renderHeader({ open, toggle: () => setOpen(!open) }) : <TouchableOpacity onPress={() => setOpen(!open)} accessibilityRole="button" accessibilityState={{ expanded: open }} style={{ paddingVertical: 12 }}>
         <Text style={{ color: Colors.green, fontSize: 13, fontWeight: "600" }}>{label} {open ? "⌃" : "⌄"}</Text>
-      </TouchableOpacity>
+      </TouchableOpacity>}
       {open && <>
         {query.isLoading && <ActivityIndicator color={Colors.green} />}
         {query.isError && <TouchableOpacity onPress={() => query.refetch()}><Text style={{ color: Colors.textSecondary }}>Unable to load. Tap to retry.</Text></TouchableOpacity>}
@@ -47,9 +47,9 @@ function ActivitySection({ kind, label, userId }) {
 
 export function PassportActivitySections({ userId }) {
   return <View style={{ marginHorizontal: Spacing.screenH }}>
-    <ActivitySection kind="played" label="Played courses" userId={userId} />
-    <ActivitySection kind="wishlist" label="Wish list" userId={userId} />
-    <ActivitySection kind="rounds" label="Rounds" userId={userId} />
-    <ActivitySection kind="reviews" label="Reviews" userId={userId} />
+    <PassportActivitySection kind="played" label="Played courses" userId={userId} />
+    <PassportActivitySection kind="wishlist" label="Wish list" userId={userId} />
+    <PassportActivitySection kind="rounds" label="Rounds" userId={userId} />
+    <PassportActivitySection kind="reviews" label="Reviews" userId={userId} />
   </View>;
 }
