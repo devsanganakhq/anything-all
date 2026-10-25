@@ -101,7 +101,7 @@ export async function GET(request, { params }) {
     );
     // Recent activity feed entries for this course
     const recentActivity = await sql`
-      SELECT af.id, af.activity_type, af.created_at,
+      SELECT af.id, af.user_id, af.activity_type, af.created_at,
              u.first_name, u.last_name, u.profile_photo_url
       FROM   activity_feed af
       JOIN   users u ON u.id = af.user_id
