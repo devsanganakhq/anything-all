@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { BackHandler, Platform } from "react-native";
+import { ActivityIndicator, BackHandler, Platform, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { useAuthStore } from "./store";
 import { resetAppCache } from "@/utils/queryClient";
@@ -113,6 +113,13 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
   return (
     <WebView
       incognito
+      startInLoadingState
+      renderLoading={() => (
+        <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "#F5F3EB", alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color="#193D2C" />
+          <Text style={{ marginTop: 14, color: "#193D2C", fontSize: 16 }}>Loading your secure sign-in…</Text>
+        </View>
+      )}
       sharedCookiesEnabled={false}
       thirdPartyCookiesEnabled={false}
       source={{
@@ -207,7 +214,8 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
         setURI(newURL);
         return false;
       }}
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: "#F5F3EB" }}
+      containerStyle={{ backgroundColor: "#F5F3EB" }}
     />
   );
 };
