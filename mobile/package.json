@@ -120,7 +120,8 @@
     "tailwind-scrollbar": "3.1.0",
     "tailwindcss": "3",
     "tailwindcss-animate": "1.0.7",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "yaml": "2.9.1"
   },
   "jest": {
     "preset": "jest-expo"
