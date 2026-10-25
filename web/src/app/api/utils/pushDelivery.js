@@ -1,4 +1,5 @@
 import sql from "./sql";
+import { pushAllowedSQL } from "./notificationPreferences";
 export async function flushPushOutbox({ notificationId = null } = {}) {
   await checkPushReceipts();
   // Atomically lease rows; another invocation cannot dispatch the same lease.
@@ -10,7 +11,7 @@ export async function flushPushOutbox({ notificationId = null } = {}) {
   UPDATE push_outbox SET attempts=attempts+1, available_at=NOW()+INTERVAL '5 minutes' WHERE id IN(SELECT id FROM picked) RETURNING *
  ) SELECT o.*,n.target_path,n.message,n.community_id FROM leased o JOIN notifications n ON n.id=o.notification_id
  JOIN users u ON u.id=o.user_id WHERE COALESCE(u.is_suspended,false)=false
-  AND COALESCE((u.notification_settings->>'push_enabled')::boolean,true)=true
+  AND ${pushAllowedSQL("n.notification_type")}
   AND NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked' AND ((user_id=o.user_id AND friend_id=n.from_user_id) OR (friend_id=o.user_id AND user_id=n.from_user_id)))
   AND EXISTS(SELECT 1 FROM device_push_tokens WHERE token=o.token AND user_id=o.user_id)
   AND (n.community_id IS NULL OR EXISTS(SELECT 1 FROM community_members WHERE community_id=n.community_id AND user_id=o.user_id AND muted=false))`,

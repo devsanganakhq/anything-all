@@ -1,4 +1,6 @@
 import sql from "./sql";
+import { pushAllowedSQL } from "./notificationPreferences";
+import { notificationTarget } from "./notificationTarget";
 import { flushPushOutbox } from "./pushDelivery";
 export async function createNotification({
   userId,
@@ -15,22 +17,24 @@ export async function createNotification({
 }) {
   if (!userId || !notificationType || Number(userId) === Number(fromUserId))
     return null;
-  const path =
-    targetPath ||
-    (communityId
-      ? `/communities/${communityId}${notificationType === "community_message" ? "?tab=CHAT" : ""}`
-      : feedPostId
-        ? `/feed/${feedPostId}`
-        : fromUserId
-          ? `/social/${fromUserId}`
-          : "/notifications");
   try {
+    let related = {};
+    if (activityId) {
+      const activity = await sql(`SELECT af.course_id AS activity_course_id,a.slug AS achievement_slug,
+        (SELECT f.id FROM feed_posts f WHERE f.author_id=af.user_id
+         AND f.metadata->>'review_id'=af.review_id::text ORDER BY f.id DESC LIMIT 1) AS related_post_id
+        FROM activity_feed af LEFT JOIN achievements a ON a.id=af.achievement_id WHERE af.id=$1`, [activityId]);
+      related = activity[0] || {};
+    }
+    const path = targetPath || notificationTarget({ notification_type: notificationType,
+      community_id: communityId, community_post_id: communityPostId, feed_post_id: feedPostId,
+      from_user_id: fromUserId, ...related });
     // CTE atomically queues push jobs with the in-app notification. Migration is
     // required; request handlers never mutate database schema.
     const rows = await sql(
       `WITH eligible AS (
     SELECT id FROM users u WHERE id=$1
-      AND COALESCE((u.notification_settings->>CASE WHEN $2='community_message' THEN 'community_messages' WHEN $2='community_post' THEN 'community_posts' WHEN $2 IN('feed_like','photo_like') THEN 'likes' WHEN $2 IN('feed_comment','community_post_comment') THEN 'comments' ELSE 'friend_requests' END)::boolean,true) AND COALESCE(is_suspended,false)=false
+      AND COALESCE(is_suspended,false)=false
       AND ($5::int IS NULL OR NOT EXISTS(SELECT 1 FROM community_members WHERE community_id=$5 AND user_id=$1 AND muted=true))
       AND ($3::int IS NULL OR NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked' AND ((user_id=$1 AND friend_id=$3) OR (user_id=$3 AND friend_id=$1))))
    ), inserted AS (
@@ -40,7 +44,7 @@ export async function createNotification({
    ), queued AS (
     INSERT INTO push_outbox(notification_id,token,user_id)
     SELECT i.id,t.token,i.user_id FROM inserted i JOIN device_push_tokens t ON t.user_id=i.user_id JOIN users u ON u.id=i.user_id
-    WHERE COALESCE((u.notification_settings->>'push_enabled')::boolean,true)=true
+    WHERE ${pushAllowedSQL("$2")}
     ON CONFLICT(notification_id,token) DO NOTHING
    ) SELECT id FROM inserted`,
       [
