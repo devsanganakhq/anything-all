@@ -3,6 +3,7 @@
  * POST /api/user/notifications   — mark one or all as read
  *                                   body: { notificationId? }  (null = mark all)
  */
+import { notificationTarget } from "@/app/api/utils/notificationTarget";
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
@@ -35,6 +36,10 @@ export async function GET(request) {
           n.community_post_id,
           n.message,
           n.target_path,
+          af.course_id AS activity_course_id,
+          a.slug AS achievement_slug,
+          (SELECT f.id FROM feed_posts f WHERE f.author_id=af.user_id
+            AND f.metadata->>'review_id'=af.review_id::text ORDER BY f.id DESC LIMIT 1) AS related_post_id,
           n.read_at,
           n.created_at,
 
@@ -79,6 +84,8 @@ export async function GET(request) {
         FROM notifications n
         LEFT JOIN users u ON n.from_user_id = u.id
         LEFT JOIN communities c ON n.community_id = c.id
+        LEFT JOIN activity_feed af ON af.id=n.activity_id
+        LEFT JOIN achievements a ON a.id=af.achievement_id
         WHERE n.user_id = $1
         ORDER BY n.created_at DESC
         LIMIT 100`,
@@ -87,7 +94,7 @@ export async function GET(request) {
 
     const unreadCount = notifications.filter((n) => !n.read_at).length;
 
-    return Response.json({ notifications, unread_count: unreadCount });
+    return Response.json({ notifications: notifications.map(n => ({ ...n, target_path: notificationTarget(n) })), unread_count: unreadCount });
   } catch (error) {
     console.error("Notifications error:", error);
     return Response.json({ error: error.message }, { status: 500 });
