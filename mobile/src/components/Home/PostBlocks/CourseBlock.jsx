@@ -1,5 +1,5 @@
 import { RatingStars } from "@/components/RatingStars";
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, TouchableOpacity } from "react-native";
 import { Image } from "expo-image";
 import { Star, Trophy } from "lucide-react-native";
@@ -10,6 +10,8 @@ import { formatCourseHolesPar } from "@/utils/courseDisplayName";
 import { SHOW_RANKINGS } from "@/constants/courseConstants";
 
 export function CourseBlock({ post, onCoursePress }) {
+  const [expanded, setExpanded] = useState(false);
+  const [truncated, setTruncated] = useState(false);
   const flag = countryFlag(post.course_country);
   const hasRanking =
     SHOW_RANKINGS && post.top_ranking_name && post.top_ranking_position;
@@ -135,10 +137,20 @@ export function CourseBlock({ post, onCoursePress }) {
               lineHeight: 20,
               fontStyle: "italic",
             }}
-            numberOfLines={3}
+            numberOfLines={expanded ? undefined : 3}
+            onTextLayout={(event) => {
+              if (!expanded && event.nativeEvent.lines.length > 3) setTruncated(true);
+            }}
           >
-            "{post.review_text}"
+            {post.review_text}
           </Text>
+          {(truncated || expanded || post.review_text.length > 120) && (
+            <TouchableOpacity onPress={() => setExpanded(!expanded)} accessibilityRole="button" accessibilityState={{ expanded }}>
+              <Text style={{ color: Colors.green, fontSize: 13, fontWeight: "600", marginTop: 6 }}>
+                {expanded ? "Show less" : "Read more"}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
