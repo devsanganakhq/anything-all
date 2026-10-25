@@ -18,7 +18,7 @@ function useUpload() {
           const formData = new FormData();
           formData.append("file", asset.file);
           response = await globalThis.fetch(
-            `${proxyBaseUrl}/_create/api/upload/`,
+            `${proxyBaseUrl}/api/upload`,
             {
               method: "POST",
               body: formData,
@@ -46,7 +46,7 @@ function useUpload() {
           } catch {}
 
           const uploadResult = await FileSystem.uploadAsync(
-            `${proxyBaseUrl}/_create/api/upload/`,
+            `${proxyBaseUrl}/api/upload`,
             asset.uri,
             {
               uploadType: FileSystem.FileSystemUploadType.MULTIPART,
@@ -73,7 +73,7 @@ function useUpload() {
           return { url: data.url, mimeType: data.mimeType || null };
         }
       } else if ("url" in input) {
-        response = await fetch("/_create/api/upload/", {
+        response = await fetch("/api/upload", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -81,7 +81,7 @@ function useUpload() {
           body: JSON.stringify({ url: input.url }),
         });
       } else if ("base64" in input) {
-        response = await fetch("/_create/api/upload/", {
+        response = await fetch("/api/upload", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -89,7 +89,7 @@ function useUpload() {
           body: JSON.stringify({ base64: input.base64 }),
         });
       } else {
-        response = await fetch("/_create/api/upload/", {
+        response = await fetch("/api/upload", {
           method: "POST",
           headers: {
             "Content-Type": "application/octet-stream",
