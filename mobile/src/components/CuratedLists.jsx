@@ -43,14 +43,14 @@ export function CuratedLists({ userId, passport = false }) {
             borderRadius: Radius.md,
             borderWidth: 1,
             borderColor: Colors.border,
-            padding: 18,
+            padding: passport ? 12 : 18,
             marginBottom: 10,
           }}
         >
-          <Text style={{ color: Colors.textPrimary, fontSize: 17 }}>
+          <Text style={{ color: Colors.textPrimary, fontSize: passport ? 13 : 17, fontWeight: passport ? "600" : "400" }}>
             {list.title}
           </Text>
-          <Text style={{ color: Colors.textSecondary, marginTop: 8 }}>
+          <Text style={{ color: Colors.textSecondary, marginTop: 8, fontSize: passport ? 11 : 14 }}>
             {list.played} / {list.total} courses played
           </Text>
         </TouchableOpacity>
