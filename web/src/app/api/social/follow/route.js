@@ -59,7 +59,7 @@ export async function POST(request) {
     if (followeeType === "user") {
       await createNotification({
         userId: followeeId,
-        notificationType: "mention",
+        notificationType: "follow",
         fromUserId: userId,
         message: "started following you",
       });
