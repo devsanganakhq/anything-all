@@ -241,7 +241,7 @@ async function upload(opts) {
 
 function uploadErrorStatus(error) {
   const status = error?.status;
-  if (status === 400 || status === 413 || status === 429) return status;
+  if ([400, 401, 403, 413, 429].includes(status)) return status;
   return 500;
 }
 
