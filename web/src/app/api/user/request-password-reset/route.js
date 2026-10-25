@@ -11,6 +11,7 @@ import { randomBytes } from "crypto";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 import sql from "@/app/api/utils/sql";
 import { sendEmail } from "@/app/api/utils/send-email";
+import { passwordResetUrl } from "@/app/api/utils/passwordResetUrl";
 
 const RATE_LIMIT_WINDOW_MINUTES = 30;
 const RATE_LIMIT_MAX_REQUESTS = 3;
@@ -67,11 +68,7 @@ export async function POST(request) {
     );
 
     // ── Build reset URL ───────────────────────────────────────────────────
-    const baseUrl =
-      process.env.NEXT_PUBLIC_CREATE_APP_URL ||
-      process.env.AUTH_URL ||
-      "https://heathlandlinks.com";
-    const resetUrl = `${baseUrl}/account/reset-password?token=${token}`;
+    const resetUrl = passwordResetUrl(token);
 
     // ── Send email ────────────────────────────────────────────────────────
     await sendEmail({
