@@ -8,12 +8,10 @@ import { useAuthStore } from "@/utils/auth/store";
 import { queryClient } from "@/utils/queryClient";
 let registeredToken = null;
 export function safeNotificationPath(path) {
-  return typeof path === "string" &&
-    /^\/(?:course|feed|social|communities|lists)\/\d+(?:\?(?:tab=CHAT|postId=\d+(?:&openComments=1)?))?$/.test(
-      path,
-    )
-    ? path
-    : null;
+  if (typeof path !== "string") return null;
+  return /^\/(?:course|feed|social|communities|lists)\/\d+(?:\?(?:tab=(?:CHAT|REQUESTS)|postId=\d+(?:&openComments=1)?|openComments=1))?$/.test(path)
+    || /^\/achievements\/[a-z0-9-]+$/.test(path)
+    || path === "/friends" || path === "/(tabs)/passport" ? path : null;
 }
 export async function detachPushToken() {
   const token = registeredToken;

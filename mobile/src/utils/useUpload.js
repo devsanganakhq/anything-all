@@ -30,15 +30,9 @@ function useUpload() {
           const proxyBaseUrl =
             process.env.EXPO_PUBLIC_BASE_URL ||
             process.env.EXPO_PUBLIC_PROXY_BASE_URL;
-          const projectGroupId = process.env.EXPO_PUBLIC_PROJECT_GROUP_ID;
-          const host = process.env.EXPO_PUBLIC_HOST;
-
-          const headers = {
-            "x-createxyz-project-group-id": projectGroupId || "",
-            host: host || "",
-            "x-forwarded-host": host || "",
-            "x-createxyz-host": host || "",
-          };
+          // Let the native HTTP client derive Host from the upload URL.
+          // Empty or stale proxy host headers can route Vercel to a missing deployment.
+          const headers = {};
 
           try {
             const auth = useAuthStore.getState().auth;
