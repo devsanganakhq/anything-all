@@ -419,3 +419,18 @@ test("release readiness requires all six published lists and the migrated backen
     "UPDATE curated_lists SET is_published=true WHERE source_key='major_us_open_hosts'",
   );
 });
+
+test("notification preferences persist independently on the authenticated account", async () => {
+  const { POST } = await import("@/app/api/user/privacy/route");
+  await sql("INSERT INTO users(id,email,password) VALUES(4,'prefs-route@example.test','x')");
+  state.viewer = 4;
+  const values = { friend_requests:false, likes:false, comments:false, follows:false, reviews:false, achievements:false, community_notifications:false };
+  expect((await POST(req('user/privacy',{notificationSettings:values}))).status).toBe(200);
+  expect((await POST(req('user/privacy',{notificationSettings:{likes:true}}))).status).toBe(200);
+  const [saved] = await sql('SELECT notification_settings FROM users WHERE id=4');
+  expect(saved.notification_settings).toMatchObject({...values,likes:true});
+  expect((await sql('SELECT notification_settings FROM users WHERE id=2'))[0].notification_settings?.likes).not.toBe(false);
+  expect((await POST(req('user/privacy',{notificationSettings:{likes:'false'}}))).status).toBe(400);
+  state.viewer = null;
+  expect((await POST(req('user/privacy',{notificationSettings:{likes:true}}))).status).toBe(401);
+});
