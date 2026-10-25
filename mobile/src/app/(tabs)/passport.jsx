@@ -1,3 +1,4 @@
+import { PassportActivitySections } from "@/components/PassportActivitySections";
 import { CuratedLists } from "@/components/CuratedLists";
 import { PassportFavourites } from "@/components/PassportFavourites";
 /**
@@ -507,18 +508,7 @@ export default function PassportScreen() {
           </View>
         </View>
 
-        <TouchableOpacity
-          onPress={() => router.push("/passport/history")}
-          style={{
-            marginHorizontal: Spacing.screenH,
-            paddingVertical: 14,
-            marginBottom: 12,
-          }}
-        >
-          <Text style={{ color: Colors.green }}>
-            Rounds played: {stats.rounds_count || 0} · View rounds and reviews ›
-          </Text>
-        </TouchableOpacity>
+        <PassportActivitySections />
         <PassportFavourites editable />
         <CuratedLists passport />
         {/* ── Courses by country mini-bar ──────────────────────────────────── */}
