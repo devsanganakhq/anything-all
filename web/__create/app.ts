@@ -180,7 +180,7 @@ export function createApp() {
           },
         },
         providers: [
-          ...(process.env.NEXT_PUBLIC_CREATE_ENV === "DEVELOPMENT"
+          ...(process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_CREATE_ENV === "DEVELOPMENT"
             ? [
                 Credentials({
                   id: "dev-social",
