@@ -1,6 +1,7 @@
 import { randomBytes } from "crypto";
 import sql from "@/app/api/utils/sql";
 import { sendEmail } from "@/app/api/utils/send-email";
+import { passwordResetUrl } from "@/app/api/utils/passwordResetUrl";
 
 // Rate-limit: maximum 3 reset requests per email per 30 minutes
 const RATE_LIMIT_WINDOW_MINUTES = 30;
@@ -75,11 +76,7 @@ export async function POST(request) {
     );
 
     // ── Build reset URL ────────────────────────────────────────────────────
-    const baseUrl =
-      process.env.NEXT_PUBLIC_CREATE_APP_URL ||
-      process.env.AUTH_URL ||
-      "https://heathlandlinks.com";
-    const resetUrl = `${baseUrl}/account/reset-password?token=${token}`;
+    const resetUrl = passwordResetUrl(token);
 
     // ── Send email via Resend ──────────────────────────────────────────────
     await sendEmail({
