@@ -42,10 +42,10 @@ target 'HeathlandLinks' do
 # @generated begin react-native-maps - expo prebuild (DO NOT MODIFY) sync-e9cc66c360abe50bc66d89fffb3c55b034d7d369
   pod 'react-native-google-maps', path: File.dirname(`node --print "require.resolve('react-native-maps/package.json')"`)
 # @generated end react-native-maps
-  # Local checkout: CocoaPods git clone of purchases-ios times out on this network.
-  pod 'RevenueCat', :path => File.expand_path('~/.cache/purchases-ios-5.45.0')
-  pod 'RevenueCatUI', :path => File.expand_path('~/.cache/purchases-ios-5.45.0')
-  pod 'SDWebImage', :path => File.expand_path('~/.cache/SDWebImage-5.21.7')
+  # Resolve pinned dependencies from CocoaPods on clean CI workers.
+  pod 'RevenueCat', '5.45.0'
+  pod 'RevenueCatUI', '5.45.0'
+  pod 'SDWebImage', '5.21.7'
   config = use_native_modules!(config_command)
 
   use_frameworks! :linkage => podfile_properties['ios.useFrameworks'].to_sym if podfile_properties['ios.useFrameworks']
