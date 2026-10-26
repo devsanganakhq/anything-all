@@ -187,10 +187,9 @@ export default function ExploreCourseListScreen() {
 
   const courses = useMemo(() => {
     const all = data ?? [];
-    const rows =
-      kind === "country" || !query
-        ? all
-        : all.filter((c) =>
+    const rows = !query
+      ? all
+      : all.filter((c) =>
             [c.name, c.club_name, c.display_name, c.city, c.county].some((v) =>
               v?.toLowerCase().includes(query.toLowerCase()),
             ),
@@ -199,7 +198,7 @@ export default function ExploreCourseListScreen() {
       const status = statusById.get(String(c.id));
       return status ? { ...c, ...status } : c;
     });
-  }, [data, statusById, kind, query]);
+  }, [data, statusById, query]);
 
   const mappedCourses = useMemo(() => courses.filter(hasCoords), [courses]);
   const fitRegion = useMemo(
