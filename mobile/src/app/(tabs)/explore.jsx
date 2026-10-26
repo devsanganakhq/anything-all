@@ -118,6 +118,9 @@ const COUNTRY_FLAGS = {
   "the netherlands": "🇳🇱",
   holland: "🇳🇱",
   "isle of man": "🇮🇲",
+  uae: "🇦🇪",
+  "united arab emirates": "🇦🇪",
+  dubai: "🇦🇪",
 };
 
 function countryFlagEmoji(country) {

@@ -587,8 +587,7 @@ export default function PassportScreen() {
           <SectionHeader label="MY PASSPORT" icon={BookOpen} inline />
           <View style={{ gap: 9, marginTop: 10 }}>
             {SECTIONS.map((s) => s.kind ? (
-              <PassportActivitySection key={s.label} kind={s.kind} label={s.label}
-                renderHeader={({ toggle }) => <PassportSectionRow section={s} onPress={toggle} />} />
+              <PassportActivitySection key={s.label} kind={s.kind} label={s.label} />
             ) : (
               <PassportSectionRow
                 key={s.label}
