@@ -8,7 +8,7 @@ import { getSessionUserId } from "@/app/api/utils/getUserId";
 export async function GET(request) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
