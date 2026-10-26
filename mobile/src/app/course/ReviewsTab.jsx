@@ -17,6 +17,7 @@ import { SectionLabel, EmptySection } from "./SharedComponents";
 import { formatDate } from "./utils";
 import { UserAvatar } from "@/components/UserAvatar";
 import { PressableUser } from "@/components/PressableUser";
+import { useAuthStore } from "@/utils/auth/store";
 
 function photosForReview(rev) {
   const raw = rev?.photos;
@@ -45,6 +46,7 @@ export function ReviewsTab({
   categoryAverages = [],
 }) {
   const router = useRouter();
+  const currentUserId = useAuthStore((state) => state.auth?.user?.id);
   const [lightbox, setLightbox] = useState(null);
   return (
     <>
@@ -279,6 +281,34 @@ export function ReviewsTab({
                   >
                     {rev.review_text}
                   </Text>
+                ) : null}
+                {String(rev.user_id) === String(currentUserId) ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Edit your review"
+                    onPress={() =>
+                      router.push({
+                        pathname: "/activity/mark-played",
+                        params: {
+                          courseId: String(courseId),
+                          courseName,
+                          mode: "review",
+                          activityId: String(rev.id),
+                        },
+                      })
+                    }
+                    style={{ alignSelf: "flex-start", paddingVertical: 10 }}
+                  >
+                    <Text
+                      style={{
+                        color: Colors.green,
+                        fontSize: 12,
+                        fontWeight: "700",
+                      }}
+                    >
+                      Edit review
+                    </Text>
+                  </TouchableOpacity>
                 ) : null}
                 {photos.length > 0 ? (
                   <ScrollView
