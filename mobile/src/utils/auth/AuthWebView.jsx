@@ -10,6 +10,40 @@ import { identifyUser } from "@/utils/posthog";
 // (WKWebView cookies are not reliably shared with the JS fetch cookie jar).
 const nativeCallbackPath = "/api/auth/expo-web-success";
 const tokenCallbackPath = "/api/auth/token";
+const ensureForgotPasswordLink = `(() => {
+  try {
+    const addLink = () => {
+      if (window.location.pathname !== "/account/signin") return;
+      const hasLink = Array.from(document.querySelectorAll("a")).some(
+        (link) => link.textContent?.trim().toLowerCase() === "forgot password?",
+      );
+      if (hasLink) return;
+
+      const form = document.querySelector("form");
+      const submit = form?.querySelector('button[type="submit"], input[type="submit"]');
+      if (!form || !submit?.parentNode) return;
+
+      const wrapper = document.createElement("div");
+      wrapper.style.cssText = "margin-top:10px;margin-bottom:16px;text-align:right";
+      const link = document.createElement("a");
+      link.href = "/account/forgot-password" + window.location.search;
+      link.textContent = "Forgot password?";
+      link.style.cssText =
+        "font-size:14px;color:#1B3828;font-weight:600;text-decoration:underline;text-underline-offset:2px";
+      wrapper.appendChild(link);
+      submit.parentNode.insertBefore(wrapper, submit.nextSibling);
+    };
+
+    addLink();
+    new MutationObserver(addLink).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+  } catch (error) {
+    console.warn("Could not add password reset link", error);
+  }
+  return true;
+})();`;
 
 /**
  * This renders a WebView for authentication and handles both web and native platforms.
@@ -114,6 +148,7 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
     <WebView
       incognito
       startInLoadingState
+      injectedJavaScript={ensureForgotPasswordLink}
       renderLoading={() => (
         <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "#F5F3EB", alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator size="large" color="#193D2C" />
