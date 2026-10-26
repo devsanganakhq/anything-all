@@ -23,7 +23,9 @@
         "NSPhotoLibraryAddUsageDescription": "Heathland Links can save photos you choose to share from the app.",
         "NSMicrophoneUsageDescription": "Heathland Links uses the microphone when recording audio or video for course content."
       },
-      "associatedDomains": ["applinks:anything-all.vercel.app"]
+      "associatedDomains": [
+        "applinks:anything-all.vercel.app"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -73,9 +75,13 @@
               "pathPrefix": "/lists/"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
-      ]
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       [
