@@ -197,3 +197,6 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Load the Firebase Android configuration used by expo-notifications.
+apply plugin: "com.google.gms.google-services"
