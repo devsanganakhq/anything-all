@@ -52,11 +52,17 @@ export function usePushNotifications() {
         let permission = await Notifications.getPermissionsAsync();
         if (permission.canAskAgain && permission.status !== "granted")
           permission = await Notifications.requestPermissionsAsync();
-        if (!permission.granted) return;
+        if (!permission.granted) {
+          console.warn("[Push] Notification permission is not granted");
+          return;
+        }
         const projectId =
           Constants.expoConfig?.extra?.eas?.projectId ??
           Constants.easConfig?.projectId;
-        if (!projectId) return;
+        if (!projectId) {
+          console.warn("[Push] Expo project ID is missing");
+          return;
+        }
         const { data: token } = await Notifications.getExpoPushTokenAsync({
           projectId,
         });
@@ -66,9 +72,16 @@ export function usePushNotifications() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
+          signal: AbortSignal.timeout(15000),
         });
-        if (r.ok) registeredToken = token;
-      } catch {
+        if (!r.ok) {
+          console.warn("[Push] Backend rejected device registration", r.status);
+          return;
+        }
+        registeredToken = token;
+      } catch (error) {
+        // Log only provider error codes; never log device tokens or credentials.
+        console.warn("[Push] Registration failed", error?.code || "RegistrationUnavailable");
         /* Retry on the next foreground transition after offline/provider failure. */
       } finally {
         registering = false;
@@ -76,7 +89,10 @@ export function usePushNotifications() {
     }
     register();
     const appState = AppState.addEventListener("change", (state) => {
-      if (state === "active") register();
+      if (state === "active") {
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        register();
+      }
     });
     const received = Notifications.addNotificationReceivedListener(() =>
       queryClient.invalidateQueries({ queryKey: ["notifications"] }),
