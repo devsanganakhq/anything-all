@@ -51,14 +51,24 @@ export default function SignInPage() {
     }, 15000);
 
     try {
-      await signInWithCredentials({
+      const result = await signInWithCredentials({
         email,
         password,
         callbackUrl: "/api/auth/token",
-        redirect: true,
+        redirect: false,
       });
-      // On success the browser navigates away — clear timer just in case
       clearTimeout(timer);
+      if (result?.error) {
+        setError(
+          result.error === "CredentialsSignin"
+            ? "Incorrect email or password. Please try again."
+            : "Sign-in failed. Please try again.",
+        );
+      } else if (result?.url) {
+        window.location.assign(result.url);
+      } else {
+        setError("Sign-in failed. Please try again.");
+      }
     } catch (err) {
       clearTimeout(timer);
       const msg = err?.message ?? "";
@@ -174,22 +184,20 @@ export default function SignInPage() {
           labelStyle={labelStyle}
         />
 
-        {!isNativeApp && (
-          <div style={{ marginTop: -10, marginBottom: 20, textAlign: "right" }}>
-            <a
-              href="/account/forgot-password"
-              style={{
-                fontSize: 12,
-                color: "#1B3828",
-                fontWeight: 600,
-                textDecoration: "underline",
-                textUnderlineOffset: 2,
-              }}
-            >
-              Forgot password?
-            </a>
-          </div>
-        )}
+        <div style={{ marginTop: -10, marginBottom: 20, textAlign: "right" }}>
+          <a
+            href="/account/forgot-password"
+            style={{
+              fontSize: 12,
+              color: "#1B3828",
+              fontWeight: 600,
+              textDecoration: "underline",
+              textUnderlineOffset: 2,
+            }}
+          >
+            Forgot password?
+          </a>
+        </div>
 
         {/* Error banner */}
         {error && (
