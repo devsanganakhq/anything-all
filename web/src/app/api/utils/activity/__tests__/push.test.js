@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { PGlite } from "@electric-sql/pglite";
 import { beforeAll, afterAll, test, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
@@ -28,6 +29,7 @@ beforeAll(async () => {
 }, 30000);
 afterAll(async () => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   await state.db?.close();
 });
 test("accepted push tickets are recorded without claiming receipt delivery", async () => {
@@ -48,6 +50,9 @@ test("accepted push tickets are recorded without claiming receipt delivery", asy
   expect(row.receipt_status).toBeNull();
   expect(await push.flushPushOutbox()).toEqual({ sent: 0 });
   expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(fetchMock.mock.calls[0][0]).toBe("https://exp.host/--/api/v2/push/send");
+  const payload = JSON.parse(fetchMock.mock.calls[0][1].body);
+  expect(payload[0]).toMatchObject({ to: "ExponentPushToken[test-device]", data: { path: "/feed/1", notificationId: 1 } });
 });
 test("receipt errors remove only the corresponding user token and record failure", async () => {
   await state.db.exec(

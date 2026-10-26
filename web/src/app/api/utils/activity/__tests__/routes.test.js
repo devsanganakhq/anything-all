@@ -1,12 +1,15 @@
+// @vitest-environment node
 import { PGlite } from "@electric-sql/pglite";
 import { readFileSync } from "node:fs";
 import { beforeAll, afterAll, test, expect, vi } from "vitest";
 import { listService } from "../lists";
 import { activityService } from "../service";
 import { LIST_CATEGORIES, COURSE_CATEGORIES } from "../validation";
-const state = vi.hoisted(() => ({ db: null, viewer: 1 }));
+const state = vi.hoisted(() => ({ db: null, viewer: 1, requireAuthRequest: false }));
 vi.mock("@/app/api/utils/getUserId", () => ({
-  getSessionUserId: async () => {
+  getSessionUserId: async (request) => {
+    if (state.requireAuthRequest && !request)
+      throw Object.assign(Error("Request required for native auth"), { code: "UNAUTHENTICATED" });
     if (!state.viewer)
       throw Object.assign(Error("Sign in"), { code: "UNAUTHENTICATED" });
     return state.viewer;
@@ -167,6 +170,14 @@ test("course details show each activity and category averages; removed photos st
   expect(json.curatedLists).toHaveLength(1);
 });
 test("passport data endpoints deny strangers and permit accepted friends", async () => {
+  const [photoReview] = await sql(
+    `INSERT INTO course_reviews(user_id,course_id,date_played,review_text,rating,photos)
+     VALUES(1,3,'2026-02-03','Two photos',4.5,$1::jsonb) RETURNING id`,
+    [JSON.stringify([
+      "https://images.example.test/review-one.jpg",
+      "https://images.example.test/review-two.jpg",
+    ])],
+  );
   await sql(
     `UPDATE users SET privacy_settings='{"profile_visible":false}' WHERE id=1`,
   );
@@ -187,6 +198,64 @@ test("passport data endpoints deny strangers and permit accepted friends", async
   );
   for (const [path, route] of endpoints)
     expect((await route.GET(req(`${path}?userId=1`))).status).toBe(200);
+  const reviews = await endpoints[0][1].GET(req("activity/reviews?userId=1"));
+  const reviewJson = await reviews.json();
+  expect(reviewJson.reviews.find((review) => review.course_id === 3).photos).toEqual([
+    "https://images.example.test/review-one.jpg",
+    "https://images.example.test/review-two.jpg",
+  ]);
+  await sql("DELETE FROM course_reviews WHERE id=$1", [photoReview.id]);
+});
+test("friend requests, acceptance, following and unfollowing pass the request to native auth", async () => {
+  state.requireAuthRequest = true;
+  try {
+    const friendRequests = await import("@/app/api/friends/request/route");
+    const friendResponses = await import("@/app/api/friends/respond/route");
+    const friends = await import("@/app/api/friends/list/route");
+    const removeFriend = await import("@/app/api/friends/remove/route");
+    const follow = await import("@/app/api/social/follow/route");
+
+    state.viewer = 1;
+    expect((await follow.POST(req("social/follow", { followeeId: "1" }))).status).toBe(400);
+    expect((await follow.POST(req("social/follow", { followeeId: "invalid" }))).status).toBe(400);
+    let response = await friendRequests.POST(req("friends/request", { friendId: 3 }));
+    expect(response.status).toBe(200);
+    const requestRow = (await sql(
+      "SELECT id,status FROM friendships WHERE user_id=1 AND friend_id=3",
+    ))[0];
+    expect(requestRow.status).toBe("pending");
+
+    response = await friends.GET(req("friends/list?status=pending&direction=inbound"));
+    expect((await response.json()).friends).toHaveLength(0);
+    state.viewer = 3;
+    response = await friends.GET(req("friends/list?status=pending&direction=inbound"));
+    expect((await response.json()).friends[0].friend_id).toBe(1);
+    response = await friendResponses.POST(req("friends/respond", {
+      friendshipId: requestRow.id,
+      action: "accept",
+    }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).status).toBe("accepted");
+
+    state.viewer = 1;
+    response = await follow.POST(req("social/follow", { followeeId: 2, followeeType: "user" }));
+    expect(response.status).toBe(200);
+    expect((await response.json()).following).toBe(true);
+    const followNotice = await sql("SELECT user_id,from_user_id,target_path FROM notifications WHERE user_id=2 AND from_user_id=1 AND notification_type='follow'");
+    expect(followNotice).toHaveLength(1);
+    expect(followNotice[0].target_path).toBe("/social/1");
+    response = await follow.GET(req("social/follow?followeeId=2&followeeType=user"));
+    expect((await response.json()).following).toBe(true);
+    response = await follow.POST(req("social/follow", { followeeId: 2, followeeType: "user" }));
+    expect((await response.json()).following).toBe(false);
+    expect(await sql("SELECT * FROM follows WHERE follower_id=1 AND followee_id=2")).toHaveLength(0);
+
+    response = await removeFriend.POST(req("friends/remove", { friendId: 3 }));
+    expect(response.status).toBe(200);
+    expect(await sql("SELECT * FROM friendships WHERE (user_id=1 AND friend_id=3) OR (user_id=3 AND friend_id=1)")).toHaveLength(0);
+  } finally {
+    state.requireAuthRequest = false;
+  }
 });
 test("feed retains activity score and applies author privacy to list and detail reads", async () => {
   const { GET } = await import("@/app/api/feed/route");
@@ -230,14 +299,12 @@ test("community privacy, three-photo cap and mute-aware notifications", async ()
   );
   expect(res.status).toBe(200);
   expect((await res.json()).message.image_urls).toHaveLength(1);
-  expect(await sql("SELECT * FROM notifications WHERE user_id=2")).toHaveLength(
-    1,
-  );
+  expect(await sql("SELECT * FROM notifications WHERE user_id=2 AND notification_type='community_message'")).toHaveLength(1);
   await sql("UPDATE community_members SET muted=true WHERE user_id=2");
   await chat.POST(req("communities/1/chat", { text: "Muted message" }), {
     params: { id: "1" },
   });
-  expect(await sql("SELECT * FROM notifications WHERE user_id=2")).toHaveLength(
+  expect(await sql("SELECT * FROM notifications WHERE user_id=2 AND notification_type='community_message'")).toHaveLength(
     1,
   );
   expect(
