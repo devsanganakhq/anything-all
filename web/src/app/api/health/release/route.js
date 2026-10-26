@@ -35,6 +35,12 @@ export async function GET() {
         },
         { status: 503 },
       );
+    const pushTables = await sql(
+      "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('notifications','device_push_tokens','push_outbox')",
+    );
+    if (pushTables.length !== 3)
+      return Response.json({ release: "client-six-lists", ready: false,
+        reason: "Notification database migration is pending" }, { status: 503 });
     const [{ count }] = await sql(
       "SELECT COUNT(*)::int AS count FROM curated_lists WHERE is_published AND source_key=ANY($1::text[])",
       [manifest.map((l) => l.sourceKey)],
