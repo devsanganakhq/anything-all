@@ -64,6 +64,16 @@
       "ios": {
         "simulator": true
       }
+    },
+    "client-production": {
+      "extends": "production",
+      "environment": "production",
+      "autoIncrement": true,
+      "env": {
+        "HEATHLAND_CLIENT_PROJECT": "1",
+        "EXPO_PUBLIC_BASE_URL": "https://anything-all.vercel.app",
+        "EXPO_PUBLIC_PROXY_BASE_URL": "https://anything-all.vercel.app"
+      }
     }
   },
   "submit": {
