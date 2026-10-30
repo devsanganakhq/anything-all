@@ -128,6 +128,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 };
 
 const cacheDir = path.join(__dirname, 'caches');
+fs.mkdirSync(cacheDir, { recursive: true });
 
 config.cacheStores = () => [
   new FileStore({
@@ -135,11 +136,11 @@ config.cacheStores = () => [
   }),
 ];
 config.resetCache = false;
-config.fileMapCacheDirectory = cacheDir;
+const originalReporter = config.reporter;
 config.reporter = {
   ...config.reporter,
   update: (event) => {
-    config.reporter?.update(event);
+    originalReporter?.update(event);
     const reportableErrors = [
       'error',
       'bundling_error',
@@ -155,19 +156,6 @@ config.reporter = {
       }
     }
     return event;
-  },
-};
-
-const originalGetTransformOptions = config.transformer.getTransformOptions;
-
-config.transformer = {
-  ...config.transformer,
-  getTransformOptions: async (entryPoints, options) => {
-    if (options.dev === false) {
-      fs.rmSync(cacheDir, { recursive: true, force: true });
-      fs.mkdirSync(cacheDir);
-    }
-    return await originalGetTransformOptions(entryPoints, options);
   },
 };
 

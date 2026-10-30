@@ -76,156 +76,240 @@ export async function DELETE(request) {
     );
     const authUserId = authRows[0]?.id ?? null;
 
+    const affected = await sql(
+      `SELECT course_id FROM course_rounds WHERE user_id=$1 UNION SELECT course_id FROM course_reviews WHERE user_id=$1 UNION SELECT course_id FROM wishlist WHERE user_id=$1`,
+      [userId],
+    );
+    const queries = [];
     // ── Null out optional FKs pointing at this user ─────────────────────────
-    await sql(
-      `UPDATE users SET suspended_by = NULL WHERE suspended_by = $1`,
-      [userId],
+    queries.push(
+      sql(`UPDATE users SET suspended_by = NULL WHERE suspended_by = $1`, [
+        userId,
+      ]),
     );
-    await sql(
-      `UPDATE notifications SET from_user_id = NULL WHERE from_user_id = $1`,
-      [userId],
+    queries.push(
+      sql(
+        `UPDATE notifications SET from_user_id = NULL WHERE from_user_id = $1`,
+        [userId],
+      ),
     );
-    await sql(
-      `UPDATE community_join_requests SET reviewed_by = NULL WHERE reviewed_by = $1`,
-      [userId],
+    queries.push(
+      sql(
+        `UPDATE community_join_requests SET reviewed_by = NULL WHERE reviewed_by = $1`,
+        [userId],
+      ),
     );
-    await sql(
-      `UPDATE community_chat_messages SET deleted_by = NULL WHERE deleted_by = $1`,
-      [userId],
+    queries.push(
+      sql(
+        `UPDATE community_chat_messages SET deleted_by = NULL WHERE deleted_by = $1`,
+        [userId],
+      ),
     );
-    await sql(
-      `UPDATE community_reports SET reported_user_id = NULL WHERE reported_user_id = $1`,
-      [userId],
+    queries.push(
+      sql(
+        `UPDATE community_reports SET reported_user_id = NULL WHERE reported_user_id = $1`,
+        [userId],
+      ),
     );
-    await sql(
-      `UPDATE course_photos SET approved_by = NULL WHERE approved_by = $1`,
-      [userId],
+    queries.push(
+      sql(
+        `UPDATE course_photos SET approved_by = NULL WHERE approved_by = $1`,
+        [userId],
+      ),
     );
-    await sql(
-      `UPDATE course_photos SET rejected_by = NULL WHERE rejected_by = $1`,
-      [userId],
+    queries.push(
+      sql(
+        `UPDATE course_photos SET rejected_by = NULL WHERE rejected_by = $1`,
+        [userId],
+      ),
     );
-    await sql(
-      `UPDATE admin_audit_log SET target_user_id = NULL WHERE target_user_id = $1`,
-      [userId],
+    queries.push(
+      sql(
+        `UPDATE admin_audit_log SET target_user_id = NULL WHERE target_user_id = $1`,
+        [userId],
+      ),
     );
     // Admin audit rows authored by this user cannot keep a NOT NULL admin_user_id
-    await sql(`DELETE FROM admin_audit_log WHERE admin_user_id = $1`, [userId]);
-    await sql(
-      `DELETE FROM moderation_notes WHERE target_user_id = $1 OR admin_user_id = $1`,
-      [userId],
+    queries.push(
+      sql(`DELETE FROM admin_audit_log WHERE admin_user_id = $1`, [userId]),
+    );
+    queries.push(
+      sql(
+        `DELETE FROM moderation_notes WHERE target_user_id = $1 OR admin_user_id = $1`,
+        [userId],
+      ),
     );
 
     // ── Notifications & social ──────────────────────────────────────────────
-    await sql(`DELETE FROM notifications WHERE user_id = $1`, [userId]);
-    await sql(`DELETE FROM friendships WHERE user_id = $1 OR friend_id = $1`, [
-      userId,
-    ]);
-    await sql(
-      `DELETE FROM follows
+    queries.push(sql(`DELETE FROM notifications WHERE user_id = $1`, [userId]));
+    queries.push(
+      sql(`DELETE FROM friendships WHERE user_id = $1 OR friend_id = $1`, [
+        userId,
+      ]),
+    );
+    queries.push(
+      sql(
+        `DELETE FROM follows
        WHERE follower_id = $1
           OR (followee_type = 'user' AND followee_id = $1)`,
-      [userId],
+        [userId],
+      ),
     );
 
     // ── Activity (likes/comments first, then own activity rows) ─────────────
-    await sql(`DELETE FROM activity_likes WHERE user_id = $1`, [userId]);
-    await sql(`DELETE FROM activity_comments WHERE user_id = $1`, [userId]);
+    queries.push(
+      sql(`DELETE FROM activity_likes WHERE user_id = $1`, [userId]),
+    );
+    queries.push(
+      sql(`DELETE FROM activity_comments WHERE user_id = $1`, [userId]),
+    );
     // Clear activity FKs that block deleting photos / played courses
-    await sql(
-      `UPDATE activity_feed SET photo_id = NULL WHERE user_id = $1`,
-      [userId],
+    queries.push(
+      sql(`UPDATE activity_feed SET photo_id = NULL WHERE user_id = $1`, [
+        userId,
+      ]),
     );
-    await sql(
-      `UPDATE activity_feed SET review_id = NULL WHERE user_id = $1`,
-      [userId],
+    queries.push(
+      sql(`UPDATE activity_feed SET review_id = NULL WHERE user_id = $1`, [
+        userId,
+      ]),
     );
-    await sql(
-      `DELETE FROM notifications WHERE activity_id IN (SELECT id FROM activity_feed WHERE user_id = $1)`,
-      [userId],
+    queries.push(
+      sql(
+        `DELETE FROM notifications WHERE activity_id IN (SELECT id FROM activity_feed WHERE user_id = $1)`,
+        [userId],
+      ),
     );
-    await sql(`DELETE FROM activity_feed WHERE user_id = $1`, [userId]);
+    queries.push(sql(`DELETE FROM activity_feed WHERE user_id = $1`, [userId]));
 
     // ── Feed ────────────────────────────────────────────────────────────────
-    await sql(`DELETE FROM feed_reactions WHERE user_id = $1`, [userId]);
-    await sql(`DELETE FROM feed_comments WHERE user_id = $1`, [userId]);
-    await sql(`DELETE FROM feed_hidden_posts WHERE user_id = $1`, [userId]);
-    await sql(`DELETE FROM feed_post_reports WHERE reporter_id = $1`, [userId]);
+    queries.push(
+      sql(`DELETE FROM feed_reactions WHERE user_id = $1`, [userId]),
+    );
+    queries.push(sql(`DELETE FROM feed_comments WHERE user_id = $1`, [userId]));
+    queries.push(
+      sql(`DELETE FROM feed_hidden_posts WHERE user_id = $1`, [userId]),
+    );
+    queries.push(
+      sql(`DELETE FROM feed_post_reports WHERE reporter_id = $1`, [userId]),
+    );
     // Deleting feed_posts cascades media / reactions / comments / reports / hidden
-    await sql(`DELETE FROM feed_posts WHERE author_id = $1`, [userId]);
+    queries.push(sql(`DELETE FROM feed_posts WHERE author_id = $1`, [userId]));
 
     // ── Communities (owned communities deleted last among community data) ───
-    await sql(`DELETE FROM community_reports WHERE reporter_id = $1`, [userId]);
-    await sql(`DELETE FROM community_reactions WHERE user_id = $1`, [userId]);
-    await sql(
-      `DELETE FROM community_post_comments WHERE user_id = $1`,
-      [userId],
+    queries.push(
+      sql(`DELETE FROM community_reports WHERE reporter_id = $1`, [userId]),
     );
-    await sql(`DELETE FROM community_chat_messages WHERE user_id = $1`, [
-      userId,
-    ]);
-    await sql(`DELETE FROM community_posts WHERE user_id = $1`, [userId]);
-    await sql(
-      `DELETE FROM community_invites WHERE inviter_id = $1 OR invitee_id = $1`,
-      [userId],
+    queries.push(
+      sql(`DELETE FROM community_reactions WHERE user_id = $1`, [userId]),
     );
-    await sql(`DELETE FROM community_join_requests WHERE user_id = $1`, [
-      userId,
-    ]);
-    await sql(`DELETE FROM community_members WHERE user_id = $1`, [userId]);
+    queries.push(
+      sql(`DELETE FROM community_post_comments WHERE user_id = $1`, [userId]),
+    );
+    queries.push(
+      sql(`DELETE FROM community_chat_messages WHERE user_id = $1`, [userId]),
+    );
+    queries.push(
+      sql(`DELETE FROM community_posts WHERE user_id = $1`, [userId]),
+    );
+    queries.push(
+      sql(
+        `DELETE FROM community_invites WHERE inviter_id = $1 OR invitee_id = $1`,
+        [userId],
+      ),
+    );
+    queries.push(
+      sql(`DELETE FROM community_join_requests WHERE user_id = $1`, [userId]),
+    );
+    queries.push(
+      sql(`DELETE FROM community_members WHERE user_id = $1`, [userId]),
+    );
     // Communities they created — CASCADE removes members/posts/etc.
-    await sql(`DELETE FROM communities WHERE created_by = $1`, [userId]);
+    queries.push(
+      sql(`DELETE FROM communities WHERE created_by = $1`, [userId]),
+    );
 
     // ── Photos ──────────────────────────────────────────────────────────────
-    await sql(`DELETE FROM course_photo_likes WHERE user_id = $1`, [userId]);
-    await sql(
-      `DELETE FROM course_photo_reports WHERE reported_by_user_id = $1`,
-      [userId],
+    queries.push(
+      sql(`DELETE FROM course_photo_likes WHERE user_id = $1`, [userId]),
+    );
+    queries.push(
+      sql(`DELETE FROM course_photo_reports WHERE reported_by_user_id = $1`, [
+        userId,
+      ]),
     );
     // Null activity refs to this user's member photos
-    await sql(
-      `UPDATE activity_feed SET photo_id = NULL
+    queries.push(
+      sql(
+        `UPDATE activity_feed SET photo_id = NULL
        WHERE photo_id IN (SELECT id FROM member_photos WHERE user_id = $1)`,
-      [userId],
+        [userId],
+      ),
     );
-    await sql(
-      `UPDATE course_photos SET review_id = NULL WHERE user_id = $1`,
-      [userId],
+    queries.push(
+      sql(`UPDATE course_photos SET review_id = NULL WHERE user_id = $1`, [
+        userId,
+      ]),
     );
-    await sql(`DELETE FROM course_photos WHERE user_id = $1`, [userId]);
-    await sql(`DELETE FROM member_photos WHERE user_id = $1`, [userId]);
+    queries.push(sql(`DELETE FROM course_photos WHERE user_id = $1`, [userId]));
+    queries.push(sql(`DELETE FROM member_photos WHERE user_id = $1`, [userId]));
 
     // ── Passport / profile data ─────────────────────────────────────────────
-    await sql(`DELETE FROM user_achievements WHERE user_id = $1`, [userId]);
-    await sql(`DELETE FROM user_club_memberships WHERE user_id = $1`, [
-      userId,
-    ]);
-    await sql(`DELETE FROM wishlist WHERE user_id = $1`, [userId]);
-    await sql(
-      `UPDATE activity_feed SET review_id = NULL
-       WHERE review_id IN (SELECT id FROM played_courses WHERE user_id = $1)`,
-      [userId],
+    queries.push(
+      sql(`DELETE FROM user_achievements WHERE user_id = $1`, [userId]),
     );
-    await sql(`DELETE FROM played_courses WHERE user_id = $1`, [userId]);
+    queries.push(
+      sql(`DELETE FROM user_club_memberships WHERE user_id = $1`, [userId]),
+    );
+    queries.push(sql(`DELETE FROM wishlist WHERE user_id = $1`, [userId]));
+    queries.push(
+      sql(
+        `UPDATE activity_feed SET review_id = NULL
+       WHERE review_id IN (SELECT id FROM played_courses WHERE user_id = $1)`,
+        [userId],
+      ),
+    );
+    queries.push(
+      sql(`DELETE FROM played_courses WHERE user_id = $1`, [userId]),
+    );
 
     // ── App user row ────────────────────────────────────────────────────────
-    await sql(`DELETE FROM users WHERE id = $1`, [userId]);
+    queries.push(sql(`DELETE FROM users WHERE id = $1`, [userId]));
 
     // ── Auth + password reset ───────────────────────────────────────────────
-    await sql(`DELETE FROM password_reset_tokens WHERE LOWER(email) = LOWER($1)`, [
-      email,
-    ]);
-    await sql(
-      `DELETE FROM auth_verification_token WHERE LOWER(identifier) = LOWER($1)`,
-      [email],
+    queries.push(
+      sql(`DELETE FROM password_reset_tokens WHERE LOWER(email) = LOWER($1)`, [
+        email,
+      ]),
+    );
+    queries.push(
+      sql(
+        `DELETE FROM auth_verification_token WHERE LOWER(identifier) = LOWER($1)`,
+        [email],
+      ),
     );
 
     if (authUserId) {
       // Order: sessions/accounts first (adapter does users first; ON DELETE CASCADE also works)
-      await sql(`DELETE FROM auth_sessions WHERE "userId" = $1`, [authUserId]);
-      await sql(`DELETE FROM auth_accounts WHERE "userId" = $1`, [authUserId]);
-      await sql(`DELETE FROM auth_users WHERE id = $1`, [authUserId]);
+      queries.push(
+        sql(`DELETE FROM auth_sessions WHERE "userId" = $1`, [authUserId]),
+      );
+      queries.push(
+        sql(`DELETE FROM auth_accounts WHERE "userId" = $1`, [authUserId]),
+      );
+      queries.push(sql(`DELETE FROM auth_users WHERE id = $1`, [authUserId]));
     }
+
+    queries.push(
+      sql(
+        `UPDATE courses c SET
+      played_count=(SELECT COUNT(*) FROM course_rounds WHERE course_id=c.id),
+      community_rating=(SELECT AVG(rating) FROM course_reviews WHERE course_id=c.id AND deleted_at IS NULL),
+      wishlist_count=(SELECT COUNT(*) FROM wishlist WHERE course_id=c.id) WHERE c.id=ANY($1::int[])`,
+        [affected.map((c) => c.course_id)],
+      ),
+    );
+    await sql.transaction(queries);
 
     return Response.json({
       success: true,

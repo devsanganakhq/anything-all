@@ -101,7 +101,10 @@ export async function GET(request) {
       200,
       Math.max(
         1,
-        parseInt(searchParams.get("preview") || (collectionId ? "200" : "8"), 10),
+        parseInt(
+          searchParams.get("preview") || (collectionId ? "200" : "8"),
+          10,
+        ),
       ),
     );
 
@@ -174,7 +177,9 @@ export async function GET(request) {
       const uniqueCourses = [];
       for (const course of allCourses) {
         const positionKey =
-          course.position == null ? `id:${course.id}` : `pos:${course.position}`;
+          course.position == null
+            ? `id:${course.id}`
+            : `pos:${course.position}`;
         const idKey = course.id == null ? null : String(course.id);
         if (seenPositions.has(positionKey)) continue;
         if (idKey && seenIds.has(idKey)) continue;
@@ -269,19 +274,14 @@ export async function GET(request) {
       [preview],
     );
 
-    const destinations = await sql(
-      `SELECT
-          country,
-          COUNT(*)::int                                      AS course_count,
-          ROUND(AVG(community_rating)::numeric, 2)           AS avg_rating,
-          MIN(latitude)                                       AS lat,
-          MIN(longitude)                                      AS lng
-        FROM public.courses
-        WHERE country IS NOT NULL
-        GROUP BY country
-        ORDER BY course_count DESC
-        LIMIT 8`,
-    );
+    const destinations = await sql(`WITH destinations AS (
+      SELECT CASE WHEN LOWER(TRIM(country)) IN ('usa','united states','united states of america') THEN 'USA'
+        WHEN LOWER(TRIM(country)) IN ('uae','united arab emirates') THEN 'UAE' ELSE TRIM(country) END AS country,
+        community_rating,latitude,longitude FROM courses WHERE country IS NOT NULL AND TRIM(country)<>''
+      UNION ALL SELECT 'Hawaii',community_rating,latitude,longitude FROM courses
+      WHERE LOWER(TRIM(country)) IN ('usa','united states','united states of america') AND LOWER(TRIM(region))='hawaii'
+    ) SELECT country,COUNT(*)::int AS course_count,ROUND(AVG(community_rating)::numeric,2) AS avg_rating,
+     MIN(latitude) AS lat,MIN(longitude) AS lng FROM destinations GROUP BY country ORDER BY course_count DESC,country`);
 
     // ── 3. Assemble response ─────────────────────────────────────────────────
     const collections = [

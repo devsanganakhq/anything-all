@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "172507135044",
+    "project_id": "heathland-links-17c60",
+    "storage_bucket": "heathland-links-17c60.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:172507135044:android:faec7196c40a635ac15011",
+        "android_client_info": {
+          "package_name": "com.heathlandlinks.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhjfl6X6x8k4nRcAOibUgu51J6JW0UGK4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

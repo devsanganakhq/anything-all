@@ -20,6 +20,7 @@ import {
   LogOut,
   Trash2,
   ChevronRight,
+  ChevronDown,
   Users,
   MapPin,
   Award,
@@ -29,7 +30,7 @@ import {
 } from "lucide-react-native";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Purchases from "react-native-purchases";
 import { useAuth } from "@/utils/auth/useAuth";
 import { Colors, Spacing, Radius, Shadow } from "@/constants/theme";
@@ -40,7 +41,53 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();
-  const [isPublic, setIsPublic] = React.useState(true);
+  const queryClient = useQueryClient();
+  const [notificationsExpanded, setNotificationsExpanded] = React.useState(false);
+  const notificationMutation = useMutation({
+    mutationFn: async ({ key, value }) => {
+      const response = await fetch("/api/user/privacy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationSettings: { [key]: value } }),
+      });
+      if (!response.ok) throw new Error("Could not save notification preferences. Please try again.");
+      return response.json();
+    },
+    onSuccess: (data) => queryClient.setQueryData(["user-profile"], (old) => old ? {
+      ...old, profile: { ...old.profile, notification_settings: data.settings.notification_settings },
+    } : old),
+    onError: (error) => Alert.alert("Notifications", error.message),
+  });
+  const privacyMutation = useMutation({
+    mutationFn: async (isPublic) => {
+      const response = await fetch("/api/user/privacy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          privacySettings: { profile_visible: isPublic },
+        }),
+      });
+      if (!response.ok)
+        throw new Error("Could not save privacy settings. Please try again.");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(["user-profile"], (old) =>
+        old
+          ? {
+              ...old,
+              profile: {
+                ...old.profile,
+                privacy_settings: data.settings.privacy_settings,
+              },
+            }
+          : old,
+      );
+      queryClient.invalidateQueries({ queryKey: ["social-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["feed"] });
+    },
+    onError: (error) => Alert.alert("Privacy settings", error.message),
+  });
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false);
 
   const {
@@ -647,8 +694,9 @@ export default function ProfileScreen() {
             </Text>
           </View>
           <Switch
-            value={isPublic}
-            onValueChange={setIsPublic}
+            value={profile?.privacy_settings?.profile_visible ?? true}
+            disabled={privacyMutation.isPending || !profile}
+            onValueChange={(value) => privacyMutation.mutate(value)}
             trackColor={{ false: Colors.border, true: Colors.green }}
             thumbColor={Colors.ivory}
           />
@@ -702,8 +750,31 @@ export default function ProfileScreen() {
             <MenuItem
               icon={Bell}
               title="Notifications"
-              onPress={() => router.push("/notifications")}
+              onPress={() => setNotificationsExpanded((value) => !value)}
+              expanded={notificationsExpanded}
             />
+            {notificationsExpanded && (
+              <View style={{ backgroundColor: Colors.ivory, borderBottomWidth: 1, borderBottomColor: Colors.divider }}>
+                {[
+                  ["friend_requests", "Friend Requests"], ["likes", "Likes"],
+                  ["comments", "Comments"], ["follows", "Follows"],
+                  ["reviews", "Reviews"], ["achievements", "Achievements"],
+                  ["community_notifications", "Community Notifications"],
+                ].map(([key, label]) => (
+                  <View key={key} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8, paddingLeft: 48, paddingRight: 16 }}>
+                    <Text style={{ flex: 1, color: Colors.textPrimary, fontSize: 14 }}>{label}</Text>
+                    <Switch accessibilityLabel={`${label} push notifications`}
+                      value={(profile?.notification_settings?.[key] ?? profile?.notification_settings?.push_enabled ?? true) === true}
+                      disabled={notificationMutation.isPending}
+                      onValueChange={(value) => notificationMutation.mutate({ key, value })}
+                      trackColor={{ false: Colors.border, true: Colors.green }} />
+                  </View>
+                ))}
+                <Text style={{ color: Colors.textSecondary, fontSize: 12, paddingHorizontal: 16, paddingBottom: 14 }}>
+                  These settings control phone push notifications. Your notification bell stays active. Community chat messages appear only in the app.
+                </Text>
+              </View>
+            )}
             <MenuItem
               icon={HelpCircle}
               title="Support & Help"
@@ -762,10 +833,13 @@ function MenuItem({
   titleColor,
   onPress,
   isCustomIcon,
+  expanded,
 }) {
   return (
     <TouchableOpacity
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={expanded === undefined ? undefined : { expanded }}
       style={{
         flexDirection: "row",
         alignItems: "center",
@@ -801,7 +875,7 @@ function MenuItem({
           </Text>
         )}
       </View>
-      <ChevronRight color={Colors.textMuted} size={15} strokeWidth={1.8} />
+      {expanded ? <ChevronDown color={Colors.textMuted} size={15} strokeWidth={1.8} /> : <ChevronRight color={Colors.textMuted} size={15} strokeWidth={1.8} />}
     </TouchableOpacity>
   );
 }

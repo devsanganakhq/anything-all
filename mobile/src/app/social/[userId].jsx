@@ -1,3 +1,6 @@
+import { PassportActivitySections } from "@/components/PassportActivitySections";
+import { CuratedLists } from "@/components/CuratedLists";
+import { PassportFavourites } from "@/components/PassportFavourites";
 /**
  * Public golfer profile
  * Route: /social/:userId
@@ -828,6 +831,9 @@ export default function GolferProfileScreen() {
         )}
 
         {/* ── Recent courses ───────────────────────────────────────────────── */}
+        <PassportFavourites userId={targetId} />
+        <CuratedLists passport userId={targetId} />
+        <PassportActivitySections userId={targetId} />
         {recentCourses.length > 0 && (
           <Section label="RECENTLY PLAYED">
             <View style={{ gap: 8, paddingHorizontal: Spacing.screenH }}>

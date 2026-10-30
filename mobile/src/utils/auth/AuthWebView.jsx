@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { BackHandler, Platform } from "react-native";
+import { ActivityIndicator, BackHandler, Platform, Text, View } from "react-native";
 import { WebView } from "react-native-webview";
 import { useAuthStore } from "./store";
 import { resetAppCache } from "@/utils/queryClient";
@@ -10,6 +10,40 @@ import { identifyUser } from "@/utils/posthog";
 // (WKWebView cookies are not reliably shared with the JS fetch cookie jar).
 const nativeCallbackPath = "/api/auth/expo-web-success";
 const tokenCallbackPath = "/api/auth/token";
+const ensureForgotPasswordLink = `(() => {
+  try {
+    const addLink = () => {
+      if (window.location.pathname !== "/account/signin") return;
+      const hasLink = Array.from(document.querySelectorAll("a")).some(
+        (link) => link.textContent?.trim().toLowerCase() === "forgot password?",
+      );
+      if (hasLink) return;
+
+      const form = document.querySelector("form");
+      const submit = form?.querySelector('button[type="submit"], input[type="submit"]');
+      if (!form || !submit?.parentNode) return;
+
+      const wrapper = document.createElement("div");
+      wrapper.style.cssText = "margin-top:10px;margin-bottom:16px;text-align:right";
+      const link = document.createElement("a");
+      link.href = "/account/forgot-password" + window.location.search;
+      link.textContent = "Forgot password?";
+      link.style.cssText =
+        "font-size:14px;color:#1B3828;font-weight:600;text-decoration:underline;text-underline-offset:2px";
+      wrapper.appendChild(link);
+      submit.parentNode.insertBefore(wrapper, submit.nextSibling);
+    };
+
+    addLink();
+    new MutationObserver(addLink).observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
+  } catch (error) {
+    console.warn("Could not add password reset link", error);
+  }
+  return true;
+})();`;
 
 /**
  * This renders a WebView for authentication and handles both web and native platforms.
@@ -69,7 +103,15 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
       return;
     }
     const handleMessage = (event) => {
-      if (event.origin !== process.env.EXPO_PUBLIC_PROXY_BASE_URL) {
+      if (
+        ![baseURL, proxyURL].filter(Boolean).some((value) => {
+          try {
+            return event.origin === new URL(value).origin;
+          } catch {
+            return false;
+          }
+        })
+      ) {
         return;
       }
       if (event.data.type === "AUTH_SUCCESS") {
@@ -105,20 +147,28 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
   return (
     <WebView
       incognito
+      startInLoadingState
+      injectedJavaScript={ensureForgotPasswordLink}
+      renderLoading={() => (
+        <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "#F5F3EB", alignItems: "center", justifyContent: "center" }}>
+          <ActivityIndicator size="large" color="#193D2C" />
+          <Text style={{ marginTop: 14, color: "#193D2C", fontSize: 16 }}>Loading your secure sign-in…</Text>
+        </View>
+      )}
       sharedCookiesEnabled={false}
       thirdPartyCookiesEnabled={false}
       source={{
         uri: currentURI,
-      }}
-      headers={{
-        "x-createxyz-project-group-id":
-          process.env.EXPO_PUBLIC_PROJECT_GROUP_ID,
-        host: process.env.EXPO_PUBLIC_HOST,
-        "x-forwarded-host": process.env.EXPO_PUBLIC_HOST,
-        "x-createxyz-host": process.env.EXPO_PUBLIC_HOST,
+        headers: {
+          "x-createxyz-project-group-id":
+            process.env.EXPO_PUBLIC_PROJECT_GROUP_ID || "",
+          "x-createxyz-host": process.env.EXPO_PUBLIC_HOST || "",
+        },
       }}
       onMessage={(event) => {
         try {
+          const origin = new URL(event.nativeEvent.url).origin;
+          if (origin !== new URL(baseURL).origin) return;
           const data = JSON.parse(event.nativeEvent.data);
           if (data?.type === "AUTH_SUCCESS") {
             applyAuthSuccess(data);
@@ -164,15 +214,21 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
           return true;
         }
 
-        if (url.includes("/account/forgot-password")) {
-          return false;
-        }
-
         if (url === currentURI) return true;
 
         const hasParams = url.includes("?");
         const separator = hasParams ? "&" : "?";
-        const newURL = url.replaceAll(proxyURL, baseURL);
+        let parsed;
+        try {
+          parsed = new URL(url);
+        } catch {
+          return false;
+        }
+        const trusted = [baseURL, proxyURL]
+          .filter(Boolean)
+          .some((value) => parsed.origin === new URL(value).origin);
+        if (!trusted) return false;
+        const newURL = proxyURL ? url.replace(proxyURL, baseURL) : url;
 
         if (
           newURL.endsWith(tokenCallbackPath) ||
@@ -183,10 +239,7 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
         }
 
         // Keep callbackUrl attached when navigating between account pages
-        if (
-          newURL.includes("/account/") &&
-          !newURL.includes("callbackUrl=")
-        ) {
+        if (newURL.includes("/account/") && !newURL.includes("callbackUrl=")) {
           setURI(
             `${newURL}${separator}callbackUrl=${encodeURIComponent(nativeCallbackPath)}`,
           );
@@ -196,7 +249,8 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
         setURI(newURL);
         return false;
       }}
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: "#F5F3EB" }}
+      containerStyle={{ backgroundColor: "#F5F3EB" }}
     />
   );
 };

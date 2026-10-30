@@ -6,11 +6,14 @@ import {
   TouchableOpacity,
   Modal,
   Pressable,
+  Dimensions,
 } from "react-native";
 import { Image } from "expo-image";
 import { Camera, X } from "lucide-react-native";
 import { Colors, Radius } from "@/constants/theme";
 import { SCREEN_W, THUMB_H } from "@/components/Home/constants";
+
+const SCREEN_H = Dimensions.get("window").height;
 
 function PhotoFrame({ uri, onPress, width = "100%" }) {
   return (
@@ -36,6 +39,7 @@ function PhotoFrame({ uri, onPress, width = "100%" }) {
 export function ReviewPhotos({ urls = [] }) {
   const photos = (urls || []).filter(Boolean);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [frameWidth, setFrameWidth] = useState(SCREEN_W);
   const [lightbox, setLightbox] = useState(null);
 
   if (!photos.length) return null;
@@ -43,20 +47,24 @@ export function ReviewPhotos({ urls = [] }) {
   if (photos.length === 1) {
     return (
       <>
-        <View style={{ position: "relative", marginBottom: 4 }}>
+        <View onLayout={(event) => setFrameWidth(event.nativeEvent.layout.width)} style={{ position: "relative", marginBottom: 4 }}>
           <PhotoFrame
             uri={photos[0]}
             onPress={() => setLightbox({ uri: photos[0] })}
           />
         </View>
-        <ReviewPhotoLightbox lightbox={lightbox} onClose={() => setLightbox(null)} />
+        <ReviewPhotoLightbox
+          lightbox={lightbox}
+          photos={photos}
+          onClose={() => setLightbox(null)}
+        />
       </>
     );
   }
 
   return (
     <>
-      <View style={{ position: "relative", marginBottom: 4 }}>
+      <View onLayout={(event) => setFrameWidth(event.nativeEvent.layout.width)} style={{ position: "relative", marginBottom: 4 }}>
         <ScrollView
           horizontal
           pagingEnabled
@@ -64,7 +72,7 @@ export function ReviewPhotos({ urls = [] }) {
           style={{ flexGrow: 0 }}
           onMomentumScrollEnd={(e) => {
             setActiveIdx(
-              Math.round(e.nativeEvent.contentOffset.x / SCREEN_W),
+              Math.round(e.nativeEvent.contentOffset.x / frameWidth),
             );
           }}
         >
@@ -72,7 +80,7 @@ export function ReviewPhotos({ urls = [] }) {
             <PhotoFrame
               key={`${url}-${i}`}
               uri={url}
-              width={SCREEN_W}
+              width={frameWidth}
               onPress={() => setLightbox({ uri: url, index: i })}
             />
           ))}
@@ -123,12 +131,22 @@ export function ReviewPhotos({ urls = [] }) {
           ))}
         </View>
       </View>
-      <ReviewPhotoLightbox lightbox={lightbox} onClose={() => setLightbox(null)} />
+      <ReviewPhotoLightbox
+        lightbox={lightbox}
+        photos={photos}
+        onClose={() => setLightbox(null)}
+      />
     </>
   );
 }
 
-function ReviewPhotoLightbox({ lightbox, onClose }) {
+function ReviewPhotoLightbox({ lightbox, photos, onClose }) {
+  const [activeIdx, setActiveIdx] = useState(lightbox?.index || 0);
+
+  React.useEffect(() => {
+    if (lightbox) setActiveIdx(lightbox.index || 0);
+  }, [lightbox?.index, lightbox]);
+
   return (
     <Modal
       visible={!!lightbox}
@@ -136,30 +154,77 @@ function ReviewPhotoLightbox({ lightbox, onClose }) {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable
-        onPress={onClose}
+      <View
         style={{
           flex: 1,
           backgroundColor: "rgba(0,0,0,0.92)",
           justifyContent: "center",
           alignItems: "center",
-          padding: 20,
         }}
       >
+        <Pressable
+          onPress={onClose}
+          style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}
+        />
         <TouchableOpacity
           onPress={onClose}
           style={{ position: "absolute", top: 56, right: 20, zIndex: 2 }}
         >
           <X color="#fff" size={24} strokeWidth={2} />
         </TouchableOpacity>
-        {lightbox?.uri ? (
+        {photos.length > 1 ? (
+          <ScrollView
+            key={lightbox?.index || 0}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            contentOffset={{ x: (lightbox?.index || 0) * SCREEN_W, y: 0 }}
+            onMomentumScrollEnd={(event) => {
+              setActiveIdx(
+                Math.round(event.nativeEvent.contentOffset.x / SCREEN_W),
+              );
+            }}
+            style={{ flexGrow: 0, width: SCREEN_W, height: SCREEN_H * 0.78 }}
+          >
+            {photos.map((uri, index) => (
+              <View
+                key={`${uri}-${index}`}
+                style={{
+                  width: SCREEN_W,
+                  height: SCREEN_H * 0.78,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <Image
+                  source={{ uri }}
+                  style={{ width: "100%", height: "100%" }}
+                  contentFit="contain"
+                />
+              </View>
+            ))}
+          </ScrollView>
+        ) : lightbox?.uri ? (
           <Image
             source={{ uri: lightbox.uri }}
-            style={{ width: "100%", height: "70%" }}
+            style={{ width: SCREEN_W - 40, height: SCREEN_H * 0.7 }}
             contentFit="contain"
           />
         ) : null}
-      </Pressable>
+        {photos.length > 1 ? (
+          <Text
+            style={{
+              position: "absolute",
+              bottom: 36,
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: "700",
+            }}
+          >
+            {activeIdx + 1} / {photos.length}
+          </Text>
+        ) : null}
+      </View>
     </Modal>
   );
 }

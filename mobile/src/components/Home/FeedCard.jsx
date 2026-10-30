@@ -89,6 +89,8 @@ export function FeedCard({
 
       {/* Caption (for types that don't embed it) */}
       {post.caption &&
+        post.post_type !== "wishlist" &&
+        !(["review", "played_course"].includes(post.post_type) && post.review_text) &&
         ![
           "club_update",
           "community_discussion",
@@ -106,7 +108,7 @@ export function FeedCard({
                 fontStyle: "italic",
               }}
             >
-              "{post.caption}"
+              {post.caption}
             </Text>
           </View>
         )}

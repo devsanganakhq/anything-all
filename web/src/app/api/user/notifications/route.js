@@ -3,15 +3,15 @@
  * POST /api/user/notifications   — mark one or all as read
  *                                   body: { notificationId? }  (null = mark all)
  */
+import { notificationTarget } from "@/app/api/utils/notificationTarget";
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
 import { ensureCommunityInvitesTable } from "@/app/api/utils/ensureCommunityInvitesTable";
 
 export async function GET(request) {
-  const userId = await getSessionUserId(request);
-
   try {
+    const userId = await getSessionUserId(request);
     await ensureCommunityJoinRequestsTable();
     await ensureCommunityInvitesTable();
     // Ensure newer FK columns exist on older DBs
@@ -34,11 +34,16 @@ export async function GET(request) {
           n.feed_post_id,
           n.community_post_id,
           n.message,
+          n.target_path,
+          af.course_id AS activity_course_id,
+          a.slug AS achievement_slug,
+          (SELECT f.id FROM feed_posts f WHERE f.author_id=af.user_id
+            AND f.metadata->>'review_id'=af.review_id::text ORDER BY f.id DESC LIMIT 1) AS related_post_id,
           n.read_at,
           n.created_at,
 
           -- From user (safe — no email)
-          u.first_name || ' ' || u.last_name  AS from_user_name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer')  AS from_user_name,
           u.profile_photo_url                  AS from_user_photo,
 
           -- Community name (if any)
@@ -78,6 +83,8 @@ export async function GET(request) {
         FROM notifications n
         LEFT JOIN users u ON n.from_user_id = u.id
         LEFT JOIN communities c ON n.community_id = c.id
+        LEFT JOIN activity_feed af ON af.id=n.activity_id
+        LEFT JOIN achievements a ON a.id=af.achievement_id
         WHERE n.user_id = $1
         ORDER BY n.created_at DESC
         LIMIT 100`,
@@ -86,18 +93,21 @@ export async function GET(request) {
 
     const unreadCount = notifications.filter((n) => !n.read_at).length;
 
-    return Response.json({ notifications, unread_count: unreadCount });
+    return Response.json({ notifications: notifications.map(n => ({ ...n, target_path: notificationTarget(n) })), unread_count: unreadCount });
   } catch (error) {
-    console.error("Notifications error:", error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return notificationError(error);
   }
 }
 
 export async function POST(request) {
-  const userId = await getSessionUserId(request);
-  const { notificationId } = await request.json();
-
   try {
+    const userId = await getSessionUserId(request);
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
+    const { notificationId } = body;
+    if (notificationId != null && (!Number.isSafeInteger(notificationId) || notificationId <= 0))
+      return Response.json({ error: "Invalid notification ID" }, { status: 400 });
     if (notificationId) {
       await sql(
         `UPDATE notifications SET read_at=NOW()
@@ -113,6 +123,13 @@ export async function POST(request) {
     }
     return Response.json({ success: true });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return notificationError(error);
   }
+}
+
+function notificationError(error) {
+  const status = error.code === "ACCOUNT_SUSPENDED" ? 403
+    : ["UNAUTHENTICATED", "AUTH_ERROR"].includes(error.code) ? 401 : 500;
+  if (status === 500) console.error("Notifications request failed", { code: error.code });
+  return Response.json({ error: status === 500 ? "Unable to load or update notifications" : error.message }, { status });
 }

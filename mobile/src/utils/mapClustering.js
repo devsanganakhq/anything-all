@@ -8,8 +8,6 @@ export const UK_OVERVIEW_REGION = {
   longitudeDelta: 9.0,
 };
 
-const MAX_LEAF_MARKERS = 150;
-
 const CLUSTER_OPTIONS = {
   radius: 60,
   maxZoom: 18,
@@ -130,13 +128,9 @@ export function getMapClusters(index, region) {
     const bbox = regionToBBox(region);
     const zoom = regionToZoom(region);
     if (!Number.isFinite(zoom)) return [];
-    const features = index.getClusters(bbox, zoom);
-    const clusters = features.filter((feature) => feature.properties.cluster);
-    const leaves = features.filter((feature) => !feature.properties.cluster);
-    if (leaves.length <= MAX_LEAF_MARKERS) {
-      return features;
-    }
-    return [...clusters, ...leaves.slice(0, MAX_LEAF_MARKERS)];
+    // Supercluster already reduces dense areas to aggregate markers. Slicing
+    // the remaining leaves here made valid courses disappear at wide zooms.
+    return index.getClusters(bbox, zoom);
   } catch {
     return [];
   }

@@ -7,7 +7,7 @@ import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunit
 import { ensureCommunityInvitesTable } from "@/app/api/utils/ensureCommunityInvitesTable";
 
 export async function GET(request, { params }) {
-  const userId = (await getSessionUserIdOrNull()) ?? 0;
+  const userId = (await getSessionUserIdOrNull(request)) ?? 0;
   const { id } = params;
   const communityId = parseInt(id, 10);
 
@@ -18,6 +18,7 @@ export async function GET(request, { params }) {
     const rows = await sql(
       `SELECT
           c.*,
+          COALESCE((SELECT muted FROM community_members WHERE community_id=c.id AND user_id=$2),false) AS muted,
           (SELECT COUNT(*)::int FROM community_members WHERE community_id=c.id) AS member_count,
           (SELECT COUNT(*)::int FROM community_posts WHERE community_id=c.id AND is_deleted=false) AS post_count,
           (SELECT role FROM community_members WHERE community_id=c.id AND user_id=$2 LIMIT 1) AS my_role,
@@ -33,7 +34,7 @@ export async function GET(request, { params }) {
           (SELECT id FROM community_invites
             WHERE community_id=c.id AND invitee_id=$2 AND status='pending'
             LIMIT 1) AS pending_invite_id,
-          ou.first_name||' '||ou.last_name AS owner_name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', ou.first_name, ou.last_name)), ''), 'Golfer') AS owner_name,
           ou.profile_photo_url AS owner_photo
         FROM communities c
         JOIN users ou ON c.created_by=ou.id
@@ -69,7 +70,7 @@ export async function GET(request, { params }) {
     const mods = await sql(
       `SELECT
           u.id,
-          u.first_name||' '||u.last_name AS name,
+          COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer') AS name,
           u.profile_photo_url AS avatar,
           u.home_club_name AS home_club,
           cm.role,

@@ -12,17 +12,14 @@
  * Rules:
  *  - Must be authenticated
  *  - User must have played the course (played_courses record exists)
- *  - Max 10 photos per review / standalone upload batch
+ *  - Max 3 photos per review / standalone upload batch
  *  - termsAccepted must be true
  */
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
-import {
-  createFeedPost,
-  buildCaption,
-} from "@/app/api/utils/createFeedPost";
+import { createFeedPost, buildCaption } from "@/app/api/utils/createFeedPost";
 
-const MAX_PHOTOS_PER_BATCH = 10;
+const MAX_PHOTOS_PER_BATCH = 3;
 const CURRENT_TERMS_VERSION = "1.0";
 
 export async function POST(request) {
@@ -100,7 +97,23 @@ export async function POST(request) {
 
     const acceptedAt = new Date().toISOString();
     const tv = termsVersion || CURRENT_TERMS_VERSION;
-    const linkedReviewId = reviewId || playedRows[0].id;
+    const linkedReviewId = playedRows[0].id;
+    if (reviewId != null && Number(reviewId) !== linkedReviewId)
+      return Response.json(
+        { error: "Review does not belong to this course and account" },
+        { status: 400 },
+      );
+    for (const p of photos) {
+      try {
+        const u = new URL(p.imageUrl);
+        if (u.protocol !== "https:" || u.username || u.password) throw Error();
+      } catch {
+        return Response.json(
+          { error: "Each photo must have a valid HTTPS image URL" },
+          { status: 400 },
+        );
+      }
+    }
 
     // Insert all photos
     const insertedIds = [];

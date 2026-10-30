@@ -10,19 +10,20 @@ import { createNotification } from "@/app/api/utils/createNotification";
 export async function POST(request) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const { followeeId, followeeType = "user" } = await request.json();
+  const { followeeId: rawFolloweeId, followeeType = "user" } = await request.json();
+  const followeeId = Number(rawFolloweeId);
   const validTypes = ["user", "club", "course", "community"];
-  if (!followeeId || !validTypes.includes(followeeType))
+  if (!Number.isSafeInteger(followeeId) || followeeId <= 0 || !validTypes.includes(followeeType))
     return Response.json(
       { error: "followeeId and valid followeeType required" },
       { status: 400 },
     );
-  if (followeeType === "user" && followeeId === userId)
+  if (followeeType === "user" && followeeId === Number(userId))
     return Response.json({ error: "Cannot follow yourself" }, { status: 400 });
 
   try {
@@ -51,17 +52,18 @@ export async function POST(request) {
       return Response.json({ following: false });
     }
 
-    await sql(
-      `INSERT INTO follows (follower_id, followee_type, followee_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+    const inserted = await sql(
+      `INSERT INTO follows (follower_id, followee_type, followee_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING RETURNING id`,
       [userId, followeeType, followeeId],
     );
 
-    if (followeeType === "user") {
+    if (followeeType === "user" && inserted.length) {
       await createNotification({
         userId: followeeId,
-        notificationType: "mention",
+        notificationType: "follow",
         fromUserId: userId,
         message: "started following you",
+        eventKey: `follow:${inserted[0].id}`,
       });
     }
 
@@ -78,7 +80,7 @@ export async function POST(request) {
 export async function GET(request) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }

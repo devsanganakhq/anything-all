@@ -22,7 +22,7 @@
  *   onUploadPress   fn?    — shown when user has played the course
  *   showUploadBtn   bool   — whether to show the "Add photos" CTA
  */
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -66,12 +66,19 @@ export function CoursePhotoCarousel({
   course = {},
   onUploadPress,
   showUploadBtn = false,
+  galleryRequest = null,
 }) {
   const qc = useQueryClient();
   const carouselRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  useEffect(() => {
+    if (galleryRequest && photos.length) {
+      setGalleryIndex(Math.min(galleryRequest.index, photos.length - 1));
+      setGalleryOpen(true);
+    }
+  }, [galleryRequest]);
   const [reportModal, setReportModal] = useState(false);
   const [reportPhotoId, setReportPhotoId] = useState(null);
 
@@ -117,9 +124,7 @@ export function CoursePhotoCarousel({
       setLikeState((s) => {
         wasLiked = s[key] !== undefined ? s[key].liked : !!photo?.user_liked;
         prevCount =
-          s[key] !== undefined
-            ? s[key].count
-            : Number(photo?.like_count) || 0;
+          s[key] !== undefined ? s[key].count : Number(photo?.like_count) || 0;
         return {
           ...s,
           [key]: {
@@ -187,7 +192,9 @@ export function CoursePhotoCarousel({
       const photo = photos.find((p) => Number(p.id) === id);
       if (!photo) return;
       const wasLiked =
-        likeState[key] !== undefined ? likeState[key].liked : !!photo.user_liked;
+        likeState[key] !== undefined
+          ? likeState[key].liked
+          : !!photo.user_liked;
 
       pendingLikeIds.current.add(key);
       likeMutation.mutate({ photoId: id, liked: !wasLiked });

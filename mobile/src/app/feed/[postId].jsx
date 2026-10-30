@@ -1,3 +1,4 @@
+import { shareLink } from "@/utils/shareLinks";
 /**
  * Feed post detail — opened from like/comment notifications.
  * Shows the post and optionally opens comments.
@@ -28,8 +29,7 @@ export default function FeedPostScreen() {
   const qc = useQueryClient();
   const { postId, openComments } = useLocalSearchParams();
   const id = parseInt(Array.isArray(postId) ? postId[0] : postId, 10);
-  const shouldOpenComments =
-    openComments === "1" || openComments === "true";
+  const shouldOpenComments = openComments === "1" || openComments === "true";
 
   const [commentOpen, setCommentOpen] = useState(false);
   const [reactionPost, setReactionPost] = useState(null);
@@ -105,8 +105,8 @@ export default function FeedPostScreen() {
     try {
       const coursePart = post.course_name ? ` at ${post.course_name}` : "";
       await Share.share({
-        message: `${post.author_name} on Heathland Links${coursePart}`,
-        url: `https://heathlandlinks.com/feed/${post.id}`,
+        message: `${post.author_name} on Heathland Links${coursePart}\n${shareLink("feed", post.id)}`,
+        url: shareLink("feed", post.id),
       });
     } catch {}
   }, [post]);
@@ -152,7 +152,9 @@ export default function FeedPostScreen() {
       </View>
 
       {isLoading ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View
+          style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+        >
           <ActivityIndicator color={Colors.green} />
         </View>
       ) : isError || !post ? (
@@ -184,10 +186,7 @@ export default function FeedPostScreen() {
           >
             This post may have been deleted or hidden.
           </Text>
-          <TouchableOpacity
-            onPress={() => refetch()}
-            style={{ marginTop: 20 }}
-          >
+          <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 20 }}>
             <Text style={{ color: Colors.green, fontWeight: "600" }}>
               Try again
             </Text>

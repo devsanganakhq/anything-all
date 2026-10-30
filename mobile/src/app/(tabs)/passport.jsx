@@ -1,3 +1,6 @@
+import { PassportActivitySection } from "@/components/PassportActivitySections";
+import { CuratedLists } from "@/components/CuratedLists";
+import { PassportFavourites } from "@/components/PassportFavourites";
 /**
  * Golf Passport — Lifetime Journey
  * A premium, visual record of every course played, ranked and reviewed.
@@ -138,7 +141,11 @@ export default function PassportScreen() {
   });
 
   const lbScope =
-    lbTab === "THIS YEAR" ? "year" : lbTab === "FRIENDS" ? "friends" : "overall";
+    lbTab === "THIS YEAR"
+      ? "year"
+      : lbTab === "FRIENDS"
+        ? "friends"
+        : "overall";
 
   const { data: leaderboardData, isLoading: lbLoading } = useQuery({
     queryKey: ["leaderboard", lbScope],
@@ -196,14 +203,14 @@ export default function PassportScreen() {
       icon: CheckCircle,
       count: stats.played_count,
       color: Colors.green,
-      route: "/passport/played",
+      kind: "played",
     },
     {
       label: "Wish List",
       icon: Heart,
       count: stats.wishlist_count,
       color: "#C9952A",
-      route: "/passport/wishlist",
+      kind: "wishlist",
     },
     ...(SHOW_RANKINGS
       ? [
@@ -218,11 +225,18 @@ export default function PassportScreen() {
         ]
       : []),
     {
+      label: "Rounds",
+      icon: CheckCircle,
+      count: stats.rounds_count || 0,
+      color: Colors.green,
+      kind: "rounds",
+    },
+    {
       label: "Reviews",
       icon: MessageSquare,
       count: stats.reviews_count,
       color: Colors.green,
-      route: "/passport/played",
+      kind: "reviews",
     },
     {
       label: "Achievements",
@@ -487,7 +501,10 @@ export default function PassportScreen() {
             <View
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.12)" }}
             />
-            <HeroStat label="REVIEWS" value={stats.reviews_count} />
+            <HeroStat
+              label="LISTS COMPLETED"
+              value={stats.lists_completed || 0}
+            />
             <View
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.12)" }}
             />
@@ -498,6 +515,8 @@ export default function PassportScreen() {
           </View>
         </View>
 
+        <PassportFavourites editable />
+        <CuratedLists passport />
         {/* ── Courses by country mini-bar ──────────────────────────────────── */}
         {byCountry.length > 0 && (
           <View style={{ marginHorizontal: Spacing.screenH, marginBottom: 22 }}>
@@ -567,7 +586,9 @@ export default function PassportScreen() {
         <View style={{ marginHorizontal: Spacing.screenH, marginTop: 22 }}>
           <SectionHeader label="MY PASSPORT" icon={BookOpen} inline />
           <View style={{ gap: 9, marginTop: 10 }}>
-            {SECTIONS.map((s) => (
+            {SECTIONS.map((s) => s.kind ? (
+              <PassportActivitySection key={s.label} kind={s.kind} label={s.label} />
+            ) : (
               <PassportSectionRow
                 key={s.label}
                 section={s}
@@ -922,7 +943,7 @@ export default function PassportScreen() {
                         >
                           COURSES
                         </Text>
-                        </View>
+                      </View>
                     </TouchableOpacity>
                   ))}
                 </View>

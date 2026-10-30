@@ -90,8 +90,11 @@ export default function NeonAdapter(client: Pool): NeonAdapter {
       }
     },
     async getUserByEmail(email) {
-      const sql = 'select * from auth_users where email = $1';
+      const sql = 'select * from auth_users where lower(trim(email)) = lower(trim($1)) LIMIT 2';
       const result = await client.query(sql, [email]);
+      if ((result.rowCount ?? 0) > 1) {
+        throw new Error('Multiple authentication records exist for this email; account review is required');
+      }
       if (result.rowCount === 0) {
         return null;
       }

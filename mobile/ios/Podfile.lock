@@ -2567,7 +2567,7 @@ DEPENDENCIES:
   - React-logger (from `../node_modules/react-native/ReactCommon/logger`)
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
-  - react-native-google-maps (from `/Users/tk-lpt-0836/Documents/Pr/anything/apps/mobile/node_modules/react-native-maps`)
+  - react-native-google-maps (from `../node_modules/react-native-maps`)
   - react-native-keyboard-controller (from `../node_modules/react-native-keyboard-controller`)
   - react-native-maps (from `../node_modules/react-native-maps`)
   - "react-native-menu (from `../node_modules/@react-native-menu/menu`)"
@@ -2608,8 +2608,8 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
-  - RevenueCat (from `/Users/tk-lpt-0836/.cache/purchases-ios-5.45.0`)
-  - RevenueCatUI (from `/Users/tk-lpt-0836/.cache/purchases-ios-5.45.0`)
+  - RevenueCat (= 5.45.0)
+  - RevenueCatUI (= 5.45.0)
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - "RNCMaskedView (from `../node_modules/@react-native-masked-view/masked-view`)"
   - "RNCPicker (from `../node_modules/@react-native-picker/picker`)"
@@ -2620,7 +2620,7 @@ DEPENDENCIES:
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSVG (from `../node_modules/react-native-svg`)
   - RNWorklets (from `../node_modules/react-native-worklets`)
-  - SDWebImage (from `/Users/tk-lpt-0836/.cache/SDWebImage-5.21.7`)
+  - SDWebImage (= 5.21.7)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
@@ -2634,6 +2634,9 @@ SPEC REPOS:
     - PurchasesHybridCommon
     - PurchasesHybridCommonUI
     - ReachabilitySwift
+    - RevenueCat
+    - RevenueCatUI
+    - SDWebImage
     - SDWebImageAVIFCoder
     - SDWebImageSVGCoder
     - SDWebImageWebPCoder
@@ -2814,7 +2817,7 @@ EXTERNAL SOURCES:
   React-microtasksnativemodule:
     :path: "../node_modules/react-native/ReactCommon/react/nativemodule/microtasks"
   react-native-google-maps:
-    :path: "/Users/tk-lpt-0836/Documents/Pr/anything/apps/mobile/node_modules/react-native-maps"
+    :path: "../node_modules/react-native-maps"
   react-native-keyboard-controller:
     :path: "../node_modules/react-native-keyboard-controller"
   react-native-maps:
@@ -2895,10 +2898,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   ReactNativeDependencies:
     :podspec: "../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
-  RevenueCat:
-    :path: "/Users/tk-lpt-0836/.cache/purchases-ios-5.45.0"
-  RevenueCatUI:
-    :path: "/Users/tk-lpt-0836/.cache/purchases-ios-5.45.0"
   RNCAsyncStorage:
     :path: "../node_modules/@react-native-async-storage/async-storage"
   RNCMaskedView:
@@ -2919,8 +2918,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-svg"
   RNWorklets:
     :path: "../node_modules/react-native-worklets"
-  SDWebImage:
-    :path: "/Users/tk-lpt-0836/.cache/SDWebImage-5.21.7"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 

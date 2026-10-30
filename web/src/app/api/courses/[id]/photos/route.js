@@ -71,8 +71,7 @@ export async function GET(request, { params }) {
          AND  cp.moderation_status = 'approved'
          AND  cp.deleted_at IS NULL
        ORDER BY cp.is_featured DESC,
-                cp.like_count   DESC,
-                cp.uploaded_at  DESC
+                cp.uploaded_at DESC, cp.id DESC
        LIMIT  $2 OFFSET $3`,
       [courseId, limit, offset],
     );

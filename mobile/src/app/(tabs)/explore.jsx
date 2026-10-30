@@ -10,7 +10,14 @@
  *   ♥ Gold        — wishlisted (not yet played)
  *   ✓ Bright green — already played
  */
-import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { CuratedLists } from "@/components/CuratedLists";
+import React, {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  useMemo,
+} from "react";
 import {
   View,
   Text,
@@ -22,6 +29,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { fetchCoursePages } from "@/utils/coursePages";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -31,7 +39,12 @@ import {
   MAP_STYLE,
   MARKER,
 } from "@/components/ExploreMapShared";
-import { UK_OVERVIEW_REGION, getClusterZoomRegion, quantizeMapRegion, regionsEqual } from "@/utils/mapClustering";
+import {
+  UK_OVERVIEW_REGION,
+  getClusterZoomRegion,
+  quantizeMapRegion,
+  regionsEqual,
+} from "@/utils/mapClustering";
 import { useMapClusters } from "@/utils/useMapClusters";
 import {
   Search,
@@ -61,7 +74,10 @@ import { SHOW_RANKINGS } from "@/constants/courseConstants";
 import { RANKING_COLLECTIONS, ACCENT_HEX } from "@/data/rankingCollections";
 import { CourseImagePlaceholder } from "@/components/CourseImagePlaceholder";
 import { CourseListRow } from "@/components/CourseListRow";
-import { MapCoursePreviewCard, markPlayedHref } from "@/components/MapCoursePreviewCard";
+import {
+  MapCoursePreviewCard,
+  markPlayedHref,
+} from "@/components/MapCoursePreviewCard";
 import {
   courseDisplayName,
   formatCourseHolesPar,
@@ -102,6 +118,9 @@ const COUNTRY_FLAGS = {
   "the netherlands": "🇳🇱",
   holland: "🇳🇱",
   "isle of man": "🇮🇲",
+  uae: "🇦🇪",
+  "united arab emirates": "🇦🇪",
+  dubai: "🇦🇪",
 };
 
 function countryFlagEmoji(country) {
@@ -272,7 +291,8 @@ export default function ExploreScreen() {
   // navigation. `open` is a nonce the caller changes to force a re-apply.
   useEffect(() => {
     if (paramView === "MAP" || paramView === "LIST") setViewMode(paramView);
-    if (MAP_FILTERS.some((f) => f.key === paramFilter)) setMapFilter(paramFilter);
+    if (MAP_FILTERS.some((f) => f.key === paramFilter))
+      setMapFilter(paramFilter);
   }, [paramView, paramFilter, paramOpen]);
 
   // ── Search state ─────────────────────────────────────────────────────────
@@ -325,11 +345,8 @@ export default function ExploreScreen() {
     isFetching: mapFetching,
   } = useQuery({
     queryKey: ["courses-map", mapFilter],
-    queryFn: async () => {
-      const res = await fetch(`/api/courses/map?filter=${mapFilter}`);
-      if (!res.ok) throw new Error("Failed to fetch map data");
-      return res.json();
-    },
+    queryFn: ({ signal }) =>
+      fetchCoursePages(`/api/courses/map?filter=${mapFilter}`, signal),
     staleTime: 1000 * 30, // 30 s
   });
   const mapCourses = mapData?.courses ?? [];
@@ -413,7 +430,9 @@ export default function ExploreScreen() {
     return {
       collections: mergedCollections,
       namedCollections: named,
-      topRatedCol: mergedCollections.find((c) => c.id === "community-top-rated"),
+      topRatedCol: mergedCollections.find(
+        (c) => c.id === "community-top-rated",
+      ),
       mostPlayedCol: mergedCollections.find((c) => c.id === "most-played"),
       trendingCol: mergedCollections.find((c) => c.id === "trending"),
       hiddenGemsCol: mergedCollections.find((c) => c.id === "hidden-gems"),
@@ -479,18 +498,9 @@ export default function ExploreScreen() {
   const handleMarkerPress = useCallback(
     (course) => {
       lastMarkerPressAt.current = Date.now();
-      setSelectedCourse(course);
-      // Defer animation so iOS map press / marker remount don't race native driver.
-      requestAnimationFrame(() => {
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 60,
-          friction: 10,
-        }).start();
-      });
+      router.push(`/course/${course.id}`);
     },
-    [slideAnim],
+    [router],
   );
 
   const closePreview = useCallback(() => {
@@ -997,10 +1007,13 @@ export default function ExploreScreen() {
           paddingBottom: insets.bottom + 100,
         }}
       >
+        <CuratedLists />
         {/* ── RANKING COLLECTIONS ── (hidden for now; flip SHOW_RANKING_COLLECTIONS) */}
         {SHOW_RANKING_COLLECTIONS && (
           <>
-            <View style={{ paddingHorizontal: Spacing.screenH, marginBottom: 14 }}>
+            <View
+              style={{ paddingHorizontal: Spacing.screenH, marginBottom: 14 }}
+            >
               <Text
                 style={{
                   fontSize: 9,
@@ -1080,9 +1093,9 @@ export default function ExploreScreen() {
                   lineHeight: 15,
                 }}
               >
-                Ranking collections show verified positions from published sources.
-                Incomplete lists display only confirmed courses — missing spots are
-                awaiting verification.
+                Ranking collections show verified positions from published
+                sources. Incomplete lists display only confirmed courses —
+                missing spots are awaiting verification.
               </Text>
             </View>
           </>

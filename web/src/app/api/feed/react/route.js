@@ -1,3 +1,4 @@
+import { visibleFeedPost } from "@/app/api/utils/feedVisibility";
 /**
  * POST /api/feed/react
  * Toggle a reaction on a feed post.
@@ -10,7 +11,13 @@ import { getSessionUserId } from "@/app/api/utils/getUserId";
 import { createNotification } from "@/app/api/utils/createNotification";
 
 export async function POST(request) {
-  const { postId, reaction } = await request.json();
+  const { postId, reaction: requestedReaction } = await request.json();
+  if (
+    requestedReaction != null &&
+    !["like", "love", "celebrate"].includes(requestedReaction)
+  )
+    return Response.json({ error: "Invalid reaction" }, { status: 400 });
+  const reaction = requestedReaction == null ? null : "like";
   const userId = await getSessionUserId(request);
 
   if (!postId)
@@ -18,10 +25,8 @@ export async function POST(request) {
 
   try {
     // Check if post exists and is visible; need author for notifications
-    const post = await sql(
-      `SELECT id, author_id FROM feed_posts WHERE id = $1 AND is_private = false`,
-      [postId],
-    );
+    const found = await visibleFeedPost(userId, postId);
+    const post = found ? [found] : [];
     if (!post.length)
       return Response.json({ error: "Post not found" }, { status: 404 });
 
@@ -32,10 +37,7 @@ export async function POST(request) {
 
     let userReaction = null;
 
-    if (
-      !reaction ||
-      (existing.length && existing[0].reaction_type === reaction)
-    ) {
+    if (!reaction || (existing.length && !!reaction)) {
       // Remove reaction (toggle off or explicit null)
       await sql(
         `DELETE FROM feed_reactions WHERE post_id = $1 AND user_id = $2`,
@@ -56,6 +58,7 @@ export async function POST(request) {
         notificationType: "feed_like",
         fromUserId: userId,
         message: "liked your post",
+        eventKey: `feed-like:${postId}:${userId}`,
         feedPostId: parseInt(postId, 10),
       });
     }

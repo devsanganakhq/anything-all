@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View, useWindowDimensions } from "react-native";
 import { Home, Compass, BookOpen, Users, User } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors, TabBar } from "@/constants/theme";
@@ -21,6 +21,8 @@ function TabIcon({ Icon, color, focused }) {
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const barHeight = BAR_HEIGHT + Math.max(0, fontScale - 1) * 24;
 
   return (
     <Tabs
@@ -37,7 +39,7 @@ export default function TabLayout() {
           left: BAR_INSET,
           right: BAR_INSET,
           bottom: Math.max(insets.bottom, 8) + BAR_LIFT,
-          height: BAR_HEIGHT,
+          height: barHeight,
           borderRadius: BAR_RADIUS,
           borderTopWidth: 0,
           backgroundColor: "transparent",
@@ -51,7 +53,7 @@ export default function TabLayout() {
           paddingHorizontal: 0,
         },
         tabBarLabelPosition: "below-icon",
-        tabBarAllowFontScaling: false,
+        tabBarAllowFontScaling: true,
         tabBarLabelStyle: {
           fontSize: 9.5,
           fontWeight: "600",

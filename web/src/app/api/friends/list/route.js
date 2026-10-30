@@ -8,7 +8,7 @@ import { getSessionUserId } from "@/app/api/utils/getUserId";
 export async function GET(request) {
   let userId;
   try {
-    userId = await getSessionUserId();
+    userId = await getSessionUserId(request);
   } catch {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -33,7 +33,7 @@ export async function GET(request) {
         `SELECT
             f.id,
             CASE WHEN f.user_id=$1 THEN f.friend_id ELSE f.user_id END AS friend_id,
-            CASE WHEN f.user_id=$1 THEN u2.first_name||' '||u2.last_name ELSE u1.first_name||' '||u1.last_name END AS friend_name,
+            CASE WHEN f.user_id=$1 THEN COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u2.first_name, u2.last_name)), ''), 'Golfer') ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u1.first_name, u1.last_name)), ''), 'Golfer') END AS friend_name,
             CASE WHEN f.user_id=$1 THEN u2.profile_photo_url ELSE u1.profile_photo_url END AS friend_photo,
             CASE WHEN f.user_id=$1 THEN u2.location ELSE u1.location END AS friend_location,
             CASE WHEN f.user_id=$1 THEN u2.home_club_name ELSE u1.home_club_name END AS home_club,
@@ -55,7 +55,7 @@ export async function GET(request) {
         `SELECT
             f.id,
             CASE WHEN f.user_id=$1 THEN f.friend_id ELSE f.user_id END AS friend_id,
-            CASE WHEN f.user_id=$1 THEN u2.first_name||' '||u2.last_name ELSE u1.first_name||' '||u1.last_name END AS friend_name,
+            CASE WHEN f.user_id=$1 THEN COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u2.first_name, u2.last_name)), ''), 'Golfer') ELSE COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u1.first_name, u1.last_name)), ''), 'Golfer') END AS friend_name,
             CASE WHEN f.user_id=$1 THEN u2.profile_photo_url ELSE u1.profile_photo_url END AS friend_photo,
             CASE WHEN f.user_id=$1 THEN u2.location ELSE u1.location END AS friend_location,
             CASE WHEN f.user_id=$1 THEN u2.home_club_name ELSE u1.home_club_name END AS home_club,

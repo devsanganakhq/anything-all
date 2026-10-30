@@ -8,17 +8,22 @@
  * Internally delegates to the same forgot-password logic.
  */
 import { randomBytes } from "crypto";
-import { auth } from "@/auth";
+import { getSessionUserId } from "@/app/api/utils/getUserId";
 import sql from "@/app/api/utils/sql";
 import { sendEmail } from "@/app/api/utils/send-email";
+import { passwordResetUrl } from "@/app/api/utils/passwordResetUrl";
 
 const RATE_LIMIT_WINDOW_MINUTES = 30;
 const RATE_LIMIT_MAX_REQUESTS = 3;
 const TOKEN_EXPIRY_MINUTES = 60;
 
-export async function POST() {
-  const session = await auth();
-  const email = session?.user?.email;
+export async function POST(request) {
+  let email;
+  try {
+    const userId = await getSessionUserId(request);
+    const rows = await sql("SELECT email FROM users WHERE id=$1", [userId]);
+    email = rows[0]?.email;
+  } catch {}
 
   if (!email) {
     return Response.json({ error: "Not authenticated" }, { status: 401 });
@@ -63,11 +68,7 @@ export async function POST() {
     );
 
     // ── Build reset URL ───────────────────────────────────────────────────
-    const baseUrl =
-      process.env.NEXT_PUBLIC_CREATE_APP_URL ||
-      process.env.AUTH_URL ||
-      "https://heathlandlinks.com";
-    const resetUrl = `${baseUrl}/account/reset-password?token=${token}`;
+    const resetUrl = passwordResetUrl(token);
 
     // ── Send email ────────────────────────────────────────────────────────
     await sendEmail({

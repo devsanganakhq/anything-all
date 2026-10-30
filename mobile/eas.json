@@ -15,6 +15,10 @@
       "distribution": "internal",
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "0"
+      },
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
       }
     },
     "production": {
@@ -28,9 +32,57 @@
       "env": {
         "EXPO_USE_PRECOMPILED_MODULES": "0"
       }
+    },
+    "testflight": {
+      "extends": "production",
+      "ios": {
+        "distribution": "store"
+      }
+    },
+    "client-preview": {
+      "extends": "preview",
+      "environment": "preview",
+      "autoIncrement": true,
+      "env": {
+        "HEATHLAND_CLIENT_PROJECT": "1",
+        "EXPO_PUBLIC_BASE_URL": "https://anything-all-git-fix-heathland-client-scope-sanganak-hq.vercel.app",
+        "EXPO_PUBLIC_PROXY_BASE_URL": "https://anything-all-git-fix-heathland-client-scope-sanganak-hq.vercel.app"
+      }
+    },
+    "client-testflight": {
+      "extends": "testflight",
+      "environment": "preview",
+      "env": {
+        "HEATHLAND_CLIENT_PROJECT": "1",
+        "EXPO_PUBLIC_BASE_URL": "https://anything-all-git-fix-heathland-client-scope-sanganak-hq.vercel.app",
+        "EXPO_PUBLIC_PROXY_BASE_URL": "https://anything-all-git-fix-heathland-client-scope-sanganak-hq.vercel.app"
+      }
+    },
+    "client-simulator": {
+      "extends": "client-preview",
+      "autoIncrement": false,
+      "ios": {
+        "simulator": true
+      }
+    },
+    "client-production": {
+      "extends": "production",
+      "environment": "production",
+      "autoIncrement": true,
+      "env": {
+        "HEATHLAND_CLIENT_PROJECT": "1",
+        "EXPO_PUBLIC_BASE_URL": "https://anything-all.vercel.app",
+        "EXPO_PUBLIC_PROXY_BASE_URL": "https://anything-all.vercel.app"
+      }
     }
   },
   "submit": {
+    "client-testflight": {
+      "ios": {
+        "ascAppId": "6806807118",
+        "appleId": "devsanganakhq@gmail.com"
+      }
+    },
     "production": {
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",

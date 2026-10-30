@@ -45,3 +45,8 @@ app-example
 .metro-virtual/*
 
 caches/*
+# Private cloud service-account credentials must never ship with the app.
+*firebase-adminsdk*.json
+*service-account*.json
+
+credentials.json

@@ -1,3 +1,4 @@
+import { safeNotificationPath } from "@/utils/usePushNotifications";
 /**
  * Notifications screen
  * Shows all notification types with inline actions for friend requests.
@@ -178,12 +179,7 @@ export default function NotificationsScreen() {
   });
 
   const respondJoinRequestMutation = useMutation({
-    mutationFn: async ({
-      communityId,
-      requestId,
-      action,
-      notificationId,
-    }) => {
+    mutationFn: async ({ communityId, requestId, action, notificationId }) => {
       const r = await fetch(`/api/communities/${communityId}/join-requests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -206,20 +202,12 @@ export default function NotificationsScreen() {
   });
 
   const respondInviteMutation = useMutation({
-    mutationFn: async ({
-      communityId,
-      inviteId,
-      action,
-      notificationId,
-    }) => {
-      const r = await fetch(
-        `/api/communities/${communityId}/invites/respond`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ inviteId, action }),
-        },
-      );
+    mutationFn: async ({ communityId, inviteId, action, notificationId }) => {
+      const r = await fetch(`/api/communities/${communityId}/invites/respond`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteId, action }),
+      });
       if (!r.ok) throw new Error("Failed");
       if (notificationId) {
         await fetch("/api/user/notifications", {
@@ -247,11 +235,14 @@ export default function NotificationsScreen() {
       // Mark as read then navigate
       if (!n.read_at) markReadMutation.mutate(n.id);
 
-      if (n.notification_type === "friend_request" && n.from_user_id) {
-        openUserProfile(n.from_user_id);
-      } else if (
-        ["feed_like", "feed_comment"].includes(n.notification_type)
-      ) {
+      const target = safeNotificationPath(n.target_path);
+      if (target) {
+        router.push(target);
+        return;
+      }
+      if (n.notification_type === "friend_request") {
+        router.push("/friends");
+      } else if (["feed_like", "feed_comment"].includes(n.notification_type)) {
         if (n.feed_post_id) {
           const openComments =
             n.notification_type === "feed_comment" ? "?openComments=1" : "";
@@ -265,6 +256,8 @@ export default function NotificationsScreen() {
         router.push("/(tabs)");
       } else if (
         [
+          "community_message",
+          "community_post",
           "community_invite",
           "community_invite_received",
           "community_invite_accepted",
@@ -287,6 +280,8 @@ export default function NotificationsScreen() {
                   ? "&openComments=1"
                   : ""
               }`
+            : n.notification_type === "community_message"
+              ? "?tab=CHAT"
             : n.notification_type === "community_invite"
               ? "?tab=REQUESTS"
               : "";
@@ -654,7 +649,12 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       );
     },
-    [handlePress, respondMutation, respondJoinRequestMutation, respondInviteMutation],
+    [
+      handlePress,
+      respondMutation,
+      respondJoinRequestMutation,
+      respondInviteMutation,
+    ],
   );
 
   return (

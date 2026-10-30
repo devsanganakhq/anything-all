@@ -15,7 +15,7 @@
 	<key>provisioningProfiles</key>
 	<dict>
 		<key>com.heathlandlinks.app</key>
-		<string>heathlandlinks</string>
+		<string>Heathland Links EAS App Store 20261030</string>
 	</dict>
 	<key>uploadSymbols</key>
 	<true/>

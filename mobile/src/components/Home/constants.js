@@ -128,4 +128,7 @@ export const COUNTRY_FLAGS = {
   "united kingdom": "🇬🇧",
   uk: "🇬🇧",
   "isle of man": "🇮🇲",
+  uae: "🇦🇪",
+  "united arab emirates": "🇦🇪",
+  dubai: "🇦🇪",
 };

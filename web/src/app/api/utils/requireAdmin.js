@@ -66,7 +66,7 @@ export async function requireAdmin() {
   let rows;
   try {
     rows = await sql(
-      `SELECT id, is_admin FROM users WHERE email = $1 LIMIT 1`,
+      `SELECT id, is_admin, is_suspended FROM users WHERE email = $1 LIMIT 1`,
       [email],
     );
   } catch (err) {
@@ -94,7 +94,7 @@ export async function requireAdmin() {
   const user = rows[0];
 
   // User exists but is not an admin
-  if (!user.is_admin) {
+  if (!user.is_admin || user.is_suspended) {
     return {
       ok: false,
       response: Response.json(
