@@ -14,7 +14,7 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "fix/heathland-client-scope": false
+      "fix/heathland-client-scope": true
     }
   }
 }
