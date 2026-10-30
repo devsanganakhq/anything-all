@@ -77,6 +77,11 @@
     }
   },
   "submit": {
+    "client-testflight": {
+      "ios": {
+        "ascAppId": "6806807118"
+      }
+    },
     "production": {
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",
