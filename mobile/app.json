@@ -32,10 +32,6 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#091811"
       },
-      "notification": {
-        "icon": "./assets/images/notification-icon.png",
-        "color": "#091811"
-      },
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyASqVSa6Q98DvY5csNodKL0LCp6T6uFflM"
