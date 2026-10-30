@@ -79,7 +79,8 @@
   "submit": {
     "client-testflight": {
       "ios": {
-        "ascAppId": "6806807118"
+        "ascAppId": "6806807118",
+        "appleId": "devsanganakhq@gmail.com"
       }
     },
     "production": {
