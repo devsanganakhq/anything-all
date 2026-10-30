@@ -78,7 +78,8 @@ export function createApp() {
     ]);
   });
   app.get("/.well-known/apple-app-site-association", (c) => {
-    const team = process.env.IOS_TEAM_ID;
+    // Public, verified Apple team for this app; deployments may override it.
+    const team = process.env.IOS_TEAM_ID || "G76V639A9J";
     if (!team || !/^[A-Z0-9]{10}$/.test(team))
       return c.json({ error: "Universal links are not configured" }, 503);
     return c.json({

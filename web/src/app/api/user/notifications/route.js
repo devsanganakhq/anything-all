@@ -10,9 +10,8 @@ import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunit
 import { ensureCommunityInvitesTable } from "@/app/api/utils/ensureCommunityInvitesTable";
 
 export async function GET(request) {
-  const userId = await getSessionUserId(request);
-
   try {
+    const userId = await getSessionUserId(request);
     await ensureCommunityJoinRequestsTable();
     await ensureCommunityInvitesTable();
     // Ensure newer FK columns exist on older DBs
@@ -96,16 +95,19 @@ export async function GET(request) {
 
     return Response.json({ notifications: notifications.map(n => ({ ...n, target_path: notificationTarget(n) })), unread_count: unreadCount });
   } catch (error) {
-    console.error("Notifications error:", error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return notificationError(error);
   }
 }
 
 export async function POST(request) {
-  const userId = await getSessionUserId(request);
-  const { notificationId } = await request.json();
-
   try {
+    const userId = await getSessionUserId(request);
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body))
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
+    const { notificationId } = body;
+    if (notificationId != null && (!Number.isSafeInteger(notificationId) || notificationId <= 0))
+      return Response.json({ error: "Invalid notification ID" }, { status: 400 });
     if (notificationId) {
       await sql(
         `UPDATE notifications SET read_at=NOW()
@@ -121,6 +123,13 @@ export async function POST(request) {
     }
     return Response.json({ success: true });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return notificationError(error);
   }
+}
+
+function notificationError(error) {
+  const status = error.code === "ACCOUNT_SUSPENDED" ? 403
+    : ["UNAUTHENTICATED", "AUTH_ERROR"].includes(error.code) ? 401 : 500;
+  if (status === 500) console.error("Notifications request failed", { code: error.code });
+  return Response.json({ error: status === 500 ? "Unable to load or update notifications" : error.message }, { status });
 }

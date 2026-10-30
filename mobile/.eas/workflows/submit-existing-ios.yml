@@ -1,0 +1,9 @@
+name: Submit Heathland Links iOS build 8 to TestFlight
+
+jobs:
+  submit_ios:
+    type: submit
+    environment: preview
+    params:
+      build_id: b3183575-a916-41a0-a277-60f0a56cb8ee
+      profile: client-testflight
