@@ -47,6 +47,22 @@ export default function MarkPlayedScreen() {
   const isList = !!listId;
   const isEdit = !!activityId;
   const categories = isList ? LIST_CATEGORIES : COURSE_CATEGORIES;
+  const { data: courseStatus, isLoading: checkingEligibility, isError: eligibilityError } = useQuery({
+    queryKey: ["course", courseId],
+    enabled: !isList && !isEdit && !!courseId,
+    queryFn: async () => {
+      const response = await fetch(`/api/courses/${courseId}`);
+      if (!response.ok) throw Error("Unable to check review eligibility");
+      return response.json();
+    },
+    staleTime: 0,
+  });
+  const hasReviewed = courseStatus?.userStatus?.hasReviewed === true;
+  const canReview = courseStatus?.userStatus?.canReview === true;
+  useEffect(() => {
+    if (!isEdit && !isList && courseStatus && !hasReviewed) setMode("review");
+    if (!isEdit && !isList && courseStatus && hasReviewed && !canReview) setMode("round");
+  }, [courseStatus, hasReviewed, canReview, isEdit, isList]);
   const [scores, setScores] = useState(
     Object.fromEntries(categories.map((c) => [c.key, 5])),
   );
@@ -270,7 +286,12 @@ export default function MarkPlayedScreen() {
               : "Record a round or share a course review in your Passport."}
           </Text>
 
-          {!isEdit && !isList && (
+          {!isEdit && !isList && (checkingEligibility || eligibilityError) && (
+            <Text style={{ color: Colors.textSecondary, marginBottom: 16 }}>
+              {eligibilityError ? "Unable to check eligibility. Reopen this course and try again." : "Checking review eligibility…"}
+            </Text>
+          )}
+          {!isEdit && !isList && courseStatus && hasReviewed && canReview && (
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 24 }}>
               {["round", "review"].map((value) => (
                 <TouchableOpacity
@@ -669,12 +690,12 @@ export default function MarkPlayedScreen() {
             </View>
           )}
 
-          {isEdit && mode === "review" && (
+          {isEdit && !isList && (
             <TouchableOpacity
               onPress={() =>
                 Alert.alert(
-                  "Delete review?",
-                  "This removes the review from rankings. Your recorded rounds remain.",
+                  mode === "review" ? "Delete review?" : "Delete round?",
+                  "This may change your Passport totals, played courses and list progress. Other valid activity at this course remains.",
                   [
                     { text: "Cancel", style: "cancel" },
                     {
@@ -683,7 +704,10 @@ export default function MarkPlayedScreen() {
                       onPress: async () => {
                         try {
                           const r = await fetch(endpoint, { method: "DELETE" });
-                          if (!r.ok) throw Error("Unable to delete review");
+                          if (!r.ok) {
+                            const result = await r.json();
+                            throw Error(result.error || "Unable to delete activity");
+                          }
                           await queryClient.invalidateQueries();
                           router.back();
                         } catch (e) {
@@ -697,7 +721,7 @@ export default function MarkPlayedScreen() {
               style={{ padding: 14, marginBottom: 15 }}
             >
               <Text style={{ color: Colors.error, textAlign: "center" }}>
-                Delete review
+                Delete {mode === "review" ? "review" : "round"}
               </Text>
             </TouchableOpacity>
           )}
@@ -713,7 +737,7 @@ export default function MarkPlayedScreen() {
               gap: 8,
               opacity: mutation.isPending || uploading ? 0.6 : 1,
             }}
-            disabled={mutation.isPending || uploading || (isEdit && !existing)}
+            disabled={mutation.isPending || uploading || (isEdit && !existing) || (!isEdit && !isList && (!courseStatus || (mode === "round" && !hasReviewed) || (mode === "review" && !canReview)))}
             onPress={() => {
               if (selectedPhotos.length > 0 && !termsAccepted) {
                 Alert.alert(
