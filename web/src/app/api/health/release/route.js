@@ -4,7 +4,10 @@ const required = [
   "20261017_activity",
   "20261019_list_sources",
   "20261019_push_receipts",
+  "20261110_list_completion_awards",
+  "20261110_notification_refs",
 ];
+const featureSet = "heathland-20261110";
 export async function GET() {
   try {
     const tables = await sql(
@@ -14,6 +17,7 @@ export async function GET() {
       return Response.json(
         {
           release: "client-six-lists",
+          feature_set: featureSet,
           ready: false,
           reason: "Database migration is pending",
         },
@@ -30,6 +34,7 @@ export async function GET() {
       return Response.json(
         {
           release: "client-six-lists",
+          feature_set: featureSet,
           ready: false,
           reason: "Database migration is pending",
         },
@@ -39,7 +44,7 @@ export async function GET() {
       "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('notifications','device_push_tokens','push_outbox')",
     );
     if (pushTables.length !== 3)
-      return Response.json({ release: "client-six-lists", ready: false,
+      return Response.json({ release: "client-six-lists", feature_set: featureSet, ready: false,
         reason: "Notification database migration is pending" }, { status: 503 });
     const [{ count }] = await sql(
       "SELECT COUNT(*)::int AS count FROM curated_lists WHERE is_published AND source_key=ANY($1::text[])",
@@ -49,6 +54,7 @@ export async function GET() {
     return Response.json(
       {
         release: "client-six-lists",
+        feature_set: featureSet,
         ready,
         lists: count,
         reason: ready ? null : "Client list import is pending",
@@ -59,6 +65,7 @@ export async function GET() {
     return Response.json(
       {
         release: "client-six-lists",
+        feature_set: featureSet,
         ready: false,
         reason: "Release backend unavailable",
       },
