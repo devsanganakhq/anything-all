@@ -49,6 +49,11 @@ vi.mock("@/app/api/utils/sql", () => {
 vi.mock("@/app/api/utils/pushDelivery", () => ({
   flushPushOutbox: async () => ({ sent: 0 }),
 }));
+vi.mock("@/app/api/utils/requireAdmin", () => ({
+  requireAdmin: async () => state.viewer === 1
+    ? { ok: true, userId: 1 }
+    : { ok: false, response: Response.json({ error: "Admin required" }, { status: 403 }) },
+}));
 let sql, lists, activities;
 const req = (url, body) =>
   new Request(
@@ -78,6 +83,12 @@ beforeAll(async () => {
   );
   await state.db.exec(
     readFileSync("migrations/20261019_push_receipts.sql", "utf8"),
+  );
+  await state.db.exec(
+    readFileSync("migrations/20261110_list_completion_awards.sql", "utf8"),
+  );
+  await state.db.exec(
+    readFileSync("migrations/20261110_notification_refs.sql", "utf8"),
   );
   sql = (await import("@/app/api/utils/sql")).default;
   lists = listService(sql);
@@ -205,6 +216,40 @@ test("passport data endpoints deny strangers and permit accepted friends", async
     "https://images.example.test/review-two.jpg",
   ]);
   await sql("DELETE FROM course_reviews WHERE id=$1", [photoReview.id]);
+});
+test("course gallery hides private member photos from strangers and blocked viewers", async () => {
+  const [photo] = await sql(
+    `INSERT INTO course_photos(course_id,user_id,image_url,moderation_status)
+     VALUES(3,1,'https://images.example.test/private.jpg','approved') RETURNING id`,
+  );
+  const gallery = (await import("@/app/api/courses/[id]/photos/route")).GET;
+  state.viewer = 3;
+  let response = await gallery(req("courses/3/photos"), { params: { id: "3" } });
+  expect(response.status).toBe(200);
+  expect((await response.json()).photos).toHaveLength(0);
+  await sql("INSERT INTO friendships(user_id,friend_id,status) VALUES(1,3,'accepted')");
+  response = await gallery(req("courses/3/photos"), { params: { id: "3" } });
+  expect((await response.json()).photos).toHaveLength(1);
+  await sql("UPDATE friendships SET status='blocked' WHERE user_id=1 AND friend_id=3");
+  response = await gallery(req("courses/3/photos"), { params: { id: "3" } });
+  expect((await response.json()).photos).toHaveLength(0);
+  await sql("DELETE FROM friendships WHERE user_id=1 AND friend_id=3");
+  await sql("DELETE FROM course_photos WHERE id=$1", [photo.id]);
+});
+test("only admins can edit a course description and the previous value is audited", async () => {
+  const route = await import("@/app/api/admin/courses/[id]/description/route");
+  state.viewer = 2;
+  expect((await route.PATCH(req("admin/courses/3/description", { description: "A factual description of this golf course." }), { params: { id: "3" } })).status).toBe(403);
+  state.viewer = 1;
+  const request = new Request("https://example.test/api/admin/courses/3/description", {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ description: "A factual description of this golf course." }),
+  });
+  const response = await route.PATCH(request, { params: { id: "3" } });
+  expect(response.status).toBe(200);
+  expect((await response.json()).course.description).toBe("A factual description of this golf course.");
+  const [audit] = await sql("SELECT previous_value,new_value FROM admin_audit_log WHERE action='course_description_updated' ORDER BY id DESC LIMIT 1");
+  expect(audit).toMatchObject({ previous_value: null, new_value: "A factual description of this golf course." });
 });
 test("friend requests, acceptance, following and unfollowing pass the request to native auth", async () => {
   state.requireAuthRequest = true;
@@ -475,7 +520,21 @@ test("release readiness requires all six published lists and the migrated backen
   const { GET } = await import("@/app/api/health/release/route");
   let r = await GET();
   expect(r.status).toBe(200);
-  expect(await r.json()).toMatchObject({ ready: true, lists: 6 });
+  expect(await r.json()).toMatchObject({
+    ready: true,
+    lists: 6,
+    feature_set: "heathland-20261110",
+  });
+  await sql("DELETE FROM app_schema_migrations WHERE version='20261110_notification_refs'");
+  r = await GET();
+  expect(r.status).toBe(503);
+  expect((await r.json()).ready).toBe(false);
+  await sql("INSERT INTO app_schema_migrations(version) VALUES('20261110_notification_refs')");
+  await sql("DELETE FROM app_schema_migrations WHERE version='20261110_list_completion_awards'");
+  r = await GET();
+  expect(r.status).toBe(503);
+  expect((await r.json()).ready).toBe(false);
+  await sql("INSERT INTO app_schema_migrations(version) VALUES('20261110_list_completion_awards')");
   await sql(
     "UPDATE curated_lists SET is_published=false WHERE source_key='major_us_open_hosts'",
   );
