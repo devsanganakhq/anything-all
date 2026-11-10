@@ -78,7 +78,7 @@ export async function GET(request) {
         LEFT JOIN member_photos mp ON af.photo_id = mp.id
         WHERE COALESCE(u.is_suspended,false)=false AND
  NOT EXISTS(SELECT 1 FROM friendships b WHERE b.status='blocked' AND ((b.user_id=${userId} AND b.friend_id=u.id) OR (b.friend_id=${userId} AND b.user_id=u.id))) AND
- (u.id=${userId} OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true) OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND ((f.user_id=${userId} AND f.friend_id=u.id) OR (f.friend_id=${userId} AND f.user_id=u.id))))
+ COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
         ORDER BY af.created_at DESC
         LIMIT 50
       `;
