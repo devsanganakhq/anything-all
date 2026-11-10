@@ -43,6 +43,7 @@ import { HomeClubIcon, MemberClubIcon } from "@/components/ClubIcons";
 import { Alert } from "react-native";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useOpenUserProfile } from "@/utils/openUserProfile";
+import { countryFlag } from "@/utils/countryFlags";
 
 const { width: SCREEN_W } = Dimensions.get("window");
 const CARD_W = SCREEN_W * 0.72;
@@ -83,20 +84,6 @@ const RANKING_ACCENTS = {
 
 const PODIUM_COLORS = { 1: Colors.gold, 2: "#B8BEC6", 3: "#C4965A" };
 
-// ── Country flag helper ───────────────────────────────────────────────────────
-const COUNTRY_FLAGS = {
-  England: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
-  Scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-  Wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-  Ireland: "🇮🇪",
-  "Northern Ireland": "🇬🇧",
-  France: "🇫🇷",
-  Spain: "🇪🇸",
-  Portugal: "🇵🇹",
-  USA: "🇺🇸",
-  Australia: "🇦🇺",
-};
-
 function passportLevel(playedCount) {
   return Math.max(1, Math.floor(Number(playedCount || 0) / 5) + 1);
 }
@@ -119,6 +106,7 @@ export default function PassportScreen() {
   const router = useRouter();
   const openUserProfile = useOpenUserProfile();
   const [lbTab, setLbTab] = useState("OVERALL");
+  const [passportTab, setPassportTab] = useState("played");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["passport-stats"],
@@ -243,8 +231,14 @@ export default function PassportScreen() {
       icon: Award,
       count: `${unlockedCount}/${totalAchievements}`,
       color: Colors.purple,
-      route: null,
-      comingSoon: true,
+      route: "/passport/achievements",
+    },
+    {
+      label: "Lists",
+      icon: BookOpen,
+      count: stats.lists_completed || 0,
+      color: Colors.green,
+      route: "/lists",
     },
     {
       label: "My Clubs",
@@ -472,7 +466,7 @@ export default function PassportScreen() {
             <View
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.15)" }}
             />
-            <HeroStat label="WISH LIST" value={stats.wishlist_count} large />
+            <HeroStat label="ROUNDS RECORDED" value={stats.rounds_count} large />
             <View
               style={{ width: 1, backgroundColor: "rgba(245,241,235,0.15)" }}
             />
@@ -516,7 +510,6 @@ export default function PassportScreen() {
         </View>
 
         <PassportFavourites editable />
-        <CuratedLists passport />
         {/* ── Courses by country mini-bar ──────────────────────────────────── */}
         {byCountry.length > 0 && (
           <View style={{ marginHorizontal: Spacing.screenH, marginBottom: 22 }}>
@@ -585,17 +578,25 @@ export default function PassportScreen() {
         {/* ── PASSPORT SECTIONS ───────────────────────────────────────────── */}
         <View style={{ marginHorizontal: Spacing.screenH, marginTop: 22 }}>
           <SectionHeader label="MY PASSPORT" icon={BookOpen} inline />
-          <View style={{ gap: 9, marginTop: 10 }}>
-            {SECTIONS.map((s) => s.kind ? (
-              <PassportActivitySection key={s.label} kind={s.kind} label={s.label} />
-            ) : (
-              <PassportSectionRow
-                key={s.label}
-                section={s}
-                onPress={() => s.route && router.push(s.route)}
-              />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={{ flexGrow: 0, marginTop: 12 }} contentContainerStyle={{ gap: 8, paddingBottom: 8 }}>
+            {SECTIONS.map((s) => (
+              <TouchableOpacity key={s.label} accessibilityRole="tab"
+                accessibilityState={{ selected: passportTab === s.kind }}
+                onPress={() => s.kind ? setPassportTab(s.kind) : s.route && router.push(s.route)}
+                style={{ minHeight: 44, paddingHorizontal: 13, borderRadius: Radius.md,
+                  justifyContent: "center", borderWidth: 1,
+                  borderColor: passportTab === s.kind ? Colors.green : Colors.border,
+                  backgroundColor: passportTab === s.kind ? Colors.green : Colors.white }}>
+                <Text style={{ fontSize: 12, fontWeight: "700",
+                  color: passportTab === s.kind ? Colors.ivory : Colors.textPrimary }}>
+                  {s.label} {s.count != null ? `(${s.count})` : ""}
+                </Text>
+              </TouchableOpacity>
             ))}
-          </View>
+          </ScrollView>
+          <PassportActivitySection kind={passportTab}
+            label={SECTIONS.find((s) => s.kind === passportTab)?.label || "Played Courses"} />
         </View>
 
         {/* ── BY COUNTRY breakdown ─────────────────────────────────────────── */}
@@ -646,7 +647,7 @@ export default function PassportScreen() {
                       }}
                     >
                       <Text style={{ fontSize: 16, marginRight: 8 }}>
-                        {COUNTRY_FLAGS[c.country] ?? "🌍"}
+                        {countryFlag(c.country)}
                       </Text>
                       <Text
                         style={{
@@ -1492,7 +1493,7 @@ function CountryBar({ countries, total }) {
               }}
             />
             <Text style={{ fontSize: 10, color: Colors.textSecondary }}>
-              {COUNTRY_FLAGS[c.country] ?? ""} {c.country} {c.count}
+              {countryFlag(c.country)} {c.country} {c.count}
             </Text>
           </View>
         ))}
