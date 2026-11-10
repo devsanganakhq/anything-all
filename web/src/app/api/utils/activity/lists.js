@@ -16,7 +16,7 @@ export function listService(sql) {
    (SELECT COUNT(*)::int FROM (SELECT pc.user_id FROM curated_list_courses lc JOIN played_courses pc ON pc.course_id=lc.course_id
      WHERE lc.list_id=l.id AND lc.counts_for_completion GROUP BY pc.user_id
      HAVING COUNT(*)=(SELECT COUNT(*) FROM curated_list_courses WHERE list_id=l.id AND counts_for_completion)) complete) AS completed
-   FROM curated_lists l WHERE l.is_published ORDER BY l.display_order,l.id`,
+   FROM curated_lists l WHERE l.is_published ORDER BY started DESC,l.display_order,l.id`,
       [userId],
     );
   }
@@ -39,12 +39,18 @@ export function listService(sql) {
       `SELECT r.*,COALESCE(NULLIF(TRIM(CONCAT_WS(' ',u.first_name,u.last_name)),''),'Golfer') AS name,
    u.profile_photo_url AS avatar FROM list_reviews r JOIN users u ON u.id=r.user_id WHERE r.list_id=$1 AND NOT COALESCE(u.is_suspended,false)
    AND NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id)))
+   AND (r.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+     OR EXISTS(SELECT 1 FROM friendships WHERE status='accepted' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id))))
    ORDER BY r.created_at DESC,r.id DESC LIMIT 100`,
       [id, userId],
     );
     const [aggregate] = await sql(
-      "SELECT AVG(rating) AS rating,COUNT(*)::int AS count FROM list_reviews WHERE list_id=$1",
-      [id],
+      `SELECT AVG(r.rating) AS rating,COUNT(*)::int AS count FROM list_reviews r JOIN users u ON u.id=r.user_id
+       WHERE r.list_id=$1 AND NOT COALESCE(u.is_suspended,false)
+       AND NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id)))
+       AND (r.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+         OR EXISTS(SELECT 1 FROM friendships WHERE status='accepted' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id))))`,
+      [id, userId],
     );
     const eligible = courses.filter((c) => c.counts_for_completion),
       completed = eligible.length > 0 && eligible.every((c) => c.user_played);

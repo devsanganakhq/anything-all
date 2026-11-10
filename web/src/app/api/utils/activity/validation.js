@@ -1,7 +1,7 @@
 export const COURSE_CATEGORIES = [
   {
     key: "clubhouse",
-    title: "Clubhouse, Welcome, practice facilities, halfway house & Pro shop.",
+    title: "Clubhouse, Welcome, Practice facilities, Halfway house & Pro shop.",
     caption: "",
   },
   {
@@ -11,7 +11,7 @@ export const COURSE_CATEGORIES = [
   },
   {
     key: "enjoyment",
-    title: "Course enjoyment & experience",
+    title: "Course enjoyment & experience.",
     caption:
       "How much did you enjoy your round? & how memorable will it remain?",
   },

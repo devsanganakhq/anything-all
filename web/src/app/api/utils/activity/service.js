@@ -26,9 +26,46 @@ export function activityService(sql) {
         [courseId],
       ),
       sql(
-        `UPDATE played_courses p SET rating=(SELECT ROUND(rating)::int FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL ORDER BY created_at DESC,id DESC LIMIT 1),
+        `UPDATE played_courses p SET date_played=COALESCE((SELECT MIN(date_played) FROM (
+          SELECT date_played FROM course_rounds WHERE user_id=$1 AND course_id=$2
+          UNION ALL SELECT date_played FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL
+        ) activity_dates),p.date_played),
+    rating=(SELECT ROUND(rating)::int FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL ORDER BY created_at DESC,id DESC LIMIT 1),
     review_text=(SELECT review_text FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL ORDER BY created_at DESC,id DESC LIMIT 1)
     WHERE p.user_id=$1 AND p.course_id=$2`,
+        [userId, courseId],
+      ),
+    ];
+  }
+  // Reconcile the unique-course compatibility row only after all qualifying
+  // activity has been checked in the same transaction as the deletion.
+  function reconcilePlayedCourse(courseId, userId) {
+    return [
+      sql(
+        `DELETE FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2
+         AND NOT EXISTS(SELECT 1 FROM course_rounds r WHERE r.user_id=$1 AND r.course_id=$2)
+         AND NOT EXISTS(SELECT 1 FROM course_reviews r WHERE r.user_id=$1 AND r.course_id=$2 AND r.deleted_at IS NULL)`,
+        [userId, courseId],
+      ),
+      sql(
+        `DELETE FROM list_reviews lr WHERE lr.user_id=$1 AND EXISTS (
+           SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=lr.list_id
+           AND lc.counts_for_completion AND lc.course_id=$2
+           AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2))`,
+        [userId, courseId],
+      ),
+      sql(
+        `DELETE FROM feed_posts fp WHERE fp.author_id=$1 AND fp.post_type='list_complete'
+         AND EXISTS(SELECT 1 FROM list_completion_awards a JOIN curated_list_courses lc ON lc.list_id=a.list_id
+           WHERE a.user_id=$1 AND a.feed_post_id=fp.id AND lc.course_id=$2 AND lc.counts_for_completion
+           AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2))`,
+        [userId, courseId],
+      ),
+      sql(
+        `UPDATE list_completion_awards a SET active=false,revoked_at=NOW(),feed_post_id=NULL
+         WHERE a.user_id=$1 AND a.active AND EXISTS(
+           SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=a.list_id AND lc.course_id=$2 AND lc.counts_for_completion
+           AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2))`,
         [userId, courseId],
       ),
     ];
@@ -131,6 +168,33 @@ export function activityService(sql) {
         sql(
           `DELETE FROM wishlist WHERE user_id=$1 AND course_id=$2 AND EXISTS(SELECT 1 FROM ${table} WHERE user_id=$1 AND request_id=$3)`,
           [userId, courseId, requestId],
+        ),
+        sql(
+          `WITH eligible AS (
+             SELECT l.id FROM curated_lists l WHERE l.is_published
+             AND EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=l.id AND lc.counts_for_completion AND lc.course_id=$2)
+             AND NOT EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=l.id AND lc.counts_for_completion
+               AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=lc.course_id))
+           ), awarded AS (
+             INSERT INTO list_completion_awards(user_id,list_id) SELECT $1,id FROM eligible
+             ON CONFLICT(user_id,list_id) DO UPDATE SET active=true,revoked_at=NULL
+               WHERE NOT list_completion_awards.active
+             RETURNING list_id
+           ), posted AS (
+             INSERT INTO feed_posts(author_id,post_type,caption,metadata)
+             SELECT $1,'list_complete',l.title,jsonb_build_object('list_id',l.id,'list_name',l.title,
+               'total',(SELECT COUNT(*) FROM curated_list_courses lc WHERE lc.list_id=l.id AND lc.counts_for_completion))
+             FROM awarded a JOIN curated_lists l ON l.id=a.list_id RETURNING id,metadata
+           ) UPDATE list_completion_awards a SET feed_post_id=p.id FROM posted p
+             WHERE a.user_id=$1 AND a.list_id=(p.metadata->>'list_id')::int`,
+          [userId, courseId],
+        ),
+        sql(
+          `UPDATE list_completion_awards a SET feed_post_id=f.id FROM feed_posts f
+           WHERE a.user_id=$1 AND a.active AND a.feed_post_id IS NULL
+           AND f.author_id=$1 AND f.post_type='list_complete'
+           AND f.metadata->>'list_id'=a.list_id::text`,
+          [userId],
         ),
         sql(
           `INSERT INTO feed_posts(author_id,post_type,course_id,caption,metadata)
@@ -338,6 +402,23 @@ export function activityService(sql) {
         "UPDATE course_photos SET deleted_at=NOW() WHERE course_review_id=$1 AND user_id=$2 AND round_id IS NULL",
         [id, userId],
       ),
+      ...reconcilePlayedCourse(row.course_id, userId),
+      ...sync(row.course_id, userId),
+    ]);
+  }
+  async function deleteRound(userId, id) {
+    id = positiveId(id);
+    const row = (await query(
+      "SELECT course_id FROM course_rounds WHERE id=$1 AND user_id=$2",
+      [id, userId],
+    ))[0];
+    if (!row) throw invalid("Round not found", 404);
+    await sql.transaction([
+      sql("SELECT pg_advisory_xact_lock(-1,$1::int)", [row.course_id]),
+      sql("UPDATE course_photos SET deleted_at=NOW() WHERE round_id=$1 AND user_id=$2 AND course_review_id IS NULL", [id, userId]),
+      sql("DELETE FROM feed_posts WHERE author_id=$1 AND metadata->>'round_id'=$2::text", [userId, id]),
+      sql("DELETE FROM course_rounds WHERE id=$1 AND user_id=$2", [id, userId]),
+      ...reconcilePlayedCourse(row.course_id, userId),
       ...sync(row.course_id, userId),
     ]);
   }
@@ -376,6 +457,7 @@ export function activityService(sql) {
     create,
     edit,
     deleteReview,
+    deleteRound,
     canViewPassport,
     favourites,
     saveFavourites,
