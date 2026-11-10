@@ -65,9 +65,10 @@ export async function GET(request) {
         UNION SELECT ${userId}
       `;
     } else {
-      // Public chronological discovery is independent of the friendship graph.
+      // All/Public discovery includes public posts from public accounts only.
+      extraWhere = `AND fp.is_private=false AND COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)`;
       authorSubquery = `SELECT id AS author_id FROM users
-        WHERE COALESCE((privacy_settings->>'profile_visible')::boolean, true) = true OR id=${userId} OR id IN(SELECT friend_id FROM friendships WHERE user_id=${userId} AND status='accepted' UNION SELECT user_id FROM friendships WHERE friend_id=${userId} AND status='accepted')`;
+        WHERE COALESCE((privacy_settings->>'profile_visible')::boolean, true) = true`;
     }
 
     // ── Main query ─────────────────────────────────────────────────────────
@@ -215,7 +216,8 @@ export async function GET(request) {
       `SELECT COUNT(DISTINCT fp.id)::int AS total
         FROM feed_posts fp JOIN users u ON fp.author_id = u.id
         WHERE fp.author_id IN (${authorSubquery})
-          AND fp.is_private = false AND fp.is_sponsored = false
+          AND ${feedVisibility}
+          AND fp.is_sponsored = false
           AND NOT EXISTS (SELECT 1 FROM friendships blocked
             WHERE blocked.status = 'blocked'
               AND ((blocked.user_id = $1 AND blocked.friend_id = fp.author_id)
