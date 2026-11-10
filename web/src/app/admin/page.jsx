@@ -476,6 +476,9 @@ export default function AdminDashboard() {
               <Upload size={11} />
               Course Import
             </a>
+            <a href="/admin/courses/edit" className="px-3 py-1.5 text-xs font-semibold text-white/60 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+              Course Descriptions
+            </a>
           </div>
 
           <div className="flex items-center gap-2">
