@@ -7,6 +7,7 @@ import {
   Modal,
   Pressable,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { Camera, X } from "lucide-react-native";
@@ -14,6 +15,21 @@ import { Colors, Radius } from "@/constants/theme";
 import { SCREEN_W, THUMB_H } from "@/components/Home/constants";
 
 const SCREEN_H = Dimensions.get("window").height;
+
+function FullScreenPhoto({ uri, width = SCREEN_W }) {
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+  return (
+    <View style={{ width, height: SCREEN_H * 0.78, justifyContent: "center", alignItems: "center" }}>
+      <Image source={{ uri }} style={{ width: "100%", height: "100%" }} contentFit="contain"
+        onLoadStart={() => { setLoading(true); setFailed(false); }}
+        onLoad={() => setLoading(false)}
+        onError={() => { setLoading(false); setFailed(true); }} />
+      {loading && <ActivityIndicator accessibilityLabel="Loading image" color="#fff" style={{ position: "absolute" }} />}
+      {failed && <Text style={{ color: "#fff", position: "absolute", backgroundColor: "#202020", padding: 12 }}>Image unavailable</Text>}
+    </View>
+  );
+}
 
 function PhotoFrame({ uri, onPress, width = "100%" }) {
   return (
@@ -140,7 +156,7 @@ export function ReviewPhotos({ urls = [] }) {
   );
 }
 
-function ReviewPhotoLightbox({ lightbox, photos, onClose }) {
+export function ReviewPhotoLightbox({ lightbox, photos, onClose }) {
   const [activeIdx, setActiveIdx] = useState(lightbox?.index || 0);
 
   React.useEffect(() => {
@@ -196,20 +212,12 @@ function ReviewPhotoLightbox({ lightbox, photos, onClose }) {
                   alignItems: "center",
                 }}
               >
-                <Image
-                  source={{ uri }}
-                  style={{ width: "100%", height: "100%" }}
-                  contentFit="contain"
-                />
+                <FullScreenPhoto uri={uri} />
               </View>
             ))}
           </ScrollView>
         ) : lightbox?.uri ? (
-          <Image
-            source={{ uri: lightbox.uri }}
-            style={{ width: SCREEN_W - 40, height: SCREEN_H * 0.7 }}
-            contentFit="contain"
-          />
+          <FullScreenPhoto uri={lightbox.uri} width={SCREEN_W - 40} />
         ) : null}
         {photos.length > 1 ? (
           <Text
