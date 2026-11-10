@@ -1,34 +1,47 @@
-# Heathland Links local release candidate — 10 November 2026
+# Heathland Links release candidate — 10 November 2026
 
-This is a TestFlight release candidate, not an approved public-store release. The source branch is `dev/heathland-20-requirements-20261110`, based on remote `fix/heathland-client-scope` at `8807430`; `local-baseline-20261110` preserves the fetched baseline. The October archive was not treated as current source. Two additive migrations have now been applied to the persistent, isolated Neon branch `heathland-release-20261019` (not production), and Vercel's `DATABASE_URL` scoped only to Preview branch `fix/heathland-client-scope` now points to that branch. Production Neon/Vercel configuration remains unchanged. GitHub push and a new Expo/Apple build are still pending.
+## Current state
 
-Architecture: Expo SDK 54 / React Native mobile app in `mobile/src/app`; React Router 7 API and web app in `web/src/app`; PostgreSQL schema in `web/schema.sql` and `web/migrations`. This repository is not a Next.js app. The API uses server sessions, owner checks, friendship/block state, and SQL transaction helpers. Existing data and production credentials were not used for destructive testing.
+PR #3, “Heathland Links: November 10 release candidate and release gates,” is open as a draft from `dev/heathland-20-requirements-20261110` into `fix/heathland-client-scope`. It contains 41 changed files and is not merged into `main`. The PR branch's Vercel deployment is shown as Preview and Ready. The current commit status reports Vercel success; no GitHub Actions run was found. The release candidate has not been accepted as a final store build.
 
-| # | Client request | Local implementation and remaining verification |
-|---|---|---|
-| 1 | Passport privacy | Existing owner/friend/public server authorization retained; profile and favourites paths reviewed. Full direct-route permission matrix remains necessary. |
-| 2 | 30-day reviews | Transactional per-user/course lock and server timestamp restriction; boundary and concurrent tests pass. |
-| 3 | Rounds count | Passport green summary uses actual round count; deletion path updates source rows. |
-| 4 | Testing elements | No new testing controls shipped; complete release-only UI/content audit remains open. |
-| 5 | Feed privacy | Public feed and course activity/gallery now filter private and blocked users; notification filtering added. Comprehensive post-detail and push audit remains open. |
-| 6 | Flags | Shared mapping adds New Zealand and consistent country identity. Unknown countries still use globe fallback; graphical coverage needs review. |
-| 7 | Map pins | Invalid coordinates/IDs and rapid taps guarded. Root cause and Android/iOS device reproduction remain open. |
-| 8 | Community images | Tap opens existing full-screen multi-image viewer. Pinch zoom, loading/error polish and device verification remain open. |
-| 9 | Completion feed | Transactional list-completion event with deduplication; deletion revokes dependent event. Local DB integration tests pass. |
-| 10 | List achievement | Additive awards table, backfill, revoke/reactivate, Passport statistics. Local migration integration tests pass. |
-| 11 | Achievement shortcut | Passport collection route and authorized social-profile link added. Visual device QA remains. |
-| 12 | Explore lists | Dedicated shortcut/list view and genuine distinct-starter sorting added. |
-| 13 | Passport layout | Compact horizontal activity tabs and shortcuts added, but lower legacy sections still need design review on small devices. |
-| 14 | NI/Hawaii flags | UK/USA parent-country identity retained; dedicated regional graphics remain open. Hawaii is not classified as sovereign. |
-| 15 | Action buttons | Course actions and mark-played screen use review eligibility; backend cooldown enforced. Offline behavior and old-client direct round calls need review. |
-| 16 | Grammar | Exact two category titles updated in backend and mobile shared definitions. |
-| 17 | Lists/descriptions | Lists loading/empty and progress refined; neutral course-description fallback; admin-only description editor with audit persistence and test. Editorial review of source descriptions remains open. |
-| 18 | Delete round | Owner-only DELETE API and confirmed mobile edit-screen action added; integration tested. |
-| 19 | Deletion consistency | Transactionally reconcile played course, lists, awards, feed and aggregates, retaining course if another review/round exists; integration tests cover key scenarios. Legacy and ranking audit still needed. |
-| 20 | Notifications | Block/privacy filters and read scope improved; server tests cover malformed/unauthorized writes. Real push and Paul test not performed. |
+The PR adds two November migrations and a release-health gate. The source history records rehearsal and application on isolated Neon branches; production remains explicitly out of scope and must remain unchanged. Before any release, re-verify the isolated database identity, migration records, six-list readiness, and endpoint response against the deployed Preview.
 
-Verification to date (rerun 10 November): 39 web Vitest tests passed; web and mobile TypeScript checks passed; web build and Android/iOS JavaScript exports passed. The intentionally broken test-only route was removed; the web build now completes without that missing-export warning. Both additive migrations were first applied and rerun on disposable Neon child branch `release-preflight-20261110` (expires 17 November), then applied to persistent isolated release branch `heathland-release-20261019`. On the persistent branch, both migration records exist, the award backfill produced 1 active award, six lists are published, and both notification reference columns are present. Neon `production` was inspected read-only and remains unchanged. Vercel confirms the preview `DATABASE_URL` is scoped only to `fix/heathland-client-scope`; a new deployment is required before the setting takes effect. The successful Expo submission is build 9 / version 2.0.2 from commit `abc7394` (submitted 31 October), not this candidate. The exports are **not** native installable builds. No Android SDK, iOS/Xcode toolchain, simulators, or physical devices are available here. Native visual QA, push delivery, complete release acceptance, and a new installable candidate are therefore **not verified**.
+## Client request coverage
 
-Before release: finish open items above, inspect all production API authorization surfaces, test on both device platforms with an isolated backend, rehearse migrations on a production-schema snapshot, review editorial descriptions, run notification testing with Paul, build signed EAS candidates, obtain client approval, then separately authorize production migration/deployment/store submission. Never apply these SQL files directly to live production without backup and schema review.
+| # | Request | Source changes in candidate | Remaining work |
+|---|---|---|---|
+| 1 | Passport privacy | Owner/friend/public authorization paths retained and profile/favourites flows reviewed. | Full direct-link/API matrix: owner, public visitor, accepted/pending friend, non-friend, blocked user. |
+| 2 | 30-day review cooldown | Server timestamp and transactional per-user/course restriction. | Recheck boundary and concurrent requests in deployed integration environment. |
+| 3 | Passport rounds count | Real round total shown and sourced from records. | Verify after add/edit/delete on devices. |
+| 4 | Remove test elements | No new testing controls added; obsolete test-only routes removed. | Complete production UI/content audit. |
+| 5 | Feed privacy | Public feed, course activity/gallery, and notification visibility filters updated. | Audit post details, privacy changes, blocks, and push payloads end to end. |
+| 6 | Country flags | Shared mapping includes New Zealand and common countries; unknowns use globe fallback. | Review graphical coverage across all screens. |
+| 7 | Map pins | Invalid coordinates/IDs and rapid repeated taps guarded. | Reproduce and verify on Android and iOS; confirm crash root cause. |
+| 8 | Community images | Tap opens existing full-screen multi-image viewer. | Zoom, loading/failure polish, and Android/iOS QA. |
+| 9 | List completion feed | Transactional, deduplicated completion activity; reversal removes dependent event. | End-to-end device flow. |
+| 10 | List achievements | Additive awards table, backfill, revoke/reactivate, Passport stats. | Rehearse against production-schema snapshot and verify eligibility. |
+| 11 | Passport achievements shortcut | Collection route and authorized social-profile link. | Visual and privacy QA on devices. |
+| 12 | Explore lists | Dedicated shortcut/view and distinct-starter sorting. | Device navigation QA. |
+| 13 | Passport layout | Compact horizontal activity tabs and shortcuts. | Review lower legacy sections and small-phone layout. |
+| 14 | Northern Ireland/Hawaii flags | Correct UK/USA parent-country identity; Hawaii is not treated as sovereign. | Dedicated regional graphics remain outstanding. |
+| 15 | Course actions | Review eligibility shown in course/mark-played actions; backend cooldown enforced. | Check offline behavior and older-client direct round calls. |
+| 16 | Exact grammar | Requested category wording updated in backend/mobile definitions. | Final editorial check. |
+| 17 | Lists/descriptions | Loading/empty/progress polish, neutral fallback, audited admin editor. | Review course descriptions for factual accuracy. |
+| 18 | Delete round | Owner-only API and confirmed mobile delete action. | Device flow and error handling. |
+| 19 | Deletion consistency | Reconciles played courses, lists, awards, feed, and aggregates while retaining other valid activity. | Audit legacy records and ranking dependencies. |
+| 20 | Notifications | Privacy/block/read-scope changes and malformed/unauthorized-write tests. | Verify real push delivery and complete the planned test with Paul. |
 
-Release-service checkpoint: GitHub PR #1 remains a draft on `fix/heathland-client-scope` at remote commit `8807430`, with 3/3 checks passing and no merge conflict. This candidate is local and has not yet been pushed. The Expo project configuration resolves to slug `anything`, bundle ID `com.heathlandlinks.app`, and EAS project ID `0571c258-6004-4ae8-9604-7463c9403e91`; the `client-testflight` profile targets the PR preview URL and App Store Connect app ID `6806807118`. The Expo submission page confirms build 9 / version 2.0.2 from `abc7394` was submitted successfully on 31 October; that is not this candidate, and Expo does not expose the current App Store Connect processing state or tester roster. No new EAS build or Apple upload has been made.
+## Validation recorded
+
+The local candidate status reports 39 web tests, web/mobile TypeScript checks, web build, and Android/iOS JavaScript exports passing on 10 November. Those checks were not rerun after the final release-health gate patch; CI has not reported a GitHub Actions run for the PR head. The Vercel Preview check is Ready. Confirm its database target and verify the endpoint returns `ready: true`, `lists: 6`, and `feature_set: heathland-20261110` before relying on that deployment.
+
+The successful TestFlight build 9 / version 2.0.2 came from older source, not this candidate. No new signed installable Android or iOS build, physical-device acceptance, real push test, or client acceptance is recorded. JavaScript exports are not native installable builds.
+
+## Remaining release gates
+
+- Complete the device, privacy, map, image, deletion, notification, and editorial checks above.
+- Independently rehearse migrations on a production-schema snapshot and verify the isolated Preview backend and recovery path.
+- Build signed Android and iOS candidates from the reviewed PR source; install and test them, then obtain client acceptance.
+- Keep PR #3 in draft until reviewers decide it is ready. Do not merge this release into `main`, run production migrations, deploy production, or submit a store build as part of this checkpoint.
+
+No claim of bug-free behavior or final release readiness is made.
