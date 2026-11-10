@@ -70,10 +70,16 @@ export async function GET(request, { params }) {
        WHERE  cp.course_id         = $1
          AND  cp.moderation_status = 'approved'
          AND  cp.deleted_at IS NULL
+         AND (cp.user_id IS NULL OR (COALESCE(u.is_suspended,false)=false
+           AND NOT EXISTS(SELECT 1 FROM friendships b WHERE b.status='blocked' AND
+             ((b.user_id=$4 AND b.friend_id=cp.user_id) OR (b.friend_id=$4 AND b.user_id=cp.user_id)))
+           AND (cp.user_id=$4 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+             OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND
+               ((f.user_id=$4 AND f.friend_id=cp.user_id) OR (f.friend_id=$4 AND f.user_id=cp.user_id))))))
        ORDER BY cp.is_featured DESC,
                 cp.uploaded_at DESC, cp.id DESC
        LIMIT  $2 OFFSET $3`,
-      [courseId, limit, offset],
+      [courseId, limit, offset, userId],
     );
 
     // ── Current user's pending uploads (visible only to them) ───────────────
@@ -99,11 +105,15 @@ export async function GET(request, { params }) {
     // Total count for pagination
     const countRow = await sql(
       `SELECT COUNT(*)::int AS total
-       FROM   course_photos
-       WHERE  course_id         = $1
-         AND  moderation_status = 'approved'
-         AND  deleted_at IS NULL`,
-      [courseId],
+       FROM course_photos cp LEFT JOIN users u ON u.id=cp.user_id
+       WHERE cp.course_id=$1 AND cp.moderation_status='approved' AND cp.deleted_at IS NULL
+         AND (cp.user_id IS NULL OR (COALESCE(u.is_suspended,false)=false
+           AND NOT EXISTS(SELECT 1 FROM friendships b WHERE b.status='blocked' AND
+             ((b.user_id=$2 AND b.friend_id=cp.user_id) OR (b.friend_id=$2 AND b.user_id=cp.user_id)))
+           AND (cp.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+             OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND
+               ((f.user_id=$2 AND f.friend_id=cp.user_id) OR (f.friend_id=$2 AND f.user_id=cp.user_id))))))`,
+      [courseId, userId],
     );
     const total = countRow[0]?.total ?? 0;
 
