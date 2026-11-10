@@ -52,6 +52,8 @@ export function SecondaryAction({ icon: Icon, label, onPress, active, color }) {
 export function BottomActionBar({
   insets,
   handleMarkPlayed,
+  hasReviewed,
+  canReview,
   alreadyPlayed,
   wishlisted,
   wishlistMutation,
@@ -78,11 +80,11 @@ export function BottomActionBar({
     >
       {/* Primary CTA row */}
       <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
-        <TouchableOpacity
-          onPress={handleMarkPlayed}
+        {(canReview || !hasReviewed) && <TouchableOpacity
+          onPress={() => handleMarkPlayed("review")}
           style={{
             flex: 1,
-            backgroundColor: alreadyPlayed ? Colors.success : Colors.green,
+            backgroundColor: Colors.green,
             paddingVertical: 14,
             borderRadius: 8,
             alignItems: "center",
@@ -104,9 +106,18 @@ export function BottomActionBar({
               color: Colors.ivory,
             }}
           >
-            {alreadyPlayed ? "RECORD ANOTHER ROUND" : "RECORD ROUND"}
+            REVIEW COURSE
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
+
+        {hasReviewed && <TouchableOpacity
+          onPress={() => handleMarkPlayed("round")}
+          style={{ flex: 1, backgroundColor: Colors.success, paddingVertical: 14, borderRadius: 8, alignItems: "center", justifyContent: "center" }}
+        >
+          <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.ivory, letterSpacing: 1 }}>
+            RECORD ROUND
+          </Text>
+        </TouchableOpacity>}
 
         <TouchableOpacity
           onPress={() => !alreadyPlayed && wishlistMutation.mutate()}
