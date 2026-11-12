@@ -242,9 +242,13 @@ export function createApp() {
               },
             },
             authorize: async (credentials) => {
-              const { email, password } = credentials;
+              const { password } = credentials;
+              const email =
+                typeof credentials.email === "string"
+                  ? credentials.email.trim().toLowerCase()
+                  : "";
               if (!email || !password) return null;
-              if (typeof email !== "string" || typeof password !== "string") {
+              if (typeof password !== "string") {
                 return null;
               }
 
