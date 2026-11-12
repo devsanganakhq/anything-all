@@ -96,6 +96,15 @@ export function createApp() {
   });
 
   app.onError((err, c) => {
+    // API callers (the mobile app) need a real status code and never a stack
+    // trace. The HTML error page below is a builder-sandbox artefact that
+    // answered 200 and exposed internal paths.
+    if (c.req.path.startsWith("/api/")) {
+      if ((err as { code?: string })?.code === "UNAUTHENTICATED")
+        return c.json({ error: "Sign in required" }, 401);
+      console.error(`Unhandled API error on ${c.req.method} ${c.req.path}:`, err);
+      return c.json({ error: "Something went wrong. Please try again." }, 500);
+    }
     if (c.req.method !== "GET") {
       return c.json(
         {
