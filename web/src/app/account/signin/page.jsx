@@ -52,9 +52,9 @@ export default function SignInPage() {
 
     try {
       const result = await signInWithCredentials({
-        email,
+        email: email.trim().toLowerCase(),
         password,
-        callbackUrl: "/api/auth/token",
+        callbackUrl: isNativeApp ? "/api/auth/expo-web-success" : "/",
         redirect: false,
       });
       clearTimeout(timer);
