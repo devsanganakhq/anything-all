@@ -66,6 +66,9 @@ export async function GET(request) {
 						var message = ${JSON.stringify(message)};
 						if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
 							window.ReactNativeWebView.postMessage(JSON.stringify(message));
+							setTimeout(function () {
+								window.location.replace('/api/auth/token');
+							}, 1500);
 							return;
 						}
 						if (window.parent && window.parent !== window) {
