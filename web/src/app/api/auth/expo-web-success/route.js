@@ -40,6 +40,7 @@ export async function GET(request) {
 				status: 401,
 				headers: {
 					'Content-Type': 'text/html',
+					'Cache-Control': 'no-store',
 				},
 			}
 		);
@@ -63,12 +64,21 @@ export async function GET(request) {
 			<body>
 				<script>
 					(function () {
-						var message = ${JSON.stringify(message)};
+						var message = ${JSON.stringify(message).replace(/</g, '\\u003c')};
 						if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-							window.ReactNativeWebView.postMessage(JSON.stringify(message));
+							// The app applies a session once, so repeated posts are safe. They
+							// cover a bridge that is not listening yet on the first post.
+							var payload = JSON.stringify(message);
+							[0, 400, 1200].forEach(function (delay) {
+								setTimeout(function () {
+									window.ReactNativeWebView.postMessage(payload);
+								}, delay);
+							});
+							// Last resort: the app loads the token route inside the WebView
+							// (where the session cookie lives) and reads it from there.
 							setTimeout(function () {
 								window.location.replace('/api/auth/token');
-							}, 1500);
+							}, 4000);
 							return;
 						}
 						if (window.parent && window.parent !== window) {
@@ -84,6 +94,7 @@ export async function GET(request) {
 		{
 			headers: {
 				'Content-Type': 'text/html',
+				'Cache-Control': 'no-store',
 			},
 		}
 	);

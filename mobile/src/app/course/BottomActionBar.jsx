@@ -110,14 +110,15 @@ export function BottomActionBar({
           </Text>
         </TouchableOpacity>}
 
-        {hasReviewed && <TouchableOpacity
+        {/* Rounds are always available, including during the review cooldown. */}
+        <TouchableOpacity
           onPress={() => handleMarkPlayed("round")}
           style={{ flex: 1, backgroundColor: Colors.success, paddingVertical: 14, borderRadius: 8, alignItems: "center", justifyContent: "center" }}
         >
           <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.ivory, letterSpacing: 1 }}>
             RECORD ROUND
           </Text>
-        </TouchableOpacity>}
+        </TouchableOpacity>
 
         <TouchableOpacity
           onPress={() => !alreadyPlayed && wishlistMutation.mutate()}

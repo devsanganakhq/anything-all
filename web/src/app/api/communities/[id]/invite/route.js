@@ -94,7 +94,7 @@ export async function POST(request, { params }) {
            WHEN community_invites.status = 'declined' THEN NOW()
            ELSE community_invites.created_at
          END
-       RETURNING id`,
+       RETURNING id, created_at`,
       [communityId, adminId, inviteeUserId],
     );
 
@@ -105,6 +105,8 @@ export async function POST(request, { params }) {
         fromUserId: adminId,
         communityId,
         message: `invited you to join ${comm[0].name}`,
+        // created_at resets when a declined invite is re-sent, giving a new key
+        eventKey: `community-invite:${rows[0].id}:${new Date(rows[0].created_at).getTime()}`,
       });
     }
 

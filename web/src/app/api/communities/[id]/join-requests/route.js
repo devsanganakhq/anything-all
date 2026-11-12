@@ -100,6 +100,7 @@ export async function POST(request, { params }) {
         fromUserId: userId,
         communityId,
         message: `declined your request to join ${joinRequest.community_name}`,
+        eventKey: `join-response:${joinRequest.id}`,
       });
 
       return Response.json({ success: true, action: "declined" });
@@ -130,6 +131,7 @@ export async function POST(request, { params }) {
       fromUserId: userId,
       communityId,
       message: `accepted your request to join ${joinRequest.community_name}`,
+      eventKey: `join-response:${joinRequest.id}`,
     });
 
     return Response.json({ success: true, action: "accepted" });

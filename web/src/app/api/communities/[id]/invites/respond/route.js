@@ -53,6 +53,7 @@ export async function POST(request, { params }) {
         fromUserId: userId,
         communityId,
         message: `declined your invite to ${invite.community_name}`,
+        eventKey: `invite-response:${invite.id}`,
       });
 
       return Response.json({ success: true, action: "declined" });
@@ -88,6 +89,7 @@ export async function POST(request, { params }) {
       fromUserId: userId,
       communityId,
       message: `accepted your invite to ${invite.community_name}`,
+      eventKey: `invite-response:${invite.id}`,
     });
 
     return Response.json({ success: true, action: "accepted" });

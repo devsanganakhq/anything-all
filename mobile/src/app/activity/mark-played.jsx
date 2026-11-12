@@ -59,10 +59,12 @@ export default function MarkPlayedScreen() {
   });
   const hasReviewed = courseStatus?.userStatus?.hasReviewed === true;
   const canReview = courseStatus?.userStatus?.canReview === true;
+  // Client rule: the first review OR the first round creates the played course,
+  // and rounds stay available during the 30-day review cooldown. Only a new
+  // review is gated (the server enforces the same rule).
   useEffect(() => {
-    if (!isEdit && !isList && courseStatus && !hasReviewed) setMode("review");
-    if (!isEdit && !isList && courseStatus && hasReviewed && !canReview) setMode("round");
-  }, [courseStatus, hasReviewed, canReview, isEdit, isList]);
+    if (!isEdit && !isList && courseStatus && !canReview) setMode("round");
+  }, [courseStatus, canReview, isEdit, isList]);
   const [scores, setScores] = useState(
     Object.fromEntries(categories.map((c) => [c.key, 5])),
   );
@@ -291,7 +293,12 @@ export default function MarkPlayedScreen() {
               {eligibilityError ? "Unable to check eligibility. Reopen this course and try again." : "Checking review eligibility…"}
             </Text>
           )}
-          {!isEdit && !isList && courseStatus && hasReviewed && canReview && (
+          {!isEdit && !isList && courseStatus && !canReview && hasReviewed && (
+            <Text style={{ color: Colors.textSecondary, marginBottom: 16 }}>
+              You reviewed this course in the last 30 days. You can record another round now and review it again after the 30 days.
+            </Text>
+          )}
+          {!isEdit && !isList && courseStatus && canReview && (
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 24 }}>
               {["round", "review"].map((value) => (
                 <TouchableOpacity
@@ -737,7 +744,7 @@ export default function MarkPlayedScreen() {
               gap: 8,
               opacity: mutation.isPending || uploading ? 0.6 : 1,
             }}
-            disabled={mutation.isPending || uploading || (isEdit && !existing) || (!isEdit && !isList && (!courseStatus || (mode === "round" && !hasReviewed) || (mode === "review" && !canReview)))}
+            disabled={mutation.isPending || uploading || (isEdit && !existing) || (!isEdit && !isList && (!courseStatus || (mode === "review" && !canReview)))}
             onPress={() => {
               if (selectedPhotos.length > 0 && !termsAccepted) {
                 Alert.alert(
