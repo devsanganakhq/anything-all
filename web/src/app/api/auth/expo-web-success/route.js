@@ -66,6 +66,7 @@ export async function GET(request) {
 						var message = ${JSON.stringify(message)};
 						if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
 							window.ReactNativeWebView.postMessage(JSON.stringify(message));
+							return;
 						}
 						if (window.parent && window.parent !== window) {
 							window.parent.postMessage(message, '*');
