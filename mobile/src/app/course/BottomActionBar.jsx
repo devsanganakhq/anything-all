@@ -78,7 +78,8 @@ export function BottomActionBar({
         paddingBottom: insets.bottom + 12,
       }}
     >
-      {/* Primary CTA row */}
+      {/* Activity row: review + round. Wishlist gets its own row so no label is
+          clipped on narrow screens or with larger system fonts (client B15). */}
       <View style={{ flexDirection: "row", gap: 10, marginBottom: 10 }}>
         {(canReview || !hasReviewed) && <TouchableOpacity
           onPress={() => handleMarkPlayed("review")}
@@ -105,6 +106,9 @@ export function BottomActionBar({
               letterSpacing: 1.2,
               color: Colors.ivory,
             }}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             REVIEW COURSE
           </Text>
@@ -115,18 +119,21 @@ export function BottomActionBar({
           onPress={() => handleMarkPlayed("round")}
           style={{ flex: 1, backgroundColor: Colors.success, paddingVertical: 14, borderRadius: 8, alignItems: "center", justifyContent: "center" }}
         >
-          <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.ivory, letterSpacing: 1 }}>
+          <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.ivory, letterSpacing: 1 }}
+            numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             RECORD ROUND
           </Text>
         </TouchableOpacity>
+      </View>
 
+      <View style={{ flexDirection: "row", marginBottom: 10 }}>
         <TouchableOpacity
           onPress={() => !alreadyPlayed && wishlistMutation.mutate()}
           disabled={alreadyPlayed || wishlistMutation.isPending}
           style={{
             flex: 1,
             backgroundColor: wishlisted ? Colors.purple : Colors.white,
-            paddingVertical: 14,
+            paddingVertical: 11,
             borderRadius: 8,
             alignItems: "center",
             flexDirection: "row",
@@ -153,6 +160,7 @@ export function BottomActionBar({
               letterSpacing: 1.2,
               color: wishlisted ? Colors.ivory : Colors.purple,
             }}
+            numberOfLines={1}
           >
             {wishlisted ? "SAVED" : "ADD TO WISHLIST"}
           </Text>

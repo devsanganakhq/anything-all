@@ -448,7 +448,7 @@ export default function CourseDetailScreen() {
         )}
         scrollEventThrottle={16}
         stickyHeaderIndices={[2]}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 210 }}
       >
         {/* ── [0] Hero ─────────────────────────────────────────────────────── */}
         <CourseHero

@@ -5,6 +5,21 @@ import {
   LIST_CATEGORIES,
   photoUrls,
 } from "./validation";
+// Curated-list source metadata comes from the client workbooks and includes
+// import/verification bookkeeping. Golfers only see the fields the app renders,
+// and notes written for the data team (master-record matching, candidate
+// benches) are withheld; price, tie and history notes stay visible.
+const PUBLIC_LIST_FIELDS = ["notes", "price_rank", "fee_amount_native", "fee_currency",
+  "host_years", "times_hosted", "first_host_year", "last_host_year", "venue_status"];
+const INTERNAL_NOTE = /\b(country master|USA master|master (ID|record|correction)|Candidate_Bench|deterministically)\b/i;
+export function publicListMetadata(metadata) {
+  const out = {};
+  for (const key of PUBLIC_LIST_FIELDS)
+    if (metadata?.[key] != null) out[key] = metadata[key];
+  if (typeof out.notes === "string" && INTERNAL_NOTE.test(out.notes)) delete out.notes;
+  return out;
+}
+
 export function listService(sql) {
   async function collections(userId = null) {
     return sql(
@@ -61,7 +76,7 @@ export function listService(sql) {
         started: summary.started,
         completed: summary.completed,
       },
-      courses,
+      courses: courses.map((c) => ({ ...c, source_metadata: publicListMetadata(c.source_metadata) })),
       reviews,
       rating: aggregate.rating,
       reviewCount: aggregate.count,

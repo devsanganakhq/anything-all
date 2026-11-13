@@ -2,6 +2,23 @@ import { activityInput, invalid, positiveId } from "./validation";
 
 // sql is injected for tests. Neon HTTP transactions execute sequential statements;
 // the first advisory-lock statement serializes writes for one course.
+// Played-course achievements: one rule list drives both awarding (after new
+// activity) and revoking (after deletion), so the two can never disagree.
+const ACHIEVEMENT_RULES = [
+  ["first-tee", "total", 1], ["course-collector", "total", 10],
+  ["fifty-club", "total", 50], ["century-club", "total", 100],
+  ["links-explorer", "links", 10], ["heathland-hunter", "heathland", 10],
+  ["scottish-explorer", "scotland", 25], ["irish-explorer", "ireland", 15],
+];
+const ACHIEVEMENT_MET = ACHIEVEMENT_RULES
+  .map(([slug, stat, min]) => `(a.slug='${slug}' AND s.${stat}>=${min})`).join(" OR ");
+const ACHIEVEMENT_SLUGS = ACHIEVEMENT_RULES.map(([slug]) => `'${slug}'`).join(",");
+const PLAYED_STATS = `SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE c.course_type='Links')::int AS links,
+       COUNT(*) FILTER(WHERE c.course_type='Heathland')::int AS heathland,
+       COUNT(*) FILTER(WHERE c.country='Scotland')::int AS scotland,
+       COUNT(*) FILTER(WHERE c.country='Ireland')::int AS ireland
+      FROM played_courses p JOIN courses c ON c.id=p.course_id WHERE p.user_id=$1`;
+
 export function activityService(sql) {
   const query = (s, p = []) => sql(s, p);
   async function canViewPassport(viewer, owner) {
@@ -67,6 +84,25 @@ export function activityService(sql) {
            SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=a.list_id AND lc.course_id=$2 AND lc.counts_for_completion
            AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2))`,
         [userId, courseId],
+      ),
+      // Played-course achievements and milestone posts the golfer no longer
+      // qualifies for are withdrawn; new activity awards them again.
+      sql(
+        `WITH stats AS (${PLAYED_STATS}), lost AS (
+           DELETE FROM user_achievements ua USING achievements a, stats s
+           WHERE ua.user_id=$1 AND ua.achievement_id=a.id AND a.slug IN (${ACHIEVEMENT_SLUGS})
+             AND NOT (${ACHIEVEMENT_MET})
+           RETURNING a.slug)
+         DELETE FROM feed_posts f USING lost
+         WHERE f.author_id=$1 AND f.post_type='achievement' AND f.metadata->>'achievement_slug'=lost.slug`,
+        [userId],
+      ),
+      sql(
+        `DELETE FROM feed_posts f WHERE f.author_id=$1 AND f.post_type='milestone'
+           AND COALESCE(f.metadata->>'milestone_count',f.metadata->>'count') ~ '^[0-9]+$'
+           AND COALESCE(f.metadata->>'milestone_count',f.metadata->>'count')::int
+             > (SELECT COUNT(*) FROM played_courses WHERE user_id=$1)`,
+        [userId],
       ),
     ];
   }
@@ -228,18 +264,11 @@ export function activityService(sql) {
         ...sync(courseId, userId),
         sql(
           `WITH stats AS (
-      SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE c.course_type='Links')::int AS links,
-       COUNT(*) FILTER(WHERE c.course_type='Heathland')::int AS heathland,
-       COUNT(*) FILTER(WHERE c.country='Scotland')::int AS scotland,
-       COUNT(*) FILTER(WHERE c.country='Ireland')::int AS ireland
-      FROM played_courses p JOIN courses c ON c.id=p.course_id WHERE p.user_id=$1
+      ${PLAYED_STATS}
     ), unlocked AS (
       INSERT INTO user_achievements(user_id,achievement_id)
       SELECT $1,a.id FROM achievements a CROSS JOIN stats s WHERE
-       (a.slug='first-tee' AND s.total>=1) OR (a.slug='course-collector' AND s.total>=10) OR
-       (a.slug='fifty-club' AND s.total>=50) OR (a.slug='century-club' AND s.total>=100) OR
-       (a.slug='links-explorer' AND s.links>=10) OR (a.slug='heathland-hunter' AND s.heathland>=10) OR
-       (a.slug='scottish-explorer' AND s.scotland>=25) OR (a.slug='irish-explorer' AND s.ireland>=15)
+       ${ACHIEVEMENT_MET}
       ON CONFLICT(user_id,achievement_id) DO NOTHING RETURNING achievement_id
     ) INSERT INTO feed_posts(author_id,post_type,caption,metadata)
       SELECT $1,'achievement',a.name,jsonb_build_object('achievement_name',a.name,'achievement_desc',a.description,'achievement_slug',a.slug)

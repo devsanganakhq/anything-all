@@ -10,9 +10,9 @@ export default function ListsIndex() {
   const insets = useSafeAreaInsets();
   return (
     <View style={{ flex: 1, backgroundColor: Colors.ivory, paddingTop: insets.top + 12 }}>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back to Explore"
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Back"
         onPress={() => router.back()} style={{ paddingHorizontal: Spacing.screenH, paddingVertical: 12 }}>
-        <Text style={{ color: Colors.green, fontWeight: "700" }}>← Explore</Text>
+        <Text style={{ color: Colors.green, fontWeight: "700" }}>← Back</Text>
       </TouchableOpacity>
       <Text style={{ color: Colors.textPrimary, fontSize: 26, fontWeight: "700",
         paddingHorizontal: Spacing.screenH, marginVertical: 18 }}>Heathland Links Lists</Text>

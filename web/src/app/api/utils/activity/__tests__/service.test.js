@@ -297,6 +297,29 @@ test("new activity still unlocks existing achievements once", async () => {
     ).rows[0].n,
   ).toBe(1);
 });
+test("deleting the only activity withdraws First Tee and its post; new activity awards it again", async () => {
+  const count = async (q) => (await db.query(q)).rows[0].n;
+  const awards = "SELECT COUNT(*)::int n FROM user_achievements ua JOIN achievements a ON a.id=ua.achievement_id WHERE ua.user_id=3 AND a.slug='first-tee'";
+  const posts = "SELECT COUNT(*)::int n FROM feed_posts WHERE author_id=3 AND post_type='achievement' AND metadata->>'achievement_slug'='first-tee'";
+  const round = await service.create(3, "round", input("revoke-first-tee-1", { courseId: 1, scores: undefined }));
+  expect(await count(awards)).toBe(1);
+  expect(await count(posts)).toBe(1);
+  await service.deleteRound(3, round.id);
+  expect(await count("SELECT COUNT(*)::int n FROM played_courses WHERE user_id=3")).toBe(0);
+  expect(await count(awards)).toBe(0);
+  expect(await count(posts)).toBe(0);
+  await service.create(3, "round", input("revoke-first-tee-2", { courseId: 1, scores: undefined }));
+  expect(await count(awards)).toBe(1);
+  expect(await count(posts)).toBe(1);
+});
+test("an achievement still earned by other courses is kept when one course is deleted", async () => {
+  const count = async (q) => (await db.query(q)).rows[0].n;
+  const awards = "SELECT COUNT(*)::int n FROM user_achievements ua JOIN achievements a ON a.id=ua.achievement_id WHERE ua.user_id=3 AND a.slug='first-tee'";
+  const second = await service.create(3, "round", input("keep-first-tee-1", { courseId: 2, scores: undefined }));
+  await service.deleteRound(3, second.id);
+  expect(await count("SELECT COUNT(*)::int n FROM played_courses WHERE user_id=3")).toBe(1);
+  expect(await count(awards)).toBe(1);
+});
 test("reusing a saved request with changed details cannot silently overwrite or report a false success", async () => {
   await expect(
     service.create(

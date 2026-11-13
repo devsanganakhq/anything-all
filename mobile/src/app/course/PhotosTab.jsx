@@ -276,11 +276,15 @@ export function PhotosTab({ courseId, alreadyPlayed, course }) {
         </TouchableOpacity>
       )}
 
-      {!alreadyPlayed && photos.length === 0 && (
+      {photos.length === 0 && (
         <EmptySection
           icon={Camera}
           title="No photos yet"
-          body="Members who have played this course can share photos."
+          body={
+            alreadyPlayed
+              ? "Be the first to share a photo of this course."
+              : "Members who have played this course can share photos."
+          }
         />
       )}
 

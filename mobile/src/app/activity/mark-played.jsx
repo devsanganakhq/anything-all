@@ -715,8 +715,11 @@ export default function MarkPlayedScreen() {
                             const result = await r.json();
                             throw Error(result.error || "Unable to delete activity");
                           }
-                          await queryClient.invalidateQueries();
+                          // Leave first: refetching the deleted activity while
+                          // this screen is still mounted showed "Unable to load".
+                          queryClient.removeQueries({ queryKey: ["activity-edit", mode, activityId] });
                           router.back();
+                          queryClient.invalidateQueries();
                         } catch (e) {
                           Alert.alert("Unable to delete", e.message);
                         }
