@@ -197,6 +197,31 @@ export async function DELETE(request) {
     queries.push(sql(`DELETE FROM feed_posts WHERE author_id = $1`, [userId]));
 
     // ── Communities (owned communities deleted last among community data) ───
+    // Other members' rows that point at this user's communities or posts have
+    // no ON DELETE CASCADE and would otherwise block the whole deletion
+    // (members' alerts, community feed/activity rows, reports). Clear them
+    // first, children before parents.
+    const ownedCommunities = `SELECT id FROM communities WHERE created_by = $1`;
+    const affectedPosts = `SELECT id FROM community_posts WHERE user_id = $1 OR community_id IN (${ownedCommunities})`;
+    queries.push(
+      sql(
+        `DELETE FROM community_reports WHERE community_id IN (${ownedCommunities}) OR post_id IN (${affectedPosts})`,
+        [userId],
+      ),
+    );
+    queries.push(
+      sql(
+        `DELETE FROM notifications WHERE community_id IN (${ownedCommunities}) OR community_post_id IN (${affectedPosts})
+           OR activity_id IN (SELECT id FROM activity_feed WHERE community_id IN (${ownedCommunities}))`,
+        [userId],
+      ),
+    );
+    queries.push(
+      sql(`DELETE FROM activity_feed WHERE community_id IN (${ownedCommunities})`, [userId]),
+    );
+    queries.push(
+      sql(`DELETE FROM feed_posts WHERE community_id IN (${ownedCommunities})`, [userId]),
+    );
     queries.push(
       sql(`DELETE FROM community_reports WHERE reporter_id = $1`, [userId]),
     );

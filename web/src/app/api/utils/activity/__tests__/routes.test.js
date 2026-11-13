@@ -517,6 +517,31 @@ test("account deletion is atomic and removes activity aggregates and credentials
     )[0],
   ).toMatchObject({ played_count: 0, community_rating: null });
 });
+test("deleting a community owner's account succeeds when other members reference the community", async () => {
+  // Owner 2 runs a community; member 1 has an alert, a post, a feed post, an
+  // activity row and a report pointing at it. None of these may block deletion.
+  await sql(`INSERT INTO communities(id,name,slug,created_by,community_type) VALUES(901,'QA Owned','qa-owned-901',2,'public')`);
+  await sql(`INSERT INTO community_members(community_id,user_id,role) VALUES(901,2,'admin'),(901,1,'member')`);
+  const [ownerPost] = await sql(`INSERT INTO community_posts(community_id,user_id,body) VALUES(901,2,'owner post') RETURNING id`);
+  await sql(`INSERT INTO community_posts(community_id,user_id,body) VALUES(901,1,'member post')`);
+  await sql(`INSERT INTO notifications(user_id,notification_type,from_user_id,community_id,community_post_id,message)
+    VALUES(1,'community_post',2,901,$1,'posted in QA Owned')`, [ownerPost.id]);
+  await sql(`INSERT INTO feed_posts(author_id,post_type,community_id,caption) VALUES(1,'community',901,'shared in community')`);
+  await sql(`INSERT INTO activity_feed(user_id,activity_type,community_id) VALUES(1,'joined_community',901)`);
+  await sql(`INSERT INTO community_reports(reporter_id,community_id,post_id,reason) VALUES(1,901,$1,'spam')`, [ownerPost.id]);
+
+  state.viewer = 2;
+  const { DELETE } = await import("@/app/api/user/account/route");
+  const response = await DELETE(req("user/account"));
+  expect(response.status).toBe(200);
+  expect(await sql("SELECT id FROM users WHERE id=2")).toHaveLength(0);
+  expect(await sql("SELECT id FROM communities WHERE id=901")).toHaveLength(0);
+  expect(await sql("SELECT id FROM notifications WHERE community_id=901")).toHaveLength(0);
+  expect(await sql("SELECT id FROM feed_posts WHERE community_id=901")).toHaveLength(0);
+  expect(await sql("SELECT id FROM community_reports WHERE community_id=901")).toHaveLength(0);
+  // the other member keeps their account
+  expect(await sql("SELECT id FROM users WHERE id=1")).toHaveLength(1);
+});
 test("release readiness requires all six published lists and the migrated backend", async () => {
   const { GET } = await import("@/app/api/health/release/route");
   let r = await GET();
