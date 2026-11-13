@@ -7,6 +7,14 @@ import { router } from "expo-router";
 import { useAuthStore } from "@/utils/auth/store";
 import { queryClient } from "@/utils/queryClient";
 let registeredToken = null;
+
+// React Native's AbortSignal polyfill has no AbortSignal.timeout(); calling it
+// threw before the device token was ever sent, so no phone registered for push.
+function timeoutSignal(ms) {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
 export function safeNotificationPath(path) {
   if (typeof path !== "string") return null;
   return /^\/(?:course|feed|social|communities|lists)\/\d+(?:\?(?:tab=(?:CHAT|REQUESTS)|postId=\d+(?:&openComments=1)?|openComments=1))?$/.test(path)
@@ -22,7 +30,7 @@ export async function detachPushToken() {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
-        signal: AbortSignal.timeout(5000),
+        signal: timeoutSignal(5000),
       });
     } catch {}
 }
@@ -72,7 +80,7 @@ export function usePushNotifications() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
-          signal: AbortSignal.timeout(15000),
+          signal: timeoutSignal(15000),
         });
         if (!r.ok) {
           console.warn("[Push] Backend rejected device registration", r.status);
