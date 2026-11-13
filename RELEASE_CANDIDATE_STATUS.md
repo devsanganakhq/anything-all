@@ -1,47 +1,53 @@
-# Heathland Links release candidate — 10 November 2026
+# Heathland Links release candidate — 13 November 2026
 
-## Current state
+## Build for client testing
 
-PR #3, “Heathland Links: November 10 release candidate and release gates,” is open as a draft from `dev/heathland-20-requirements-20261110` into `fix/heathland-client-scope`. It contains 41 changed files and is not merged into `main`. The PR branch's Vercel deployment is shown as Preview and Ready. The current commit status reports Vercel success; no GitHub Actions run was found. The release candidate has not been accepted as a final store build.
+- **Version:** 2.0.3 (Android and iOS)
+- **Branch:** `dev/heathland-20-requirements-20261110`
+- **Profiles:** `client-preview` (Android APK) and `client-testflight` (iOS TestFlight)
+- **Backend:** Vercel preview of this branch, database branch `heathland-release-20261019`. Production is not used by these builds.
 
-The PR adds two November migrations and a release-health gate. The source history records rehearsal and application on isolated Neon branches; production remains explicitly out of scope and must remain unchanged. Before any release, re-verify the isolated database identity, migration records, six-list readiness, and endpoint response against the deployed Preview.
+## What changed since the 10 November candidate
 
-## Client request coverage
+**Sign-in and password reset (tester reports)**
+- The preview backend's `AUTH_URL` pointed at production, so sign-in redirected to the wrong site (the "Signing in…" loop) and reset links opened on production (reported as "expired"). Fixed in Vercel.
+- The native session is saved before Home opens; the token fallback runs inside the WebView; failed handoffs return to sign-in with a message. A golfer's name can no longer inject script into the sign-in page.
+- iOS: a reinstalled app no longer restores an old session from the Keychain.
 
-| # | Request | Source changes in candidate | Remaining work |
-|---|---|---|---|
-| 1 | Passport privacy | Owner/friend/public authorization paths retained and profile/favourites flows reviewed. | Full direct-link/API matrix: owner, public visitor, accepted/pending friend, non-friend, blocked user. |
-| 2 | 30-day review cooldown | Server timestamp and transactional per-user/course restriction. | Recheck boundary and concurrent requests in deployed integration environment. |
-| 3 | Passport rounds count | Real round total shown and sourced from records. | Verify after add/edit/delete on devices. |
-| 4 | Remove test elements | No new testing controls added; obsolete test-only routes removed. | Complete production UI/content audit. |
-| 5 | Feed privacy | Public feed, course activity/gallery, and notification visibility filters updated. | Audit post details, privacy changes, blocks, and push payloads end to end. |
-| 6 | Country flags | Shared mapping includes New Zealand and common countries; unknowns use globe fallback. | Review graphical coverage across all screens. |
-| 7 | Map pins | Invalid coordinates/IDs and rapid repeated taps guarded. | Reproduce and verify on Android and iOS; confirm crash root cause. |
-| 8 | Community images | Tap opens existing full-screen multi-image viewer. | Zoom, loading/failure polish, and Android/iOS QA. |
-| 9 | List completion feed | Transactional, deduplicated completion activity; reversal removes dependent event. | End-to-end device flow. |
-| 10 | List achievements | Additive awards table, backfill, revoke/reactivate, Passport stats. | Rehearse against production-schema snapshot and verify eligibility. |
-| 11 | Passport achievements shortcut | Collection route and authorized social-profile link. | Visual and privacy QA on devices. |
-| 12 | Explore lists | Dedicated shortcut/view and distinct-starter sorting. | Device navigation QA. |
-| 13 | Passport layout | Compact horizontal activity tabs and shortcuts. | Review lower legacy sections and small-phone layout. |
-| 14 | Northern Ireland/Hawaii flags | Correct UK/USA parent-country identity; Hawaii is not treated as sovereign. | Dedicated regional graphics remain outstanding. |
-| 15 | Course actions | Review eligibility shown in course/mark-played actions; backend cooldown enforced. | Check offline behavior and older-client direct round calls. |
-| 16 | Exact grammar | Requested category wording updated in backend/mobile definitions. | Final editorial check. |
-| 17 | Lists/descriptions | Loading/empty/progress polish, neutral fallback, audited admin editor. | Review course descriptions for factual accuracy. |
-| 18 | Delete round | Owner-only API and confirmed mobile delete action. | Device flow and error handling. |
-| 19 | Deletion consistency | Reconciles played courses, lists, awards, feed, and aggregates while retaining other valid activity. | Audit legacy records and ranking dependencies. |
-| 20 | Notifications | Privacy/block/read-scope changes and malformed/unauthorized-write tests. | Verify real push delivery and complete the planned test with Paul. |
+**Push notifications (#20)**
+- Phones never registered for push: the app called `AbortSignal.timeout()`, which React Native does not provide, so the device token was never sent. Fixed. Firebase, Expo token issue and FCM delivery were each verified working.
+- Duplicate notifications removed: every notification now has a dedupe key (likes, friend requests, community invites, join requests, joins).
 
-## Validation recorded
+**Client changes and testing findings**
+- A round can be recorded before the first review; rounds stay available during the 30-day review cooldown, which the screen explains (#2, #15).
+- Course actions on two rows so no label is clipped (B15).
+- Deleting a round closes the editor cleanly (#18); achievements and milestone posts are withdrawn when deleted activity no longer qualifies, and awarded again on re-qualifying (#19).
+- List reviews are hidden, not deleted, while a list is incomplete, and restored on re-completion.
+- Photo viewer: pinch-zoom, double-tap zoom, solid background (#8); "No photos yet" on empty course galleries.
+- Internal import notes no longer shown on curated lists (#4).
+- Hollinwell (ENG-00169) club and course names corrected (B03). The England master workbook carries the same swap and should be corrected.
+- Shared course, feed and list links open the app on Android (B05).
 
-The local candidate status reports 39 web tests, web/mobile TypeScript checks, web build, and Android/iOS JavaScript exports passing on 10 November. Those checks were not rerun after the final release-health gate patch; CI has not reported a GitHub Actions run for the PR head. The Vercel Preview check is Ready. Confirm its database target and verify the endpoint returns `ready: true`, `lists: 6`, and `feature_set: heathland-20261110` before relying on that deployment.
+**Backend and database**
+- 31 indexes for the feed, privacy checks, notifications, course pages and sign-in.
+- `npm run migrate` applies migrations in order and refuses production hosts unless confirmed.
+- API errors return JSON with real status codes instead of a 200 HTML page with a stack trace.
 
-The successful TestFlight build 9 / version 2.0.2 came from older source, not this candidate. No new signed installable Android or iOS build, physical-device acceptance, real push test, or client acceptance is recorded. JavaScript exports are not native installable builds.
+## Verified
 
-## Remaining release gates
+- 59 automated web tests, web and mobile type checks, Android bundle build.
+- Preview backend end to end: sign-up, sign-in (mixed-case email), session handoff, token fallback, authenticated APIs, 401 without a session, password reset, account deletion.
+- On an Android emulator with the 13 Nov build: the client's change list item by item, with screenshots (`test-screenshots/TEST-REPORT.md` in the handover folder).
 
-- Complete the device, privacy, map, image, deletion, notification, and editorial checks above.
-- Independently rehearse migrations on a production-schema snapshot and verify the isolated Preview backend and recovery path.
-- Build signed Android and iOS candidates from the reviewed PR source; install and test them, then obtain client acceptance.
-- Keep PR #3 in draft until reviewers decide it is ready. Do not merge this release into `main`, run production migrations, deploy production, or submit a store build as part of this checkpoint.
+## Still open
 
-No claim of bug-free behavior or final release readiness is made.
+- **#14:** dedicated Northern Ireland and Hawaii graphics (awaiting artwork).
+- **B17:** the three Hollinwell test photos (IDs 28–30) are already removed; awaiting client confirmation.
+- **Physical-device checks:** push delivery with the app closed, community images and mute, other golfers' private Passports, reset email delivery, large font sizes, iOS.
+
+## Before production
+
+1. Neon backup branch of `production`.
+2. Run `npm run migrate` against production, including `20261113_list_review_hidden`, **before** promoting this code.
+3. Merge into the release branch and deploy production through Git.
+4. Add the Google Play app-signing SHA-256 to `ANDROID_SIGNING_CERT_SHA256` before the Play release.
