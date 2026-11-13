@@ -26,7 +26,7 @@ export function listService(sql) {
       `SELECT l.*,
    (SELECT COUNT(*)::int FROM curated_list_courses WHERE list_id=l.id AND counts_for_completion) AS total,
    (SELECT COUNT(*)::int FROM curated_list_courses lc JOIN played_courses pc ON pc.course_id=lc.course_id AND pc.user_id=$1 WHERE lc.list_id=l.id AND lc.counts_for_completion) AS played,
-   (SELECT AVG(rating) FROM list_reviews WHERE list_id=l.id) AS rating,
+   (SELECT AVG(rating) FROM list_reviews WHERE list_id=l.id AND hidden_at IS NULL) AS rating,
    (SELECT COUNT(DISTINCT pc.user_id)::int FROM curated_list_courses lc JOIN played_courses pc ON pc.course_id=lc.course_id WHERE lc.list_id=l.id AND lc.counts_for_completion) AS started,
    (SELECT COUNT(*)::int FROM (SELECT pc.user_id FROM curated_list_courses lc JOIN played_courses pc ON pc.course_id=lc.course_id
      WHERE lc.list_id=l.id AND lc.counts_for_completion GROUP BY pc.user_id
@@ -52,7 +52,7 @@ export function listService(sql) {
     );
     const reviews = await sql(
       `SELECT r.*,COALESCE(NULLIF(TRIM(CONCAT_WS(' ',u.first_name,u.last_name)),''),'Golfer') AS name,
-   u.profile_photo_url AS avatar FROM list_reviews r JOIN users u ON u.id=r.user_id WHERE r.list_id=$1 AND NOT COALESCE(u.is_suspended,false)
+   u.profile_photo_url AS avatar FROM list_reviews r JOIN users u ON u.id=r.user_id WHERE r.list_id=$1 AND r.hidden_at IS NULL AND NOT COALESCE(u.is_suspended,false)
    AND NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id)))
    AND (r.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
      OR EXISTS(SELECT 1 FROM friendships WHERE status='accepted' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id))))
@@ -61,7 +61,7 @@ export function listService(sql) {
     );
     const [aggregate] = await sql(
       `SELECT AVG(r.rating) AS rating,COUNT(*)::int AS count FROM list_reviews r JOIN users u ON u.id=r.user_id
-       WHERE r.list_id=$1 AND NOT COALESCE(u.is_suspended,false)
+       WHERE r.list_id=$1 AND r.hidden_at IS NULL AND NOT COALESCE(u.is_suspended,false)
        AND NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id)))
        AND (r.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
          OR EXISTS(SELECT 1 FROM friendships WHERE status='accepted' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id))))`,

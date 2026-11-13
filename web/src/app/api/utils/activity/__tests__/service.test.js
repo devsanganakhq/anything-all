@@ -32,6 +32,7 @@ beforeAll(async () => {
   await db.exec(readFileSync("migrations/20261017_activity.sql", "utf8"));
   await db.exec(readFileSync("migrations/20261019_list_sources.sql", "utf8"));
   await db.exec(readFileSync("migrations/20261110_list_completion_awards.sql", "utf8"));
+  await db.exec(readFileSync("migrations/20261113_list_review_hidden.sql", "utf8"));
   const sql = (text, params = []) => ({
     text,
     params,
@@ -241,12 +242,18 @@ test("deleting rounds retains a course while activity remains and invalidates de
   expect((await db.query("SELECT count(*)::int n FROM list_reviews WHERE user_id=1 AND list_id=$1", [list.id])).rows[0].n).toBe(1);
   await service.deleteRound(1, second.id);
   expect((await db.query("SELECT count(*)::int n FROM played_courses WHERE user_id=1 AND course_id=3")).rows[0].n).toBe(0);
-  expect((await db.query("SELECT count(*)::int n FROM list_reviews WHERE user_id=1 AND list_id=$1", [list.id])).rows[0].n).toBe(0);
+  // The written list review is kept but hidden while the list is incomplete...
+  expect((await db.query("SELECT count(*)::int n FROM list_reviews WHERE user_id=1 AND list_id=$1 AND hidden_at IS NOT NULL", [list.id])).rows[0].n).toBe(1);
+  expect((await lists.detail(2, list.id)).reviews).toHaveLength(0);
   expect((await db.query("SELECT played_count FROM courses WHERE id=3")).rows[0].played_count).toBe(0);
   expect((await db.query("SELECT active FROM list_completion_awards WHERE user_id=1 AND list_id=$1", [list.id])).rows[0].active).toBe(false);
   expect((await db.query("SELECT count(*)::int n FROM feed_posts WHERE author_id=1 AND post_type='list_complete' AND metadata->>'list_id'=$1", [String(list.id)])).rows[0].n).toBe(0);
   await service.create(1, "round", input("delete-round-recompleted", {courseId: 3}));
   expect((await db.query("SELECT active FROM list_completion_awards WHERE user_id=1 AND list_id=$1", [list.id])).rows[0].active).toBe(true);
+  // ...and shown again, with its text intact, once the list is complete again.
+  const [restored] = (await db.query("SELECT hidden_at, review_text FROM list_reviews WHERE user_id=1 AND list_id=$1", [list.id])).rows;
+  expect(restored).toEqual({ hidden_at: null, review_text: "Completed" });
+  expect((await lists.detail(2, list.id)).reviews).toHaveLength(1);
   expect((await db.query("SELECT count(*)::int n FROM feed_posts WHERE author_id=1 AND post_type='list_complete' AND metadata->>'list_id'=$1", [String(list.id)])).rows[0].n).toBe(1);
 });
 

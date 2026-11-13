@@ -65,7 +65,9 @@ export function activityService(sql) {
         [userId, courseId],
       ),
       sql(
-        `DELETE FROM list_reviews lr WHERE lr.user_id=$1 AND EXISTS (
+        // The written review is kept but hidden while the list is incomplete;
+        // re-completing the list shows it again (see create()).
+        `UPDATE list_reviews lr SET hidden_at=NOW() WHERE lr.user_id=$1 AND lr.hidden_at IS NULL AND EXISTS (
            SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=lr.list_id
            AND lc.counts_for_completion AND lc.course_id=$2
            AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2))`,
@@ -224,6 +226,13 @@ export function activityService(sql) {
            ) UPDATE list_completion_awards a SET feed_post_id=p.id FROM posted p
              WHERE a.user_id=$1 AND a.list_id=(p.metadata->>'list_id')::int`,
           [userId, courseId],
+        ),
+        sql(
+          `UPDATE list_reviews lr SET hidden_at=NULL WHERE lr.user_id=$1 AND lr.hidden_at IS NOT NULL
+           AND EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=lr.list_id AND lc.counts_for_completion)
+           AND NOT EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=lr.list_id AND lc.counts_for_completion
+             AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=lc.course_id))`,
+          [userId],
         ),
         sql(
           `UPDATE list_completion_awards a SET feed_post_id=f.id FROM feed_posts f

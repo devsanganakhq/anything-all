@@ -87,6 +87,7 @@ beforeAll(async () => {
   await state.db.exec(
     readFileSync("migrations/20261110_list_completion_awards.sql", "utf8"),
   );
+  await state.db.exec(readFileSync("migrations/20261113_list_review_hidden.sql", "utf8"));
   await state.db.exec(
     readFileSync("migrations/20261110_notification_refs.sql", "utf8"),
   );
