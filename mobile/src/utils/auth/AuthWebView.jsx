@@ -45,6 +45,54 @@ const ensureForgotPasswordLink = `(() => {
   return true;
 })();`;
 
+// Fallback handoff: /api/auth/token is loaded INSIDE the WebView (the only
+// place that holds the session cookie) and its JSON body is posted to RN.
+const postTokenPayload = `(() => {
+  try {
+    if (window.location.pathname !== "${tokenCallbackPath}") return true;
+    if (!window.ReactNativeWebView) return true;
+    var data = null;
+    try { data = JSON.parse(document.body ? document.body.innerText : ""); } catch (e) {}
+    var message = data && data.jwt
+      ? { type: "AUTH_SUCCESS", jwt: data.jwt, user: data.user }
+      : { type: "AUTH_ERROR", error: "Unauthorized" };
+    window.ReactNativeWebView.postMessage(JSON.stringify(message));
+  } catch (e) {}
+  return true;
+})();`;
+
+// A failed handoff always returns to sign-in (also after sign-up: the account
+// exists by then), whose page renders the ?error= code as a readable message.
+// Runs before the page renders: the token route is plain JSON and must never
+// be shown on screen (the native loading overlay stays in front of it).
+const hideTokenPage = `(() => {
+  try {
+    if (window.location.pathname === "${tokenCallbackPath}") {
+      document.documentElement.style.visibility = "hidden";
+    }
+  } catch (e) {}
+  return true;
+})();`;
+
+const signInErrorURL = (baseURL) =>
+  `${baseURL}/account/signin?callbackUrl=${encodeURIComponent(nativeCallbackPath)}&error=Callback`;
+
+const sameOrigin = (url, base) => {
+  try {
+    return new URL(url).origin === new URL(base).origin;
+  } catch {
+    return false;
+  }
+};
+
+const isPath = (url, path) => {
+  try {
+    return new URL(url).pathname === path;
+  } catch {
+    return false;
+  }
+};
+
 /**
  * This renders a WebView for authentication and handles both web and native platforms.
  */
@@ -56,18 +104,30 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
   const isAuthenticated = isReady ? !!auth : null;
   const iframeRef = useRef(null);
 
-  const applyAuthSuccess = (data) => {
-    if (!data?.jwt) {
-      console.error("[AuthWebView] AUTH_SUCCESS missing jwt");
+  // The success page may post more than once (retries + token fallback);
+  // apply each session exactly once.
+  const appliedJwt = useRef(null);
+
+  const applyAuthSuccess = async (data) => {
+    if (!data?.jwt || typeof data.jwt !== "string") {
+      console.error("[AuthWebView] AUTH_SUCCESS missing session");
       return;
     }
-    // Persist the new session first, then drop cached queries so refetches
-    // attach the new Bearer token instead of the previous user's.
-    setAuth({ jwt: data.jwt, user: data.user });
+    if (appliedJwt.current === data.jwt) return;
+    appliedJwt.current = data.jwt;
+    // setAuth stores the session in SecureStore before publishing it, so the
+    // navigation effect below only fires once the session survives a restart.
+    // Cached queries are dropped first so refetches use the new Bearer token.
+    resetAppCache();
+    await setAuth({ jwt: data.jwt, user: data.user });
     if (data.user) {
       identifyUser(data.user);
     }
-    resetAppCache();
+  };
+
+  const showAuthError = () => {
+    appliedJwt.current = null;
+    setURI(signInErrorURL(baseURL));
   };
 
   useEffect(() => {
@@ -148,7 +208,8 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
     <WebView
       incognito
       startInLoadingState
-      injectedJavaScript={ensureForgotPasswordLink}
+      injectedJavaScript={`${ensureForgotPasswordLink}\n${postTokenPayload}`}
+      injectedJavaScriptBeforeContentLoaded={hideTokenPage}
       renderLoading={() => (
         <View style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "#F5F3EB", alignItems: "center", justifyContent: "center" }}>
           <ActivityIndicator size="large" color="#193D2C" />
@@ -166,58 +227,24 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
         },
       }}
       onMessage={(event) => {
+        // Only messages from pages served by our own backend are trusted.
+        if (!sameOrigin(event.nativeEvent.url, baseURL)) return;
+        let data;
         try {
-          const origin = new URL(event.nativeEvent.url).origin;
-          if (origin !== new URL(baseURL).origin) return;
-          const data = JSON.parse(event.nativeEvent.data);
-          if (data?.type === "AUTH_SUCCESS") {
-            applyAuthSuccess(data);
-          } else if (data?.type === "AUTH_ERROR") {
-            console.error("[AuthWebView] Auth error:", data.error);
-          }
-        } catch (err) {
-          console.error("[AuthWebView] onMessage parse error:", err);
+          data = JSON.parse(event.nativeEvent.data);
+        } catch {
+          return;
+        }
+        if (data?.type === "AUTH_SUCCESS") {
+          applyAuthSuccess(data);
+        } else if (data?.type === "AUTH_ERROR") {
+          // Never log the payload; it can contain account details.
+          console.warn("[AuthWebView] sign-in handoff was rejected");
+          if (!isAuthenticated) showAuthError();
         }
       }}
       onShouldStartLoadWithRequest={(request) => {
         const url = request.url || "";
-
-        // Fallback: if redirected to JSON token endpoint, fetch via WebView cookies
-        // by letting the page load is unreliable; prefer expo-web-success postMessage.
-        if (
-          url === `${baseURL}${tokenCallbackPath}` ||
-          url.startsWith(`${baseURL}${tokenCallbackPath}?`)
-        ) {
-          fetch(url, { credentials: "include" })
-            .then(async (response) => {
-              if (!response.ok) {
-                console.error(
-                  "[AuthWebView] Token fetch failed:",
-                  response.status,
-                );
-                return;
-              }
-              const data = await response.json();
-              applyAuthSuccess(data);
-            })
-            .catch((err) => {
-              console.error("[AuthWebView] Token fetch error:", err);
-            });
-          return false;
-        }
-
-        // Allow expo-web-success page to load so its script can postMessage
-        if (
-          url === `${baseURL}${nativeCallbackPath}` ||
-          url.startsWith(`${baseURL}${nativeCallbackPath}?`)
-        ) {
-          return true;
-        }
-
-        if (url === currentURI) return true;
-
-        const hasParams = url.includes("?");
-        const separator = hasParams ? "&" : "?";
         let parsed;
         try {
           parsed = new URL(url);
@@ -226,20 +253,30 @@ export const AuthWebView = ({ mode, proxyURL, baseURL, onClose }) => {
         }
         const trusted = [baseURL, proxyURL]
           .filter(Boolean)
-          .some((value) => parsed.origin === new URL(value).origin);
+          .some((value) => sameOrigin(url, value));
         if (!trusted) return false;
+
+        // Handoff pages must load inside the WebView: it is the only place that
+        // holds the session cookie. Intercepting them would cancel the handoff.
+        if (
+          sameOrigin(url, baseURL) &&
+          (isPath(url, nativeCallbackPath) || isPath(url, tokenCallbackPath))
+        ) {
+          return true;
+        }
+
+        if (url === currentURI) return true;
+
         const newURL = proxyURL ? url.replace(proxyURL, baseURL) : url;
 
-        if (
-          newURL.endsWith(tokenCallbackPath) ||
-          newURL.endsWith(nativeCallbackPath)
-        ) {
+        if (isPath(newURL, nativeCallbackPath) || isPath(newURL, tokenCallbackPath)) {
           setURI(newURL);
           return false;
         }
 
         // Keep callbackUrl attached when navigating between account pages
-        if (newURL.includes("/account/") && !newURL.includes("callbackUrl=")) {
+        if (parsed.pathname.startsWith("/account/") && !parsed.searchParams.has("callbackUrl")) {
+          const separator = newURL.includes("?") ? "&" : "?";
           setURI(
             `${newURL}${separator}callbackUrl=${encodeURIComponent(nativeCallbackPath)}`,
           );

@@ -918,6 +918,11 @@ export default function GolferProfileScreen() {
         {/* ── Achievements ─────────────────────────────────────────────────── */}
         {achievements.length > 0 && (
           <Section label={`ACHIEVEMENTS (${achievements.length})`}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="View all achievements"
+              onPress={() => router.push({ pathname: "/passport/achievements", params: { userId: targetId } })}
+              style={{ paddingHorizontal: Spacing.screenH, paddingBottom: 10 }}>
+              <Text style={{ color: Colors.green, fontWeight: "700" }}>View all achievements →</Text>
+            </TouchableOpacity>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}

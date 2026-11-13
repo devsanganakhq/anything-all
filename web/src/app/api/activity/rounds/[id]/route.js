@@ -20,3 +20,9 @@ export function PATCH(request, { params }) {
     });
   });
 }
+export function DELETE(request, { params }) {
+  return authenticated(request, async (userId) => {
+    await activities.deleteRound(userId, (await params).id);
+    return Response.json({ success: true });
+  });
+}

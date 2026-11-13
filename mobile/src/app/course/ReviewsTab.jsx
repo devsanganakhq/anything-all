@@ -41,6 +41,7 @@ export function ReviewsTab({
   rating,
   alreadyPlayed,
   handleMarkPlayed,
+  canReview,
   courseId,
   courseName,
   categoryAverages = [],
@@ -358,7 +359,7 @@ export function ReviewsTab({
       )}
 
       {/* CTA to add own review */}
-      {true && (
+      {canReview && (
         <TouchableOpacity
           onPress={() =>
             router.push({

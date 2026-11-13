@@ -60,6 +60,7 @@ export async function POST(request) {
         fromUserId: userId,
         communityId: parseInt(communityId, 10),
         message: `left community ${community.name}`,
+        eventKey: `community-leave:${communityId}:${userId}:${new Date().toISOString().slice(0, 10)}`,
       });
 
       return Response.json({ success: true, action: "left" });
@@ -83,7 +84,7 @@ export async function POST(request) {
         const wasDeclined =
           existingReq.length && existingReq[0].status === "declined";
 
-        await sql(
+        const [joinRequest] = await sql(
           `INSERT INTO community_join_requests (community_id, user_id, status)
            VALUES ($1, $2, 'pending')
            ON CONFLICT (community_id, user_id) DO UPDATE SET
@@ -93,7 +94,8 @@ export async function POST(request) {
              created_at = CASE
                WHEN community_join_requests.status = 'declined' THEN NOW()
                ELSE community_join_requests.created_at
-             END`,
+             END
+           RETURNING id, created_at`,
           [communityId, userId],
         );
 
@@ -104,6 +106,7 @@ export async function POST(request) {
             fromUserId: userId,
             communityId: parseInt(communityId, 10),
             message: `requested to join community ${community.name}`,
+            eventKey: `join-request:${joinRequest.id}:${new Date(joinRequest.created_at).getTime()}`,
           });
         }
 
@@ -122,6 +125,7 @@ export async function POST(request) {
         fromUserId: userId,
         communityId: parseInt(communityId, 10),
         message: `joined community ${community.name}`,
+        eventKey: `community-join:${communityId}:${userId}:${new Date().toISOString().slice(0, 10)}`,
       });
 
       return Response.json({ success: true, action: "joined" });

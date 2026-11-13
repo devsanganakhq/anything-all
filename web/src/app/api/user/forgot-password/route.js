@@ -50,7 +50,7 @@ export async function POST(request) {
 
     // ── Check the user exists in auth_users ────────────────────────────────
     const authUser = await sql(
-      `SELECT id FROM auth_users WHERE LOWER(email) = $1 LIMIT 1`,
+      `SELECT id FROM auth_users WHERE LOWER(TRIM(email)) = $1 LIMIT 1`,
       [emailTrimmed],
     );
     if (authUser.length === 0) {

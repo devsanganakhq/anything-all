@@ -39,8 +39,8 @@ export async function POST(request) {
         { status: 409 },
       );
 
-    await sql(
-      `INSERT INTO friendships (user_id, friend_id, status) VALUES ($1, $2, 'pending')`,
+    const [request] = await sql(
+      `INSERT INTO friendships (user_id, friend_id, status) VALUES ($1, $2, 'pending') RETURNING id`,
       [userId, friendId],
     );
     await createNotification({
@@ -48,6 +48,8 @@ export async function POST(request) {
       notificationType: "friend_request",
       fromUserId: userId,
       message: "sent you a friend request",
+      // a retried request reuses the same row; a new request after decline gets a new id
+      eventKey: `friend-request:${request.id}`,
     });
     return Response.json({ success: true });
   } catch (error) {

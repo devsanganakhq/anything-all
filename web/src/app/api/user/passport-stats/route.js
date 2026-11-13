@@ -55,7 +55,8 @@ export async function GET(request) {
           (SELECT COUNT(*)::int FROM course_rounds WHERE user_id=$1) AS rounds_count,
           (SELECT COUNT(*)::int FROM curated_lists l WHERE is_published AND EXISTS(SELECT 1 FROM curated_list_courses WHERE list_id=l.id AND counts_for_completion)
            AND NOT EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=l.id AND lc.counts_for_completion AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=lc.course_id))) AS lists_completed,
-          (SELECT COUNT(*)::int  FROM user_achievements           WHERE user_id = $1)                       AS achievements_unlocked`,
+          ((SELECT COUNT(*)::int FROM user_achievements WHERE user_id=$1)
+           + (SELECT COUNT(*)::int FROM list_completion_awards WHERE user_id=$1 AND active)) AS achievements_unlocked`,
       [USER_ID, VERIFIED_STATUSES],
     );
 
@@ -110,12 +111,16 @@ export async function GET(request) {
 
     // ── 4. Achievements ─────────────────────────────────────────────────────
     const achievements = await sql(
-      `SELECT
-          a.id, a.slug, a.name, a.description, a.icon_name,
-          ua.unlocked_at
-        FROM achievements a
-        LEFT JOIN user_achievements ua ON ua.achievement_id = a.id AND ua.user_id = $1
-        ORDER BY ua.unlocked_at DESC NULLS LAST, a.id ASC`,
+      `SELECT * FROM (
+        SELECT a.id::text AS id,a.slug,a.name,a.description,a.icon_name,ua.unlocked_at
+          FROM achievements a LEFT JOIN user_achievements ua ON ua.achievement_id=a.id AND ua.user_id=$1
+        UNION ALL
+        SELECT 'list-'||l.id::text AS id,'list-completion-'||l.id::text AS slug,
+          'Completed '||l.title AS name,'Played every qualifying course in this Heathland Links list' AS description,
+          'trophy' AS icon_name,aw.awarded_at AS unlocked_at
+          FROM list_completion_awards aw JOIN curated_lists l ON l.id=aw.list_id
+          WHERE aw.user_id=$1 AND aw.active AND l.is_published
+      ) achievements ORDER BY unlocked_at DESC NULLS LAST,id ASC`,
       [USER_ID],
     );
 

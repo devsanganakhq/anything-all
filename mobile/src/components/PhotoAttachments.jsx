@@ -10,6 +10,7 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import useUpload from "@/utils/useUpload";
 import { Colors, Radius } from "@/constants/theme";
+import { ReviewPhotoLightbox } from "@/components/Home/ReviewPhotos";
 export function PhotoAttachments({
   photos,
   onChange,
@@ -110,18 +111,22 @@ export function PhotoAttachments({
   );
 }
 export function AttachedPhotos({ photos = [] }) {
+  const [lightbox, setLightbox] = useState(null);
+  const validPhotos = photos.filter((uri) => typeof uri === "string" && uri.length > 0);
   return (
+    <View>
     <View
       style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 }}
     >
-      {photos.map((uri, i) => (
-        <Image
-          key={uri + i}
-          source={{ uri }}
-          style={{ width: 90, height: 90, borderRadius: 6 }}
-          contentFit="cover"
-        />
+      {validPhotos.map((uri, i) => (
+        <TouchableOpacity key={uri + i} accessibilityRole="button"
+          accessibilityLabel={`Open image ${i + 1} of ${validPhotos.length}`}
+          onPress={() => setLightbox({ uri, index: i })}>
+          <Image source={{ uri }} style={{ width: 90, height: 90, borderRadius: 6 }} contentFit="cover" />
+        </TouchableOpacity>
       ))}
+    </View>
+    <ReviewPhotoLightbox photos={validPhotos} lightbox={lightbox} onClose={() => setLightbox(null)} />
     </View>
   );
 }

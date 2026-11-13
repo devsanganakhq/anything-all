@@ -81,7 +81,7 @@ export async function POST(request) {
 
     // ── Find the auth_users row for this email ─────────────────────────────
     const authUserRows = await sql(
-      `SELECT id FROM auth_users WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      `SELECT id FROM auth_users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
       [email],
     );
 

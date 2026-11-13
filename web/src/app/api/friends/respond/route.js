@@ -25,7 +25,7 @@ export async function POST(request) {
     if (action === "accept") {
       const result = await sql(
         `UPDATE friendships SET status='accepted', updated_at=NOW()
-          WHERE id=$1 AND friend_id=$2 AND status='pending' RETURNING user_id`,
+          WHERE id=$1 AND friend_id=$2 AND status='pending' RETURNING id, user_id`,
         [friendshipId, userId],
       );
       if (!result.length)
@@ -39,6 +39,7 @@ export async function POST(request) {
         notificationType: "friend_accepted",
         fromUserId: userId,
         message: "accepted your friend request",
+        eventKey: `friend-accepted:${result[0].id}`,
       });
       return Response.json({ success: true, status: "accepted" });
     } else if (action === "decline") {

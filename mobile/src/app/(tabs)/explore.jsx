@@ -10,7 +10,6 @@
  *   ♥ Gold        — wishlisted (not yet played)
  *   ✓ Bright green — already played
  */
-import { CuratedLists } from "@/components/CuratedLists";
 import React, {
   useState,
   useRef,
@@ -30,6 +29,7 @@ import {
   Alert,
 } from "react-native";
 import { fetchCoursePages } from "@/utils/coursePages";
+import { countryFlag } from "@/utils/countryFlags";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -99,33 +99,9 @@ const FALLBACK_DEST = [
   { country: "Wales", course_count: 180, flag: "🏴󠁧󠁢󠁷󠁬󠁳󠁿" },
 ];
 
-const COUNTRY_FLAGS = {
-  england: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
-  scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-  wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-  ireland: "🇮🇪",
-  "northern ireland": "🇬🇧",
-  usa: "🇺🇸",
-  "united states": "🇺🇸",
-  australia: "🇦🇺",
-  "new zealand": "🇳🇿",
-  spain: "🇪🇸",
-  portugal: "🇵🇹",
-  turkey: "🇹🇷",
-  france: "🇫🇷",
-  canada: "🇨🇦",
-  netherlands: "🇳🇱",
-  "the netherlands": "🇳🇱",
-  holland: "🇳🇱",
-  "isle of man": "🇮🇲",
-  uae: "🇦🇪",
-  "united arab emirates": "🇦🇪",
-  dubai: "🇦🇪",
-};
-
 function countryFlagEmoji(country) {
   if (!country) return null;
-  return COUNTRY_FLAGS[String(country).trim().toLowerCase()] || null;
+  return countryFlag(country);
 }
 
 // ─── Map filters ─────────────────────────────────────────────────────────────
@@ -497,8 +473,12 @@ export default function ExploreScreen() {
   // ── Map interactions ─────────────────────────────────────────────────────
   const handleMarkerPress = useCallback(
     (course) => {
+      const id = Number(course?.id);
+      if (!Number.isSafeInteger(id) || id <= 0) return;
+      // A native map can dispatch multiple pin taps before navigation mounts.
+      if (Date.now() - lastMarkerPressAt.current < 600) return;
       lastMarkerPressAt.current = Date.now();
-      router.push(`/course/${course.id}`);
+      router.push(`/course/${id}`);
     },
     [router],
   );
@@ -1007,7 +987,6 @@ export default function ExploreScreen() {
           paddingBottom: insets.bottom + 100,
         }}
       >
-        <CuratedLists />
         {/* ── RANKING COLLECTIONS ── (hidden for now; flip SHOW_RANKING_COLLECTIONS) */}
         {SHOW_RANKING_COLLECTIONS && (
           <>
@@ -1190,6 +1169,22 @@ export default function ExploreScreen() {
           router={router}
           offset={3}
         /> */}
+
+        {/* Curated lists live in their own view, after the ranking shortcuts. */}
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Open Heathland Links Lists"
+          onPress={() => router.push("/lists")}
+          style={{ marginHorizontal: Spacing.screenH, marginTop: 22, padding: 18,
+            backgroundColor: Colors.green, borderRadius: Radius.md,
+            flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+        >
+          <View>
+            <Text style={{ color: Colors.ivory, fontSize: 16, fontWeight: "700" }}>Heathland Links Lists</Text>
+            <Text style={{ color: Colors.ivory, opacity: 0.8, marginTop: 4 }}>Explore curated golf challenges</Text>
+          </View>
+          <ChevronRight color={Colors.ivory} size={20} />
+        </TouchableOpacity>
 
         {/* ── GOLF DESTINATIONS ── */}
         <View style={{ paddingHorizontal: Spacing.screenH, marginTop: 28 }}>

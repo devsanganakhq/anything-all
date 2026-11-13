@@ -61,6 +61,8 @@ export async function POST(request) {
           fromUserId: userId,
           activityId,
           message: "liked your activity",
+          // one alert per liker per activity, even after unlike/re-like
+          eventKey: `activity-like:${activityId}:${userId}`,
         });
       }
 

@@ -28,7 +28,6 @@ export const FILTERS = [
   { key: "communities", label: "Communities" },
   { key: "achievements", label: "Achievements" },
 ];
-
 export const POST_TYPE_META = {
   played_course: {
     label: "Played",
@@ -72,6 +71,12 @@ export const POST_TYPE_META = {
     color: Colors.gold,
     bg: Colors.goldLight,
   },
+  list_complete: {
+    label: "List complete",
+    icon: Trophy,
+    color: Colors.gold,
+    bg: Colors.goldLight,
+  },
   passport_complete: {
     label: "Passport",
     icon: Flag,
@@ -109,26 +114,3 @@ export const REACTION_OPTIONS = [
   { type: "love", emoji: "🔥", label: "Fire" },
   { type: "celebrate", emoji: "🎉", label: "Celebrate" },
 ];
-
-export const COUNTRY_FLAGS = {
-  england: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
-  scotland: "🏴󠁧󠁢󠁳󠁣󠁴󠁿",
-  wales: "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
-  ireland: "🇮🇪",
-  "northern ireland": "🇬🇧",
-  usa: "🇺🇸",
-  "united states": "🇺🇸",
-  australia: "🇦🇺",
-  canada: "🇨🇦",
-  "south africa": "🇿🇦",
-  spain: "🇪🇸",
-  france: "🇫🇷",
-  germany: "🇩🇪",
-  japan: "🇯🇵",
-  "united kingdom": "🇬🇧",
-  uk: "🇬🇧",
-  "isle of man": "🇮🇲",
-  uae: "🇦🇪",
-  "united arab emirates": "🇦🇪",
-  dubai: "🇦🇪",
-};

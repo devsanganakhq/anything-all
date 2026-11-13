@@ -56,7 +56,13 @@ export async function GET(request, { params }) {
       SELECT mp.*, u.first_name, u.last_name
       FROM   member_photos mp
       LEFT JOIN users u ON u.id = mp.user_id
-      WHERE  mp.course_id = ${id}
+      WHERE  mp.course_id = ${id} AND (mp.user_id IS NULL OR
+        (COALESCE(u.is_suspended,false)=false
+         AND NOT EXISTS(SELECT 1 FROM friendships b WHERE b.status='blocked' AND
+           ((b.user_id=${userId} AND b.friend_id=mp.user_id) OR (b.friend_id=${userId} AND b.user_id=mp.user_id)))
+         AND (mp.user_id=${userId} OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+          OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND
+            ((f.user_id=${userId} AND f.friend_id=mp.user_id) OR (f.friend_id=${userId} AND f.user_id=mp.user_id))))))
       ORDER BY mp.created_at DESC
       LIMIT 18
     `;
@@ -105,7 +111,12 @@ export async function GET(request, { params }) {
              u.first_name, u.last_name, u.profile_photo_url
       FROM   activity_feed af
       JOIN   users u ON u.id = af.user_id
-      WHERE  af.course_id = ${id}
+      WHERE  af.course_id = ${id} AND COALESCE(u.is_suspended,false)=false
+        AND (af.user_id=${userId} OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+          OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND
+            ((f.user_id=${userId} AND f.friend_id=af.user_id) OR (f.friend_id=${userId} AND f.user_id=af.user_id))))
+        AND NOT EXISTS(SELECT 1 FROM friendships b WHERE b.status='blocked' AND
+          ((b.user_id=${userId} AND b.friend_id=af.user_id) OR (b.friend_id=${userId} AND b.user_id=af.user_id)))
       ORDER  BY af.created_at DESC
       LIMIT  10
     `;
@@ -118,13 +129,15 @@ export async function GET(request, { params }) {
     `;
 
     // Per-user status — safe defaults for guests
-    let userStatus = { wishlisted: false, played: false, following: false };
+    let userStatus = { wishlisted: false, played: false, following: false, hasReviewed: false, canReview: false };
     if (userId) {
       const [row] = await sql(
         `SELECT
            (SELECT COUNT(*) > 0 FROM wishlist       WHERE user_id=$1 AND course_id=$2) AS wishlisted,
            (SELECT COUNT(*) > 0 FROM played_courses WHERE user_id=$1 AND course_id=$2) AS played,
-           (SELECT COUNT(*) > 0 FROM follows        WHERE follower_id=$1 AND followee_type='course' AND followee_id=$2) AS following`,
+           (SELECT COUNT(*) > 0 FROM follows        WHERE follower_id=$1 AND followee_type='course' AND followee_id=$2) AS following,
+           (SELECT COUNT(*) > 0 FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL) AS has_reviewed,
+           (SELECT COALESCE(MAX(created_at) <= NOW()-INTERVAL '30 days',true) FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL) AS can_review`,
         [userId, id],
       );
       if (row) {
@@ -132,6 +145,8 @@ export async function GET(request, { params }) {
           wishlisted: row.wishlisted ?? false,
           played: row.played ?? false,
           following: row.following ?? false,
+          hasReviewed: row.has_reviewed ?? false,
+          canReview: row.can_review ?? false,
         };
       }
     }

@@ -5,18 +5,33 @@ import {
   LIST_CATEGORIES,
   photoUrls,
 } from "./validation";
+// Curated-list source metadata comes from the client workbooks and includes
+// import/verification bookkeeping. Golfers only see the fields the app renders,
+// and notes written for the data team (master-record matching, candidate
+// benches) are withheld; price, tie and history notes stay visible.
+const PUBLIC_LIST_FIELDS = ["notes", "price_rank", "fee_amount_native", "fee_currency",
+  "host_years", "times_hosted", "first_host_year", "last_host_year", "venue_status"];
+const INTERNAL_NOTE = /\b(country master|USA master|master (ID|record|correction)|Candidate_Bench|deterministically)\b/i;
+export function publicListMetadata(metadata) {
+  const out = {};
+  for (const key of PUBLIC_LIST_FIELDS)
+    if (metadata?.[key] != null) out[key] = metadata[key];
+  if (typeof out.notes === "string" && INTERNAL_NOTE.test(out.notes)) delete out.notes;
+  return out;
+}
+
 export function listService(sql) {
   async function collections(userId = null) {
     return sql(
       `SELECT l.*,
    (SELECT COUNT(*)::int FROM curated_list_courses WHERE list_id=l.id AND counts_for_completion) AS total,
    (SELECT COUNT(*)::int FROM curated_list_courses lc JOIN played_courses pc ON pc.course_id=lc.course_id AND pc.user_id=$1 WHERE lc.list_id=l.id AND lc.counts_for_completion) AS played,
-   (SELECT AVG(rating) FROM list_reviews WHERE list_id=l.id) AS rating,
+   (SELECT AVG(rating) FROM list_reviews WHERE list_id=l.id AND hidden_at IS NULL) AS rating,
    (SELECT COUNT(DISTINCT pc.user_id)::int FROM curated_list_courses lc JOIN played_courses pc ON pc.course_id=lc.course_id WHERE lc.list_id=l.id AND lc.counts_for_completion) AS started,
    (SELECT COUNT(*)::int FROM (SELECT pc.user_id FROM curated_list_courses lc JOIN played_courses pc ON pc.course_id=lc.course_id
      WHERE lc.list_id=l.id AND lc.counts_for_completion GROUP BY pc.user_id
      HAVING COUNT(*)=(SELECT COUNT(*) FROM curated_list_courses WHERE list_id=l.id AND counts_for_completion)) complete) AS completed
-   FROM curated_lists l WHERE l.is_published ORDER BY l.display_order,l.id`,
+   FROM curated_lists l WHERE l.is_published ORDER BY started DESC,l.display_order,l.id`,
       [userId],
     );
   }
@@ -37,14 +52,20 @@ export function listService(sql) {
     );
     const reviews = await sql(
       `SELECT r.*,COALESCE(NULLIF(TRIM(CONCAT_WS(' ',u.first_name,u.last_name)),''),'Golfer') AS name,
-   u.profile_photo_url AS avatar FROM list_reviews r JOIN users u ON u.id=r.user_id WHERE r.list_id=$1 AND NOT COALESCE(u.is_suspended,false)
+   u.profile_photo_url AS avatar FROM list_reviews r JOIN users u ON u.id=r.user_id WHERE r.list_id=$1 AND r.hidden_at IS NULL AND NOT COALESCE(u.is_suspended,false)
    AND NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id)))
+   AND (r.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+     OR EXISTS(SELECT 1 FROM friendships WHERE status='accepted' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id))))
    ORDER BY r.created_at DESC,r.id DESC LIMIT 100`,
       [id, userId],
     );
     const [aggregate] = await sql(
-      "SELECT AVG(rating) AS rating,COUNT(*)::int AS count FROM list_reviews WHERE list_id=$1",
-      [id],
+      `SELECT AVG(r.rating) AS rating,COUNT(*)::int AS count FROM list_reviews r JOIN users u ON u.id=r.user_id
+       WHERE r.list_id=$1 AND r.hidden_at IS NULL AND NOT COALESCE(u.is_suspended,false)
+       AND NOT EXISTS(SELECT 1 FROM friendships WHERE status='blocked' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id)))
+       AND (r.user_id=$2 OR COALESCE((u.privacy_settings->>'profile_visible')::boolean,true)
+         OR EXISTS(SELECT 1 FROM friendships WHERE status='accepted' AND ((user_id=$2 AND friend_id=r.user_id) OR (friend_id=$2 AND user_id=r.user_id))))`,
+      [id, userId],
     );
     const eligible = courses.filter((c) => c.counts_for_completion),
       completed = eligible.length > 0 && eligible.every((c) => c.user_played);
@@ -55,7 +76,7 @@ export function listService(sql) {
         started: summary.started,
         completed: summary.completed,
       },
-      courses,
+      courses: courses.map((c) => ({ ...c, source_metadata: publicListMetadata(c.source_metadata) })),
       reviews,
       rating: aggregate.rating,
       reviewCount: aggregate.count,

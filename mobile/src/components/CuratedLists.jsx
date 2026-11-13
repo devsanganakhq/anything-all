@@ -1,11 +1,11 @@
 import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Colors, Spacing, Radius } from "@/constants/theme";
-export function CuratedLists({ userId, passport = false }) {
+export function CuratedLists({ userId, passport = false, scrollable = false }) {
   const router = useRouter();
-  const { data, isError, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["curated-lists", userId],
     queryFn: async () => {
       const r = await fetch(`/api/lists${userId ? `?userId=${userId}` : ""}`);
@@ -21,8 +21,9 @@ export function CuratedLists({ userId, passport = false }) {
         </Text>
       </TouchableOpacity>
     );
-  if (!data?.lists?.length) return null;
-  return (
+  if (isLoading && scrollable) return <ActivityIndicator color={Colors.green} accessibilityLabel="Loading lists" />;
+  if (!data?.lists?.length) return scrollable ? <Text style={{ padding: Spacing.screenH, color: Colors.textSecondary }}>No lists are available yet.</Text> : null;
+  const content = (
     <View style={{ paddingHorizontal: Spacing.screenH, marginBottom: 22 }}>
       <Text
         style={{
@@ -53,8 +54,12 @@ export function CuratedLists({ userId, passport = false }) {
           <Text style={{ color: Colors.textSecondary, marginTop: 6, fontSize: passport ? 11 : 12 }}>
             {list.played} / {list.total} courses played
           </Text>
+          {!passport && <Text style={{ color: Colors.green, marginTop: 6, fontSize: 11 }}>
+            {list.started} golfers started
+          </Text>}
         </TouchableOpacity>
       ))}
     </View>
   );
+  return scrollable ? <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>{content}</ScrollView> : content;
 }

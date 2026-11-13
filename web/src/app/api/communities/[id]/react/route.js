@@ -74,6 +74,7 @@ export async function POST(request, { params }) {
         communityId: post[0].community_id || parseInt(communityId, 10),
         communityPostId: parseInt(postId, 10),
         message: "liked your community post",
+        eventKey: `community-like:${parseInt(postId, 10)}:${userId}`,
       });
     }
 

@@ -10,6 +10,8 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Camera, X } from "lucide-react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ZoomablePhoto } from "@/components/ZoomablePhoto";
 import { Colors, Radius } from "@/constants/theme";
 import { SCREEN_W, THUMB_H } from "@/components/Home/constants";
 
@@ -140,11 +142,16 @@ export function ReviewPhotos({ urls = [] }) {
   );
 }
 
-function ReviewPhotoLightbox({ lightbox, photos, onClose }) {
+export function ReviewPhotoLightbox({ lightbox, photos, onClose }) {
   const [activeIdx, setActiveIdx] = useState(lightbox?.index || 0);
+  const [zoomed, setZoomed] = useState(false);
+  const photoHeight = SCREEN_H * 0.78;
 
   React.useEffect(() => {
-    if (lightbox) setActiveIdx(lightbox.index || 0);
+    if (lightbox) {
+      setActiveIdx(lightbox.index || 0);
+      setZoomed(false);
+    }
   }, [lightbox?.index, lightbox]);
 
   return (
@@ -152,79 +159,82 @@ function ReviewPhotoLightbox({ lightbox, photos, onClose }) {
       visible={!!lightbox}
       transparent
       animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
       onRequestClose={onClose}
     >
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.92)",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Pressable
-          onPress={onClose}
-          style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}
-        />
-        <TouchableOpacity
-          onPress={onClose}
-          style={{ position: "absolute", top: 56, right: 20, zIndex: 2 }}
+      {/* Modals render outside the app root, so gestures need their own root. */}
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "#000",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
         >
-          <X color="#fff" size={24} strokeWidth={2} />
-        </TouchableOpacity>
-        {photos.length > 1 ? (
-          <ScrollView
-            key={lightbox?.index || 0}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: (lightbox?.index || 0) * SCREEN_W, y: 0 }}
-            onMomentumScrollEnd={(event) => {
-              setActiveIdx(
-                Math.round(event.nativeEvent.contentOffset.x / SCREEN_W),
-              );
-            }}
-            style={{ flexGrow: 0, width: SCREEN_W, height: SCREEN_H * 0.78 }}
-          >
-            {photos.map((uri, index) => (
-              <View
-                key={`${uri}-${index}`}
-                style={{
-                  width: SCREEN_W,
-                  height: SCREEN_H * 0.78,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Image
-                  source={{ uri }}
-                  style={{ width: "100%", height: "100%" }}
-                  contentFit="contain"
-                />
-              </View>
-            ))}
-          </ScrollView>
-        ) : lightbox?.uri ? (
-          <Image
-            source={{ uri: lightbox.uri }}
-            style={{ width: SCREEN_W - 40, height: SCREEN_H * 0.7 }}
-            contentFit="contain"
+          <Pressable
+            onPress={onClose}
+            accessibilityLabel="Close photo"
+            style={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}
           />
-        ) : null}
-        {photos.length > 1 ? (
-          <Text
-            style={{
-              position: "absolute",
-              bottom: 36,
-              color: "#fff",
-              fontSize: 14,
-              fontWeight: "700",
-            }}
+          <TouchableOpacity
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close photo"
+            hitSlop={12}
+            style={{ position: "absolute", top: 56, right: 20, zIndex: 2 }}
           >
-            {activeIdx + 1} / {photos.length}
-          </Text>
-        ) : null}
-      </View>
+            <X color="#fff" size={26} strokeWidth={2} />
+          </TouchableOpacity>
+          {photos.length > 1 ? (
+            <ScrollView
+              key={lightbox?.index || 0}
+              horizontal
+              pagingEnabled
+              scrollEnabled={!zoomed}
+              showsHorizontalScrollIndicator={false}
+              contentOffset={{ x: (lightbox?.index || 0) * SCREEN_W, y: 0 }}
+              onMomentumScrollEnd={(event) => {
+                setActiveIdx(
+                  Math.round(event.nativeEvent.contentOffset.x / SCREEN_W),
+                );
+              }}
+              style={{ flexGrow: 0, width: SCREEN_W, height: photoHeight }}
+            >
+              {photos.map((uri, index) => (
+                <ZoomablePhoto
+                  key={`${uri}-${index}`}
+                  uri={uri}
+                  width={SCREEN_W}
+                  height={photoHeight}
+                  onZoomChange={setZoomed}
+                />
+              ))}
+            </ScrollView>
+          ) : lightbox?.uri ? (
+            <ZoomablePhoto
+              uri={lightbox.uri}
+              width={SCREEN_W}
+              height={photoHeight}
+              onZoomChange={setZoomed}
+            />
+          ) : null}
+          {photos.length > 1 ? (
+            <Text
+              style={{
+                position: "absolute",
+                bottom: 48,
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: "700",
+              }}
+            >
+              {activeIdx + 1} / {photos.length}
+            </Text>
+          ) : null}
+        </View>
+      </GestureHandlerRootView>
     </Modal>
   );
 }

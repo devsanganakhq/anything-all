@@ -1,6 +1,7 @@
 import { detachPushToken } from "@/utils/usePushNotifications";
 import { router } from "expo-router";
 import * as SecureStore from "expo-secure-store";
+import * as Application from "expo-application";
 import { useCallback, useEffect, useMemo } from "react";
 import { create } from "zustand";
 import { Modal, View } from "react-native";
@@ -8,10 +9,45 @@ import {
   useAuthModal,
   useAuthStore,
   authKey,
+  installKey,
   secureStoreOptions,
 } from "./store";
 import { resetAppCache } from "@/utils/queryClient";
 import { identifyUser, resetUser } from "@/utils/posthog";
+
+/**
+ * Reads the stored session, discarding one left behind by a previous install.
+ *
+ * iOS keeps Keychain items after an app is deleted, so a reinstalled app would
+ * otherwise come back signed in with an old session. The session is stamped
+ * with the app's installation time, which changes on reinstall but not on
+ * update. A session from before stamping existed is kept and stamped, so
+ * updating the app never signs anyone out.
+ */
+async function readStoredSession() {
+  const stored = await SecureStore.getItemAsync(authKey, secureStoreOptions);
+  if (!stored) return null;
+  let installedAt = null;
+  try {
+    const time = await Application.getInstallationTimeAsync();
+    installedAt = time ? String(time.getTime()) : null;
+  } catch {
+    return stored; // cannot tell; keep the session rather than sign out
+  }
+  if (!installedAt) return stored;
+  const stamp = await SecureStore.getItemAsync(installKey, secureStoreOptions);
+  if (stamp && stamp !== installedAt) {
+    await Promise.allSettled([
+      SecureStore.deleteItemAsync(authKey, secureStoreOptions),
+      SecureStore.setItemAsync(installKey, installedAt, secureStoreOptions),
+    ]);
+    return null;
+  }
+  if (!stamp) {
+    await SecureStore.setItemAsync(installKey, installedAt, secureStoreOptions).catch(() => {});
+  }
+  return stored;
+}
 
 /**
  * This hook provides authentication functionality.
@@ -31,7 +67,7 @@ export const useAuth = () => {
     // catch the unhandled rejection leaves isReady=false forever and the
     // RootLayout renders null — the user sees a blank screen indefinitely.
     Promise.race([
-      SecureStore.getItemAsync(authKey, secureStoreOptions),
+      readStoredSession(),
       new Promise((resolve) => setTimeout(() => resolve(null), 3000)),
     ])
       .then((stored) => {

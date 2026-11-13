@@ -95,7 +95,7 @@ export const CourseMarker = React.memo(function CourseMarker({ course, onPress }
     return () => clearTimeout(t);
   }, [course?.user_played, course?.user_wishlisted, course?.id]);
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
 
   return (
     <Marker
@@ -155,7 +155,7 @@ export const ClusterMarker = React.memo(function ClusterMarker({
     return () => clearTimeout(t);
   }, [pointCount, lat, lng]);
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
 
   return (
     <Marker

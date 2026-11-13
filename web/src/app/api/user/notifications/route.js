@@ -4,6 +4,7 @@
  *                                   body: { notificationId? }  (null = mark all)
  */
 import { notificationTarget } from "@/app/api/utils/notificationTarget";
+import { feedVisibility } from "@/app/api/utils/feedVisibility";
 import sql from "@/app/api/utils/sql";
 import { getSessionUserId } from "@/app/api/utils/getUserId";
 import { ensureCommunityJoinRequestsTable } from "@/app/api/utils/ensureCommunityJoinRequestsTable";
@@ -14,16 +15,6 @@ export async function GET(request) {
     const userId = await getSessionUserId(request);
     await ensureCommunityJoinRequestsTable();
     await ensureCommunityInvitesTable();
-    // Ensure newer FK columns exist on older DBs
-    try {
-      await sql(
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS feed_post_id INTEGER`,
-      );
-      await sql(
-        `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS community_post_id INTEGER`,
-      );
-    } catch (_) {}
-
     const notifications = await sql(
       `SELECT
           n.id,
@@ -41,6 +32,7 @@ export async function GET(request) {
             AND f.metadata->>'review_id'=af.review_id::text ORDER BY f.id DESC LIMIT 1) AS related_post_id,
           n.read_at,
           n.created_at,
+          COUNT(*) FILTER (WHERE n.read_at IS NULL) OVER()::int AS unread_total,
 
           -- From user (safe — no email)
           COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'Golfer')  AS from_user_name,
@@ -86,12 +78,27 @@ export async function GET(request) {
         LEFT JOIN activity_feed af ON af.id=n.activity_id
         LEFT JOIN achievements a ON a.id=af.achievement_id
         WHERE n.user_id = $1
+          AND (n.from_user_id IS NULL OR NOT EXISTS(SELECT 1 FROM friendships b
+            WHERE b.status='blocked' AND ((b.user_id=$1 AND b.friend_id=n.from_user_id)
+              OR (b.friend_id=$1 AND b.user_id=n.from_user_id))))
+          AND (n.feed_post_id IS NULL OR EXISTS(SELECT 1 FROM feed_posts fp JOIN users u ON u.id=fp.author_id
+            WHERE fp.id=n.feed_post_id AND ${feedVisibility}))
+          AND (n.activity_id IS NULL OR af.user_id=$1 OR EXISTS(SELECT 1 FROM users author
+            WHERE author.id=af.user_id AND COALESCE(author.is_suspended,false)=false
+              AND (COALESCE((author.privacy_settings->>'profile_visible')::boolean,true)
+                OR EXISTS(SELECT 1 FROM friendships f WHERE f.status='accepted' AND
+                  ((f.user_id=$1 AND f.friend_id=af.user_id) OR (f.friend_id=$1 AND f.user_id=af.user_id))))))
+          AND (n.community_post_id IS NULL OR EXISTS(SELECT 1 FROM community_posts cp
+            JOIN communities community ON community.id=cp.community_id
+            WHERE cp.id=n.community_post_id AND NOT cp.is_deleted AND
+              (community.community_type<>'private' OR EXISTS(SELECT 1 FROM community_members m
+                WHERE m.community_id=community.id AND m.user_id=$1))))
         ORDER BY n.created_at DESC
         LIMIT 100`,
       [userId],
     );
 
-    const unreadCount = notifications.filter((n) => !n.read_at).length;
+    const unreadCount = notifications[0]?.unread_total ?? 0;
 
     return Response.json({ notifications: notifications.map(n => ({ ...n, target_path: notificationTarget(n) })), unread_count: unreadCount });
   } catch (error) {

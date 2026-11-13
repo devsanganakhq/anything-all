@@ -307,7 +307,7 @@ export default function CourseDetailScreen() {
     setClaimModalVisible(true);
   }, [data?.course, id]);
 
-  const handleMarkPlayed = useCallback(() => {
+  const handleMarkPlayed = useCallback((mode = "round") => {
     const { title } = courseDisplayName(data?.course);
     capture(AnalyticsEvents.MARK_PLAYED_STARTED, {
       course_id: id,
@@ -318,9 +318,10 @@ export default function CourseDetailScreen() {
       params: {
         courseId: id,
         courseName: formatCourseShareLabel(data?.course),
+        mode,
       },
     });
-  }, [alreadyPlayed, id, data, router]);
+  }, [id, data, router]);
 
   // ── Loading / error states ─────────────────────────────────────────────
   if (isLoading || !data?.course) {
@@ -405,9 +406,8 @@ export default function CourseDetailScreen() {
   // D. null → CourseHero renders the branded placeholder
   const { uri: heroImage, fit: heroFit } = resolveCourseHero(course);
 
-  const description =
-    course.description ||
-    "One of Britain's finest courses — a supreme test of golf across beautifully maintained fairways, with breathtaking natural scenery at every turn.";
+  const description = course.description?.trim() ||
+    "Course information has not yet been added by the club or an administrator.";
 
   const rating = Number(course.community_rating || 0);
 
@@ -448,7 +448,7 @@ export default function CourseDetailScreen() {
         )}
         scrollEventThrottle={16}
         stickyHeaderIndices={[2]}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 150 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 210 }}
       >
         {/* ── [0] Hero ─────────────────────────────────────────────────────── */}
         <CourseHero
@@ -542,6 +542,7 @@ export default function CourseDetailScreen() {
               rating={rating}
               alreadyPlayed={alreadyPlayed}
               handleMarkPlayed={handleMarkPlayed}
+              canReview={data.userStatus?.canReview}
             />
           )}
 
@@ -582,6 +583,8 @@ export default function CourseDetailScreen() {
       <BottomActionBar
         insets={insets}
         handleMarkPlayed={handleMarkPlayed}
+        hasReviewed={data.userStatus?.hasReviewed}
+        canReview={data.userStatus?.canReview}
         alreadyPlayed={alreadyPlayed}
         wishlisted={wishlisted}
         wishlistMutation={wishlistMutation}

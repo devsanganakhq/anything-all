@@ -2,6 +2,23 @@ import { activityInput, invalid, positiveId } from "./validation";
 
 // sql is injected for tests. Neon HTTP transactions execute sequential statements;
 // the first advisory-lock statement serializes writes for one course.
+// Played-course achievements: one rule list drives both awarding (after new
+// activity) and revoking (after deletion), so the two can never disagree.
+const ACHIEVEMENT_RULES = [
+  ["first-tee", "total", 1], ["course-collector", "total", 10],
+  ["fifty-club", "total", 50], ["century-club", "total", 100],
+  ["links-explorer", "links", 10], ["heathland-hunter", "heathland", 10],
+  ["scottish-explorer", "scotland", 25], ["irish-explorer", "ireland", 15],
+];
+const ACHIEVEMENT_MET = ACHIEVEMENT_RULES
+  .map(([slug, stat, min]) => `(a.slug='${slug}' AND s.${stat}>=${min})`).join(" OR ");
+const ACHIEVEMENT_SLUGS = ACHIEVEMENT_RULES.map(([slug]) => `'${slug}'`).join(",");
+const PLAYED_STATS = `SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE c.course_type='Links')::int AS links,
+       COUNT(*) FILTER(WHERE c.course_type='Heathland')::int AS heathland,
+       COUNT(*) FILTER(WHERE c.country='Scotland')::int AS scotland,
+       COUNT(*) FILTER(WHERE c.country='Ireland')::int AS ireland
+      FROM played_courses p JOIN courses c ON c.id=p.course_id WHERE p.user_id=$1`;
+
 export function activityService(sql) {
   const query = (s, p = []) => sql(s, p);
   async function canViewPassport(viewer, owner) {
@@ -26,10 +43,68 @@ export function activityService(sql) {
         [courseId],
       ),
       sql(
-        `UPDATE played_courses p SET rating=(SELECT ROUND(rating)::int FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL ORDER BY created_at DESC,id DESC LIMIT 1),
+        `UPDATE played_courses p SET date_played=COALESCE((SELECT MIN(date_played) FROM (
+          SELECT date_played FROM course_rounds WHERE user_id=$1 AND course_id=$2
+          UNION ALL SELECT date_played FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL
+        ) activity_dates),p.date_played),
+    rating=(SELECT ROUND(rating)::int FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL ORDER BY created_at DESC,id DESC LIMIT 1),
     review_text=(SELECT review_text FROM course_reviews WHERE user_id=$1 AND course_id=$2 AND deleted_at IS NULL ORDER BY created_at DESC,id DESC LIMIT 1)
     WHERE p.user_id=$1 AND p.course_id=$2`,
         [userId, courseId],
+      ),
+    ];
+  }
+  // Reconcile the unique-course compatibility row only after all qualifying
+  // activity has been checked in the same transaction as the deletion.
+  function reconcilePlayedCourse(courseId, userId) {
+    return [
+      sql(
+        `DELETE FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2
+         AND NOT EXISTS(SELECT 1 FROM course_rounds r WHERE r.user_id=$1 AND r.course_id=$2)
+         AND NOT EXISTS(SELECT 1 FROM course_reviews r WHERE r.user_id=$1 AND r.course_id=$2 AND r.deleted_at IS NULL)`,
+        [userId, courseId],
+      ),
+      sql(
+        // The written review is kept but hidden while the list is incomplete;
+        // re-completing the list shows it again (see create()).
+        `UPDATE list_reviews lr SET hidden_at=NOW() WHERE lr.user_id=$1 AND lr.hidden_at IS NULL AND EXISTS (
+           SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=lr.list_id
+           AND lc.counts_for_completion AND lc.course_id=$2
+           AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2))`,
+        [userId, courseId],
+      ),
+      sql(
+        `DELETE FROM feed_posts fp WHERE fp.author_id=$1 AND fp.post_type='list_complete'
+         AND EXISTS(SELECT 1 FROM list_completion_awards a JOIN curated_list_courses lc ON lc.list_id=a.list_id
+           WHERE a.user_id=$1 AND a.feed_post_id=fp.id AND lc.course_id=$2 AND lc.counts_for_completion
+           AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2))`,
+        [userId, courseId],
+      ),
+      sql(
+        `UPDATE list_completion_awards a SET active=false,revoked_at=NOW(),feed_post_id=NULL
+         WHERE a.user_id=$1 AND a.active AND EXISTS(
+           SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=a.list_id AND lc.course_id=$2 AND lc.counts_for_completion
+           AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=$2))`,
+        [userId, courseId],
+      ),
+      // Played-course achievements and milestone posts the golfer no longer
+      // qualifies for are withdrawn; new activity awards them again.
+      sql(
+        `WITH stats AS (${PLAYED_STATS}), lost AS (
+           DELETE FROM user_achievements ua USING achievements a, stats s
+           WHERE ua.user_id=$1 AND ua.achievement_id=a.id AND a.slug IN (${ACHIEVEMENT_SLUGS})
+             AND NOT (${ACHIEVEMENT_MET})
+           RETURNING a.slug)
+         DELETE FROM feed_posts f USING lost
+         WHERE f.author_id=$1 AND f.post_type='achievement' AND f.metadata->>'achievement_slug'=lost.slug`,
+        [userId],
+      ),
+      sql(
+        `DELETE FROM feed_posts f WHERE f.author_id=$1 AND f.post_type='milestone'
+           AND COALESCE(f.metadata->>'milestone_count',f.metadata->>'count') ~ '^[0-9]+$'
+           AND COALESCE(f.metadata->>'milestone_count',f.metadata->>'count')::int
+             > (SELECT COUNT(*) FROM played_courses WHERE user_id=$1)`,
+        [userId],
       ),
     ];
   }
@@ -133,6 +208,40 @@ export function activityService(sql) {
           [userId, courseId, requestId],
         ),
         sql(
+          `WITH eligible AS (
+             SELECT l.id FROM curated_lists l WHERE l.is_published
+             AND EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=l.id AND lc.counts_for_completion AND lc.course_id=$2)
+             AND NOT EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=l.id AND lc.counts_for_completion
+               AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=lc.course_id))
+           ), awarded AS (
+             INSERT INTO list_completion_awards(user_id,list_id) SELECT $1,id FROM eligible
+             ON CONFLICT(user_id,list_id) DO UPDATE SET active=true,revoked_at=NULL
+               WHERE NOT list_completion_awards.active
+             RETURNING list_id
+           ), posted AS (
+             INSERT INTO feed_posts(author_id,post_type,caption,metadata)
+             SELECT $1,'list_complete',l.title,jsonb_build_object('list_id',l.id,'list_name',l.title,
+               'total',(SELECT COUNT(*) FROM curated_list_courses lc WHERE lc.list_id=l.id AND lc.counts_for_completion))
+             FROM awarded a JOIN curated_lists l ON l.id=a.list_id RETURNING id,metadata
+           ) UPDATE list_completion_awards a SET feed_post_id=p.id FROM posted p
+             WHERE a.user_id=$1 AND a.list_id=(p.metadata->>'list_id')::int`,
+          [userId, courseId],
+        ),
+        sql(
+          `UPDATE list_reviews lr SET hidden_at=NULL WHERE lr.user_id=$1 AND lr.hidden_at IS NOT NULL
+           AND EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=lr.list_id AND lc.counts_for_completion)
+           AND NOT EXISTS(SELECT 1 FROM curated_list_courses lc WHERE lc.list_id=lr.list_id AND lc.counts_for_completion
+             AND NOT EXISTS(SELECT 1 FROM played_courses p WHERE p.user_id=$1 AND p.course_id=lc.course_id))`,
+          [userId],
+        ),
+        sql(
+          `UPDATE list_completion_awards a SET feed_post_id=f.id FROM feed_posts f
+           WHERE a.user_id=$1 AND a.active AND a.feed_post_id IS NULL
+           AND f.author_id=$1 AND f.post_type='list_complete'
+           AND f.metadata->>'list_id'=a.list_id::text`,
+          [userId],
+        ),
+        sql(
           `INSERT INTO feed_posts(author_id,post_type,course_id,caption,metadata)
     SELECT user_id,$3,course_id,${textField},jsonb_build_object($4::text,id,'rating',${kind === "review" ? "rating" : "NULL::numeric"},'date_played',date_played)
     FROM ${table} a WHERE user_id=$1 AND request_id=$2 AND NOT EXISTS
@@ -164,18 +273,11 @@ export function activityService(sql) {
         ...sync(courseId, userId),
         sql(
           `WITH stats AS (
-      SELECT COUNT(*)::int AS total,COUNT(*) FILTER(WHERE c.course_type='Links')::int AS links,
-       COUNT(*) FILTER(WHERE c.course_type='Heathland')::int AS heathland,
-       COUNT(*) FILTER(WHERE c.country='Scotland')::int AS scotland,
-       COUNT(*) FILTER(WHERE c.country='Ireland')::int AS ireland
-      FROM played_courses p JOIN courses c ON c.id=p.course_id WHERE p.user_id=$1
+      ${PLAYED_STATS}
     ), unlocked AS (
       INSERT INTO user_achievements(user_id,achievement_id)
       SELECT $1,a.id FROM achievements a CROSS JOIN stats s WHERE
-       (a.slug='first-tee' AND s.total>=1) OR (a.slug='course-collector' AND s.total>=10) OR
-       (a.slug='fifty-club' AND s.total>=50) OR (a.slug='century-club' AND s.total>=100) OR
-       (a.slug='links-explorer' AND s.links>=10) OR (a.slug='heathland-hunter' AND s.heathland>=10) OR
-       (a.slug='scottish-explorer' AND s.scotland>=25) OR (a.slug='irish-explorer' AND s.ireland>=15)
+       ${ACHIEVEMENT_MET}
       ON CONFLICT(user_id,achievement_id) DO NOTHING RETURNING achievement_id
     ) INSERT INTO feed_posts(author_id,post_type,caption,metadata)
       SELECT $1,'achievement',a.name,jsonb_build_object('achievement_name',a.name,'achievement_desc',a.description,'achievement_slug',a.slug)
@@ -338,6 +440,23 @@ export function activityService(sql) {
         "UPDATE course_photos SET deleted_at=NOW() WHERE course_review_id=$1 AND user_id=$2 AND round_id IS NULL",
         [id, userId],
       ),
+      ...reconcilePlayedCourse(row.course_id, userId),
+      ...sync(row.course_id, userId),
+    ]);
+  }
+  async function deleteRound(userId, id) {
+    id = positiveId(id);
+    const row = (await query(
+      "SELECT course_id FROM course_rounds WHERE id=$1 AND user_id=$2",
+      [id, userId],
+    ))[0];
+    if (!row) throw invalid("Round not found", 404);
+    await sql.transaction([
+      sql("SELECT pg_advisory_xact_lock(-1,$1::int)", [row.course_id]),
+      sql("UPDATE course_photos SET deleted_at=NOW() WHERE round_id=$1 AND user_id=$2 AND course_review_id IS NULL", [id, userId]),
+      sql("DELETE FROM feed_posts WHERE author_id=$1 AND metadata->>'round_id'=$2::text", [userId, id]),
+      sql("DELETE FROM course_rounds WHERE id=$1 AND user_id=$2", [id, userId]),
+      ...reconcilePlayedCourse(row.course_id, userId),
       ...sync(row.course_id, userId),
     ]);
   }
@@ -376,6 +495,7 @@ export function activityService(sql) {
     create,
     edit,
     deleteReview,
+    deleteRound,
     canViewPassport,
     favourites,
     saveFavourites,

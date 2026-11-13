@@ -1,21 +1,7 @@
-import sql from "@/app/api/utils/sql";
-
-let ensured = false;
-
-/** Ensures community_invites exists on older DBs. Safe to call repeatedly. */
-export async function ensureCommunityInvitesTable() {
-  if (ensured) return;
-  await sql(`
-    CREATE TABLE IF NOT EXISTS community_invites (
-      id SERIAL PRIMARY KEY,
-      community_id INTEGER NOT NULL REFERENCES communities(id) ON DELETE CASCADE,
-      inviter_id INTEGER NOT NULL REFERENCES users(id),
-      invitee_id INTEGER NOT NULL REFERENCES users(id),
-      status TEXT NOT NULL DEFAULT 'pending',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      responded_at TIMESTAMPTZ,
-      UNIQUE (community_id, invitee_id)
-    )
-  `);
-  ensured = true;
-}
+/**
+ * Formerly ran CREATE TABLE IF NOT EXISTS community_invites on each cold start. The table
+ * is part of schema.sql and exists in every environment, and request handlers
+ * must not change the schema (migrations do, via scripts/migrate.mjs). Kept as
+ * a no-op so existing callers need no change.
+ */
+export async function ensureCommunityInvitesTable() {}

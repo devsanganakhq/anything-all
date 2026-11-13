@@ -26,6 +26,8 @@ export function ActivityHeadline({ post, meta, md }) {
     headline = `${first} is making progress through ${md.list_name || "a ranking list"}.`;
   else if (SHOW_RANKINGS && post.post_type === "ranking_complete")
     headline = `${first} completed ${md.list_name || "a ranking list"}!`;
+  else if (post.post_type === "list_complete")
+    headline = `${first} completed ${md.list_name || "a Heathland Links list"}!`;
   else if (post.post_type === "passport_complete")
     headline = `${first} completed the ${md.passport_name || "Passport Challenge"}!`;
   else if (post.post_type === "club_update")

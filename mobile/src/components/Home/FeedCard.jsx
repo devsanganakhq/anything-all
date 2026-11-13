@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
 import { Shadow, Colors } from "@/constants/theme";
 import { POST_TYPE_META } from "./constants";
 import { CardHeader } from "./CardHeader";
@@ -28,6 +29,7 @@ export function FeedCard({
   onMenu,
   onCoursePress,
 }) {
+  const router = useRouter();
   const meta = POST_TYPE_META[post.post_type] || POST_TYPE_META.played_course;
   const md = post.metadata || {};
   const isClub = post.post_type === "club_update";
@@ -76,8 +78,12 @@ export function FeedCard({
         <RankingProgressBlock post={post} md={md} />
       )}
       {((SHOW_RANKINGS && post.post_type === "ranking_complete") ||
-        post.post_type === "passport_complete") && (
-        <CompletionBlock post={post} md={md} />
+        post.post_type === "passport_complete" || post.post_type === "list_complete") && (
+        post.post_type === "list_complete" && Number.isSafeInteger(Number(md.list_id)) ?
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`View ${md.list_name || "completed list"}`}
+            onPress={() => router.push(`/lists/${Number(md.list_id)}`)}>
+            <CompletionBlock post={post} md={md} />
+          </TouchableOpacity> : <CompletionBlock post={post} md={md} />
       )}
       {post.post_type === "club_update" && (
         <ClubUpdateBlock post={post} md={md} />

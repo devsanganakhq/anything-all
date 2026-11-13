@@ -92,9 +92,15 @@ export async function GET(request, { params }) {
     }
 
     const achievements = await sql(
-      `SELECT a.id, a.slug, a.name, a.description, a.icon_name, ua.unlocked_at
-        FROM user_achievements ua JOIN achievements a ON ua.achievement_id=a.id
-        WHERE ua.user_id=$1 ORDER BY ua.unlocked_at DESC`,
+      `SELECT * FROM (
+        SELECT a.id::text AS id,a.slug,a.name,a.description,a.icon_name,ua.unlocked_at
+          FROM user_achievements ua JOIN achievements a ON ua.achievement_id=a.id WHERE ua.user_id=$1
+        UNION ALL
+        SELECT 'list-'||l.id::text,'list-completion-'||l.id::text,'Completed '||l.title,
+          'Played every qualifying course in this Heathland Links list','trophy',aw.awarded_at
+          FROM list_completion_awards aw JOIN curated_lists l ON l.id=aw.list_id
+          WHERE aw.user_id=$1 AND aw.active AND l.is_published
+      ) achievements ORDER BY unlocked_at DESC`,
       [targetId],
     );
 
